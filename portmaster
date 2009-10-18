@@ -46,7 +46,7 @@ version () {
 	cvs='$FreeBSD$'
 
 	rcs="${rcs#*,v }" ; rcs="${rcs%% *}"
-	cvs="${cvs#*,v }" ; cvs="${cvs%% *}"
+	cvs="${cvs#*,v }" ; cvs="${cvs#*/portmaster }" ; cvs="${cvs%% *}"
 
 	echo ''
 	[ "${cvs#$}" != 'FreeBSD$' ] &&
