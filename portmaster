@@ -669,7 +669,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	read_distinfos
 
 	echo "===>>> Checking for stale distfiles"
-	for df in `find $distdir -type f`; do
+	for df in `find $distdir -type f | sort`; do
 		f=${df#$distdir}
 		if ! grep -ql $f $DI_FILES; then
 			if [ -n "$ALL" ]; then
