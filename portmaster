@@ -261,7 +261,7 @@ usage () {
 	echo "${0##*/} -h|--help"
 	echo "${0##*/} --version"
 	echo ''
-	echo "--force-config 'make config' for all ports (must be first option)"
+	echo "--force-config 'make config' for all ports"
 	echo "-C prevents 'make clean' from being run before building"
 	echo "-G prevents recursive 'make config' (overrides --force-config)"
 	echo "-H hide details of the port build and install in a log file"
@@ -366,19 +366,30 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	export pd pdb distdir
 fi
 
-case "$1" in
---help)			usage 0 ;;
---version)		version ; exit 0 ;;
---clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
---clean-distfiles-all)	CLEAN_DISTFILES=clean_distfiles_all ; ALL=cda ;;
---check-depends)	CHECK_DEPENDS=check_depends ;;
---check-port-dbdir)	CHECK_PORT_DBDIR=check_port_dbdir ;;
---list-origins)		LIST_ORIGINS=list_origins ;;
---show-work)		SHOW_WORK=show ; RECURSE_THOROUGH=thorough ; shift ;;
---force-config)		export FORCE_CONFIG=force_config ; shift ;;
---*)			echo "Illegal option $1" ; echo ''
-			echo "===>>> Try ${0##*/} --help"; exit 1 ;;
-esac
+echo '' ; echo "Debug> #: $# @: $@"
+
+for var in "$@" ; do
+	case "$var" in
+	-[A-Za-z0-9]*)          newopts="$newopts $var" ;;
+	--help)			usage 0 ;;
+	--version)		version ; exit 0 ;;
+	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
+	--clean-distfiles-all)	CLEAN_DISTFILES=clean_distfiles_all ; ALL=cda ;;
+	--check-depends)	CHECK_DEPENDS=check_depends ;;
+	--check-port-dbdir)	CHECK_PORT_DBDIR=check_port_dbdir ;;
+	--list-origins)		LIST_ORIGINS=list_origins ;;
+	--show-work)		SHOW_WORK=show ; RECURSE_THOROUGH=thorough ;;
+	--force-config)		export FORCE_CONFIG=force_config ;;
+	--*)			echo "Illegal option $var" ; echo ''
+				echo "===>>> Try ${0##*/} --help"; exit 1 ;;
+	*)                      newopts="$newopts $var" ;;
+	esac
+done
+
+set -- $newopts
+unset var newopts
+
+echo '' ; echo "Debug> #: $# @: $@"
 
 #=============== Begin functions relevant to --features and main ===============
 
