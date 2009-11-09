@@ -2293,9 +2293,13 @@ if [ -n "$PM_PACKAGES" ]; then
 #echo ''
 
 	[ -n "$PM_VERBOSE" ] && echo "===>>> Checking package repository"
-	latest_link=`pm_make -V LATEST_LINK`
-	latest_pv=`fetch -q -o - ${sitepath} 2>/dev/null | grep ">$latest_link"`
-	unset latest_link
+
+	case "$new_port" in
+	*\.*)	s=${new_port%%\.*} ;;
+	*)	s=`pm_make -V LATEST_LINK` ;;
+	esac
+	latest_pv=`fetch -q -o - ${sitepath} 2>/dev/null | grep "href=\"${s}"`
+	unset s
 
 	if [ -z "$latest_pv" ]; then
 		echo "===>>> Package and/or archive not found at:"
