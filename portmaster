@@ -233,7 +233,6 @@ usage () {
 	echo "${0##*/} [Common flags] Multiple full names/paths from $pdb|$pd"
 	echo "                          and/or multiple globs from $pdb"
 	echo ''
-	echo "${0##*/} [Common flags] -p <port directory in $pd>"
 	echo "${0##*/} [Common flags] . [Use in $pd/foo/bar to build that port]"
 	echo ''
 	echo "${0##*/} --show-work [-Gv] [-m <args>] <single port, as above>"

@@ -54,9 +54,6 @@ This is a change from pre-version-2.3 behavior.
 and/or multiple globs from /var/db/pkg
 .Nm
 .Op Common Flags
-.Fl p Ar port directory in /usr/ports
-.Nm
-.Op Common Flags
  . (Use in /usr/ports/foo/bar to build that port)
 .Nm
 .Fl -show-work
@@ -306,8 +303,13 @@ any arguments to supply to
 .It Fl x
 avoid building or updating ports that match this pattern.
 Can be specified more than once.
+If a port is not already installed the exclude pattern will
+be run against the directory name from
+.Pa /usr/ports .
 .It Fl p Ar port directory in /usr/ports
-specify the full path to a port directory
+specify the full path to a port directory.
+This option is generally not necessary and may be
+removed in future versions.
 .It Fl -show-work
 show what dependent ports are, and are not installed (implies
 .Fl t ) .
@@ -478,11 +480,13 @@ along with their related options.
 .Ed
 .Pp
 .It Pa /var/db/pkg/*/+IGNOREME
-If this file exists, several things will happen:
+If this file exists for a port that is already installed,
+several things will happen:
 .Bl -tag -width F1
-.It 1. The port will be ignored for all purposes, including
-dependency updates, if there is no directory for it in
-.Pa /usr/ports ,
+.It 1. The port will be ignored for all purposes.
+This includes dependency updates even if there is no
+directory for the port in
+.Pa /usr/ports
 and there is no entry for it in
 .Pa /usr/ports/MOVED .
 If the
