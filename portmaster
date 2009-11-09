@@ -2288,7 +2288,9 @@ if [ -n "$PM_PACKAGES" ]; then
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
 
+#echo ''
 #echo "Debug> sitepath: $sitepath"
+#echo ''
 
 	[ -n "$PM_VERBOSE" ] && echo "===>>> Checking package repository"
 	latest_link=`pm_make -V LATEST_LINK`
@@ -2303,10 +2305,15 @@ if [ -n "$PM_PACKAGES" ]; then
 		echo "       on setting the PACKAGESITE environment variable"
 		fail 'No package archive found'
 	fi
-	latest_pv=${latest_pv#*tbz\">}
+	latest_pv=${latest_pv#*href=\"}
 	latest_pv=${latest_pv%%\.tbz*}
+	case "$latest_pv" in
+	*%2[cC]*)	latest_pv=`echo $latest_pv | sed s#%2[cC]#,#` ;;
+	esac
 
+#echo ''
 #echo "Debug> new_port: $new_port latest_pv: $latest_pv"
+#echo ''
 
 notnewer () {
 	echo ''
