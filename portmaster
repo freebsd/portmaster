@@ -2283,7 +2283,8 @@ if [ -n "$PM_PACKAGES" ]; then
 		sitepath="${PACKAGEROOT:-"http://ftp.freebsd.org"}/pub/FreeBSD/ports/`uname -p`/${release}/"
 		unset release
 	else
-		sitepath="$PACKAGESITE"
+		sitepath="${PACKAGESITE%/}"
+		sitepath="${sitepath%Latest}"
 	fi
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
