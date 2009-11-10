@@ -55,7 +55,7 @@ version () {
 }
 
 fail () {
-	echo '' ; echo "===>>> $1" ; echo "===>>> Aborting update"
+	echo '' ; echo "===>>> $*" ; echo "===>>> Aborting update"
 	[ "$$" -eq "$PM_PARENT_PID" ] && trap_exit fail
 	safe_exit 1
 }
@@ -224,8 +224,8 @@ usage () {
 	echo ''
 	echo 'Usage:'
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
-	echo "    [--packages|--packages-only] [-P|-PP] [--packages-if-newer]"
-	echo "    [-m <arguments for make>]"
+	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]"
+	echo "    [--packages-if-newer] [-m <arguments for make>]"
 	echo "    [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -289,9 +289,10 @@ usage () {
 	echo '-R used with -[rf] to skip ports updated on a previous run'
 	echo '-a check all ports, update as necessary'
 	echo ''
-	echo 'NOTE: The package options imply -G'
+	echo 'NOTE: The -P[P] options imply -G'
 	echo '-P|--packages use packages, but build port if not available'
 	echo '-PP|--packages-only fail if no package is available'
+	echo '--packages-build use packages for all build dependencies'
 	echo '--packages-if-newer use package if newer than installed even'
 	echo '   if the package is not the latest according to the ports tree'
 	echo ''
@@ -372,25 +373,39 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	export pd pdb distdir
 fi
 
-pmuex () {
-fail "The -P/--packages and -PP/--packages-only options are mutually exclusive"
+# XXX
+
+packages_init () {
+	local e1 e2
+
+e1="The -P/--packages and -PP/--packages-only options are mutually exclusive"
+e2="The --packages-build option and the -P[P] options are mutually exclusive"
+
+	case "$1" in
+	first)		[ "$PM_PACKAGES" = only ] && fail $e1
+			[ -n "$PM_PACKAGES_BUILD" ] && fail $e2 ;;
+	only)		[ "$PM_PACKAGES" = first ] && fail $e1
+			[ -n "$PM_PACKAGES_BUILD" ] && fail $e2 ;;
+	build)		case "$PM_PACKAGES" in first|only) fail $e2 ;; esac ;;
+	newer)		[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
+				PM_PACKAGES=newer ; export PM_PACKAGES; } ;;
+	esac
 }
 
-# XXX
 for var in "$@" ; do
 	case "$var" in
-	-P|--packages)		[ "$PM_PACKAGES" = only ] && pmuex
-				NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS"
+	-P|--packages)		packages_init first
 				PM_PACKAGES=first ; export PM_PACKAGES ;;
-	-PP|--packages-only)	[ "$PM_PACKAGES" = first ] && pmuex
-				NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS"
-				PM_PACKAGES=only  ; export PM_PACKAGES ;;
-	--packages-if-newer)	[ -z "$PM_PACKAGES" ] && {
-				PM_PACKAGES=newer ; export PM_PACKAGES;
-				NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS"; }
-				PM_PACKAGES_NEWER=pm_packages_newer
+	-PP|--packages-only)	packages_init only
+				PM_PACKAGES=only ; export PM_PACKAGES ;;
+	--packages-build)	packages_init build
+				unset PM_PACKAGES
+				PM_PACKAGES_BUILD=pmp_build
+				export PM_PACKAGES_BUILD ;;
+	--packages-if-newer)	packages_init newer
+				PM_PACKAGES_NEWER=pmp_newer
 				export PM_PACKAGES_NEWER ;;
-	-[A-Za-z0-9]*)          newopts="$newopts $var" ;;
+	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -402,12 +417,15 @@ for var in "$@" ; do
 	--force-config)		export FORCE_CONFIG=force_config ;;
 	--*)			echo "Illegal option $var" ; echo ''
 				echo "===>>> Try ${0##*/} --help"; exit 1 ;;
-	*)                      newopts="$newopts $var" ;;
+	*)			newopts="$newopts $var" ;;
 	esac
 done
 
+[ -n "$PM_PACKAGES" ] && { NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS"; }
+
 set -- $newopts
 unset var newopts
+unset -f packages_init
 
 #=============== Begin functions relevant to --features and main ===============
 
@@ -866,7 +884,9 @@ while getopts 'BCDFGHKLRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	p)	portdir="${OPTARG#$pd/}" ; portdir=${portdir%/} ;;
 	r)	UPDATE_REQ_BYS=ropt ; portdir=`origin_from_pdb $OPTARG` ;;
 	s)	CLEAN_STALE=sopt ;;
-	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
+	t)	[ "$PM_PACKAGES" = build ] &&
+	fail 'The --packages-build and -t options are mutually exclusive'
+		RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
 	u)	echo "===>>> The -u option has been deprecated" ; echo '' ;;
 	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
 	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
@@ -1612,6 +1632,26 @@ dependency_check () {
 		fi
 	fi
 
+# XXX
+	if [ "$PM_PACKAGES_BUILD" = pmp_doing_build_deps ]; then
+		local rundeps dep build_only build_and_run build_only_dep
+
+		rundeps=`pm_make run-depends-list | sort -u`
+		for dep in $d_port_list; do
+			case "$rundeps" in
+			*${dep}*)	build_and_run="$build_and_run $dep" ;;
+			*)		build_only="$build_only $dep" ;;
+			esac
+		done
+
+#echo '' ; echo "Debug> d_port_list: $d_port_list"
+#echo "Debug> build_only: $build_only"
+#echo "Debug> build_and_run: $build_and_run"
+#echo ''
+
+		d_port_list="$build_only $build_and_run"
+	fi
+
 	local d_port origin iport conflicts glob confl_p udf
 
 	# Do not export, for THIS parent process only
@@ -1691,6 +1731,14 @@ dependency_check () {
 			esac
 		fi
 
+# XXX
+		case "$build_only" in
+		*${d_port}*)
+#echo '' ; echo "Debug> $origin is build-only" ; echo ''
+				build_only_dep=build_only_dep
+				PM_PACKAGES=only ; export PM_PACKAGES ;;
+		esac
+
 		if [ -n "$iport" ]; then
 			# No check_interactive here because we want to tell
 			# the user whether or not there is a new version first
@@ -1699,6 +1747,8 @@ dependency_check () {
 			check_interactive $origin || continue
 			update_port $origin
 		fi
+
+		[ -n "$build_only_dep" ] && unset PM_PACKAGES
 	done
 	[ -n "$CONFIG_ONLY" ] && unset doing_dep_check
 
@@ -2129,7 +2179,7 @@ dofetch () {
 
 	# Handle the problem of manual fetching
 # XXX Not for -P/-PP
-	[ -z "$PM_PACKAGES" ] &&  master_sites=`pm_make_b -V MASTER_SITES`
+	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make_b -V MASTER_SITES`
 
 	if [ -n "$master_sites" ]; then
 		# PATCHFILES may get added post-config, but we want to
@@ -2238,12 +2288,21 @@ cd $pd/$portdir
 if [ -z "$NO_DEP_UPDATES" ]; then
 	if [ -z "$RECURSE_THOROUGH" ]; then
 		if [ ! "$PM_PACKAGES" = only ]; then
+# XXX
+			if [ "$$" -eq "$PM_PARENT_PID" ]; then
+				[ -n "$PM_PACKAGES_BUILD" ] &&
+					PM_PACKAGES_BUILD=pmp_doing_build_deps
+			fi
 			echo "===>>> Starting check for build dependencies"
 			dependency_check build-depends-list
 		fi
 	else
 		echo "===>>> Starting check for all dependencies"
 		dependency_check all-depends-list
+	fi
+	if [ "$$" -eq "$PM_PARENT_PID" ]; then
+		[ -n "$PM_PACKAGES_BUILD" ] &&
+			unset PM_PACKAGES_BUILD PM_PACKAGES
 	fi
 	cd $pd/$portdir
 elif [ -z "$NO_RECURSIVE_CONFIG" -a "$$" -eq "$PM_PARENT_PID" ]; then
@@ -2360,7 +2419,7 @@ notnewer () {
 			echo "===>>> The newest available package ($latest_pv)"
 		echo "       is older than the version in ports ($new_port)"
 			if [ "$PM_PACKAGES" = only ]; then
-				if [ -n "$PM_FORCE" ]; then 
+				if [ -n "$PM_FORCE" ]; then
 					use_package=up_force2
 				echo "===>>> Installing anyway due to -f"
 				else
