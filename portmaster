@@ -2343,6 +2343,7 @@ if [ -n "$PM_PACKAGES" ]; then
 	else
 		sitepath="${PACKAGESITE%/}"
 		sitepath="${sitepath%Latest}"
+		sitepath="${sitepath%All}"
 	fi
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
