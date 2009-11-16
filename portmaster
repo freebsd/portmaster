@@ -224,7 +224,7 @@ usage () {
 	echo ''
 	echo 'Usage:'
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
-	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]"
+	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [-m <arguments for make>]"
 	echo "    [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
