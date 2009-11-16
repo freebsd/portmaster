@@ -449,6 +449,16 @@ check_regular_file () {
 	[ ! -L "$1" -a -f "$1" ] || fail "ERROR: $1 is not a regular file!"
 }
 
+strip_to_iport () {
+	local in
+
+	while read in; do
+		in="${in%/+CONTENTS}"
+		in="${in##*/}"
+		echo $in
+	done
+}
+
 check_dependency_files () {
 	# Global: grep_deps
 	local origin iport ro_opd
@@ -465,7 +475,7 @@ check_dependency_files () {
 	# Always rely on the grep'ed dependencies instead of +REQUIRED_BY
 	grep_deps=`pm_mktemp grep-deps-${iport}`
 	egrep -l "DEPORIGIN:($origin|$ro_opd)$" $pdb/*/+CONTENTS |
-	    cut -f 5 -d '/' | sort -u > $grep_deps
+	    strip_to_iport | sort -u > $grep_deps
 
 	if [ ! -s "$grep_deps" ]; then
 		if [ -s "$pdb/$iport/+REQUIRED_BY" ]; then
@@ -1767,8 +1777,9 @@ create_master_rb_list () {
 	# Global: MASTER_RB_LIST
 	local req_by
 
-	for req_by in `grep -l DEPORIGIN:$portdir$ $pdb/*/+CONTENTS | \
-	    cut -f 5 -d '/'`; do
+	for req_by in `grep -l DEPORIGIN:$portdir$ $pdb/*/+CONTENTS`; do
+		req_by="${req_by%/+CONTENTS}"
+		req_by="${req_by##*/}"
 		MASTER_RB_LIST="${MASTER_RB_LIST}${req_by} "
 	done
 
