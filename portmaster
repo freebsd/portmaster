@@ -214,6 +214,10 @@ safe_exit () {
 		fi
 		[ -n "$URB_YES" ] &&
 			echo "URB_DONE_LIST='$URB_DONE_LIST'" >> $IPC_SAVE
+		if [ "$PM_PACKAGES_BUILD" = pmp_doing_build_deps ]; then
+			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
+			echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
+		fi
 	fi
 
 	exit ${1:-0}
@@ -894,9 +898,7 @@ while getopts 'BCDFGHKLRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	p)	portdir="${OPTARG#$pd/}" ; portdir=${portdir%/} ;;
 	r)	UPDATE_REQ_BYS=ropt ; portdir=`origin_from_pdb $OPTARG` ;;
 	s)	CLEAN_STALE=sopt ;;
-	t)	[ "$PM_PACKAGES" = build ] &&
-	fail 'The --packages-build and -t options are mutually exclusive'
-		RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
+	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
 	u)	echo "===>>> The -u option has been deprecated" ; echo '' ;;
 	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
 	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
@@ -920,6 +922,8 @@ shift $(( $OPTIND - 1 ))
 	fail "The -d and -D options are mutually exclusive"
 [ -n "$FETCH_ONLY" -a -n "$NO_RECURSIVE_CONFIG" ] &&
 	fail "The -F and -G options are mutually exclusive"
+[ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_PACKAGES_BUILD" ] &&
+	fail 'The --packages-build and -G options are mutually exclusive'
 
 #=============== Begin functions for getopts features and main ===============
 
@@ -1620,6 +1624,7 @@ update_port () {
 
 dependency_check () {
 	# Global: doing_dep_check
+	# Global: run_dl_g build_only_dl_g
 
 	local d_port_list
 
@@ -1642,24 +1647,59 @@ dependency_check () {
 		fi
 	fi
 
-# XXX
-	if [ "$PM_PACKAGES_BUILD" = pmp_doing_build_deps ]; then
-		local rundeps dep build_only build_and_run build_only_dep
+# XXXX
 
-		rundeps=`pm_make run-depends-list | sort -u`
-		for dep in $d_port_list; do
-			case "$rundeps" in
-			*${dep}*)	build_and_run="$build_and_run $dep" ;;
-			*)		build_only="$build_only $dep" ;;
+	if [ "$PM_PACKAGES_BUILD" = pmp_doing_build_deps ]; then
+
+#echo '' ; echo "Debug> d_port_list: $d_port_list"
+
+		local rundeps dep run_dl build_only_dl temp_bodlg
+
+		if [ -z "$RECURSE_THOROUGH" ]; then
+			rundeps=`pm_make run-depends-list | sort -u`
+			rundeps=" $rundeps "
+
+			for dep in $d_port_list; do
+				case "$rundeps" in
+				*${dep}*)	run_dl="$run_dl $dep" ;;
+				*)	build_only_dl="$build_only_dl $dep" ;;
+				esac
+			done
+
+#echo '' ; echo "Debug> build_only_dl: $build_only_dl"
+#echo '' ; echo "Debug> run_dl: $run_dl" ; echo ''
+
+			d_port_list="$build_only_dl $run_dl"
+		else
+			for dep in `pm_make run-depends-list | sort -u`; do
+				run_dl="$run_dl $dep"
+			done
+			build_only_dl=`pm_make build-depends-list | sort -u`
+
+#echo '' ; echo "Debug> build_only_dl: $build_only_dl"
+#echo '' ; echo "Debug> run_dl: $run_dl" ; echo ''
+		fi
+
+		run_dl_g="$run_dl_g $run_dl "
+
+		for dep in $build_only_dl; do
+			case "$build_only_dl_g" in
+			*" ${dep} "*)	;;
+			*) build_only_dl_g="$build_only_dl_g $dep " ;;
 			esac
 		done
 
-#echo '' ; echo "Debug> d_port_list: $d_port_list"
-#echo "Debug> build_only: $build_only"
-#echo "Debug> build_and_run: $build_and_run"
-#echo ''
+		for dep in $build_only_dl_g; do
+			case "$run_dl_g" in
+			*" ${dep} "*)	;;
+			*)		temp_bodlg="$temp_bodlg $dep" ;;
+			esac
+		done
 
-		d_port_list="$build_only $build_and_run"
+		build_only_dl_g=" $temp_bodlg "
+
+#echo '' ; echo "Debug> build_only_dl_g: $build_only_dl_g"
+#echo '' ; echo "Debug> run_dl_g: $run_dl_g" ; echo ''
 	fi
 
 	local d_port origin iport conflicts glob confl_p udf
@@ -1741,14 +1781,6 @@ dependency_check () {
 			esac
 		fi
 
-# XXX
-		case "$build_only" in
-		*${d_port}*)
-#echo '' ; echo "Debug> $origin is build-only" ; echo ''
-				build_only_dep=build_only_dep
-				PM_PACKAGES=only ; export PM_PACKAGES ;;
-		esac
-
 		if [ -n "$iport" ]; then
 			# No check_interactive here because we want to tell
 			# the user whether or not there is a new version first
@@ -1757,8 +1789,6 @@ dependency_check () {
 			check_interactive $origin || continue
 			update_port $origin
 		fi
-
-		[ -n "$build_only_dep" ] && unset PM_PACKAGES
 	done
 	[ -n "$CONFIG_ONLY" ] && unset doing_dep_check
 
@@ -1833,6 +1863,12 @@ multiport () {
 	echo -e $portlist
 
 	if [ -n "$CONFIG_ONLY" ]; then
+		if [ -n "$PM_PACKAGES_BUILD" ]; then
+			PM_PACKAGES_BUILD=pmp_doing_build_deps
+			run_dl_g=" " ; build_only_dl_g=" "
+			export PM_PACKAGES_BUILD run_dl_g build_only_dl_g
+		fi
+
 		for port in $worklist; do
 			($0 $ARGS $port) || fail "Update for $port failed"
 			. $IPC_SAVE
@@ -1842,7 +1878,11 @@ multiport () {
 		echo ''
 		echo "===>>> Starting build for multiple ports <<<==="
 		echo ''
+
+		[ -n "$PM_PACKAGES_BUILD" ] && unset run_dl_g
 	fi
+
+#echo '' ; echo "Debug> build_only_dl_g multiport: $build_only_dl_g" ; echo ''
 
 	export PM_BUILDING=pmbuildingmultiport
 	for port in $worklist; do
@@ -2232,6 +2272,17 @@ dofetch () {
 fi
 
 if [ -n "$CONFIG_ONLY" ]; then
+
+# XXXX
+	if [ "$$" -eq "$PM_PARENT_PID" ]; then
+		# Keep in sync in multiport()
+		if [ -n "$PM_PACKAGES_BUILD" ]; then
+			PM_PACKAGES_BUILD=pmp_doing_build_deps
+			run_dl_g=" " ; build_only_dl_g=" "
+			export PM_PACKAGES_BUILD run_dl_g build_only_dl_g
+		fi
+	fi
+
 	config_type=config-conditional
 	[ -n "$FORCE_CONFIG" ] && config_type=config
 	[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Running 'make $config_type'"
@@ -2286,6 +2337,10 @@ if [ -n "$CONFIG_ONLY" ]; then
 		unset URB_YES MASTER_RB_LIST ; URB_DONE_LIST=':'
 	fi
 
+# XXXX
+	[ -n "$PM_PACKAGES_BUILD" ] && unset run_dl_g
+#echo '' ; echo "Debug> final build_only_dl_g: $build_only_dl_g" ; echo ''
+
 	check_fetch_only
 	unset CONFIG_SEEN_LIST CONFIG_ONLY
 	echo "===>>> Starting build for $portdir <<<==="
@@ -2296,24 +2351,26 @@ fi
 
 cd $pd/$portdir
 
+if [ -n "$PM_PACKAGES_BUILD" ]; then
+	case "$build_only_dl_g" in
+	*" $pd/$portdir "*)
+
+#echo '' ; echo "Debug> DOING BUILD ONLY DEP" ; echo ''
+
+				PM_PACKAGES_BUILD=doing_build_only_dep ;;
+	*)			PM_PACKAGES_BUILD=pmp_build ;;
+	esac
+fi
+
 if [ -z "$NO_DEP_UPDATES" ]; then
 	if [ -z "$RECURSE_THOROUGH" ]; then
 		if [ ! "$PM_PACKAGES" = only ]; then
-# XXX
-			if [ "$$" -eq "$PM_PARENT_PID" ]; then
-				[ -n "$PM_PACKAGES_BUILD" ] &&
-					PM_PACKAGES_BUILD=pmp_doing_build_deps
-			fi
 			echo "===>>> Starting check for build dependencies"
 			dependency_check build-depends-list
 		fi
 	else
 		echo "===>>> Starting check for all dependencies"
 		dependency_check all-depends-list
-	fi
-	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		[ -n "$PM_PACKAGES_BUILD" ] &&
-			unset PM_PACKAGES_BUILD PM_PACKAGES
 	fi
 	cd $pd/$portdir
 elif [ -z "$NO_RECURSIVE_CONFIG" -a "$$" -eq "$PM_PARENT_PID" ]; then
@@ -2330,7 +2387,7 @@ new_port=`pm_make -V PKGNAME`
 
 # XXX Build or package?
 
-if [ -n "$PM_PACKAGES" ]; then
+if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 	if [ -z "$PACKAGESITE" ]; then
 		release=`uname -r`
 		#release=7.0-RELEASE-p12
@@ -2359,9 +2416,7 @@ if [ -n "$PM_PACKAGES" ]; then
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
 
-#echo ''
-#echo "Debug> sitepath: $sitepath"
-#echo ''
+#echo '' ; echo "Debug> sitepath: $sitepath" ; echo ''
 
 	[ -n "$PM_VERBOSE" ] && echo "===>>> Checking package repository"
 
@@ -2386,9 +2441,7 @@ if [ -n "$PM_PACKAGES" ]; then
 	*%2[cC]*)	latest_pv=`echo $latest_pv | sed s#%2[cC]#,#` ;;
 	esac
 
-#echo ''
-#echo "Debug> new_port: $new_port latest_pv: $latest_pv"
-#echo ''
+#echo '' ; echo "Debug> new_port: $new_port latest_pv: $latest_pv" ; echo ''
 
 notnewer () {
 	echo ''
