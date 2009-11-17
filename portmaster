@@ -193,6 +193,15 @@ safe_exit () {
 			echo -e $INSTALLED_LIST ;;
 		one)	echo "===>>> $ilist complete" ; echo '' ;;
 		esac
+
+		if [ -n "$build_deps_il" ]; then
+		echo "===>>> Deleting installed build-only dependencies"
+			for f in $build_deps_il; do
+				[ -n "$PM_VERBOSE" ] && echo "       $f"
+				pkg_delete -f $f
+			done
+			echo ''
+		fi
 	else
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
 
@@ -214,10 +223,12 @@ safe_exit () {
 		fi
 		[ -n "$URB_YES" ] &&
 			echo "URB_DONE_LIST='$URB_DONE_LIST'" >> $IPC_SAVE
-		if [ "$PM_PACKAGES_BUILD" = pmp_doing_build_deps ]; then
+		if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
 			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
 			echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
 		fi
+		[ -n "$PM_DEL_BUILD_ONLY" ] &&
+			echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
 	fi
 
 	exit ${1:-0}
@@ -230,6 +241,7 @@ usage () {
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [-m <arguments for make>]"
+	echo "    [--delete-build-only]"
 	echo "    [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -292,6 +304,9 @@ usage () {
 	echo '[-R] -r rebuild port, and all ports that depend on it'
 	echo '-R used with -[rf] to skip ports updated on a previous run'
 	echo '-a check all ports, update as necessary'
+	echo ''
+	echo '--delete-build-only delete ports that are build-only dependencies'
+	echo '   after a successful run, only if installed this run'
 	echo ''
 	echo 'NOTE: The -P[P] options imply -G'
 	echo '-P|--packages use packages, but build port if not available'
@@ -405,11 +420,15 @@ for var in "$@" ; do
 	--packages-build)	packages_init build
 				unset PM_PACKAGES
 				PM_PACKAGES_BUILD=pmp_build
-				export PM_PACKAGES_BUILD ;;
+				PM_BUILD_ONLY_LIST=pm_bol
+				export PM_PACKAGES_BUILD PM_BUILD_ONLY_LIST ;;
 	--packages-if-newer)	packages_init newer
 				PM_PACKAGES_NEWER=pmp_newer
 				export PM_PACKAGES_NEWER ;;
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
+	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
+				PM_BUILD_ONLY_LIST=pm_bol
+				export PM_DEL_BUILD_ONLY PM_BUILD_ONLY_LIST ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -924,6 +943,8 @@ shift $(( $OPTIND - 1 ))
 	fail "The -F and -G options are mutually exclusive"
 [ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_PACKAGES_BUILD" ] &&
 	fail 'The --packages-build and -G options are mutually exclusive'
+[ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_DEL_BUILD_ONLY" ] &&
+	fail 'The --delete-build-only and -G options are mutually exclusive'
 
 #=============== Begin functions for getopts features and main ===============
 
@@ -1649,7 +1670,7 @@ dependency_check () {
 
 # XXXX
 
-	if [ "$PM_PACKAGES_BUILD" = pmp_doing_build_deps ]; then
+	if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
 
 #echo '' ; echo "Debug> d_port_list: $d_port_list"
 
@@ -1698,8 +1719,8 @@ dependency_check () {
 
 		build_only_dl_g=" $temp_bodlg "
 
-#echo '' ; echo "Debug> build_only_dl_g: $build_only_dl_g"
-#echo '' ; echo "Debug> run_dl_g: $run_dl_g" ; echo ''
+#echo '' ; echo "Debug> build_only_dl_g: X${build_only_dl_g}X"
+#echo '' ; echo "Debug> run_dl_g: X${run_dl_g}X" ; echo ''
 	fi
 
 	local d_port origin iport conflicts glob confl_p udf
@@ -1863,10 +1884,14 @@ multiport () {
 	echo -e $portlist
 
 	if [ -n "$CONFIG_ONLY" ]; then
-		if [ -n "$PM_PACKAGES_BUILD" ]; then
-			PM_PACKAGES_BUILD=pmp_doing_build_deps
-			run_dl_g=" " ; build_only_dl_g=" "
-			export PM_PACKAGES_BUILD run_dl_g build_only_dl_g
+		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+			PM_BUILD_ONLY_LIST=pmp_doing_build_deps
+			run_dl_g='' ; build_only_dl_g=''
+			export run_dl_g build_only_dl_g
+		fi
+		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
+			build_deps_il=''
+			export build_deps_il
 		fi
 
 		for port in $worklist; do
@@ -1879,10 +1904,12 @@ multiport () {
 		echo "===>>> Starting build for multiple ports <<<==="
 		echo ''
 
-		[ -n "$PM_PACKAGES_BUILD" ] && unset run_dl_g
-	fi
-
+		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+			unset run_dl_g
+			PM_BUILD_ONLY_LIST=pm_bol
 #echo '' ; echo "Debug> build_only_dl_g multiport: $build_only_dl_g" ; echo ''
+		fi
+	fi
 
 	export PM_BUILDING=pmbuildingmultiport
 	for port in $worklist; do
@@ -2276,10 +2303,14 @@ if [ -n "$CONFIG_ONLY" ]; then
 # XXXX
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		# Keep in sync in multiport()
-		if [ -n "$PM_PACKAGES_BUILD" ]; then
-			PM_PACKAGES_BUILD=pmp_doing_build_deps
-			run_dl_g=" " ; build_only_dl_g=" "
-			export PM_PACKAGES_BUILD run_dl_g build_only_dl_g
+		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+			PM_BUILD_ONLY_LIST=pmp_doing_build_deps
+			run_dl_g='' ; build_only_dl_g=''
+			export run_dl_g build_only_dl_g
+		fi
+		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
+			build_deps_il=''
+			export build_deps_il
 		fi
 	fi
 
@@ -2338,8 +2369,11 @@ if [ -n "$CONFIG_ONLY" ]; then
 	fi
 
 # XXXX
-	[ -n "$PM_PACKAGES_BUILD" ] && unset run_dl_g
+	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+		unset run_dl_g
+		PM_BUILD_ONLY_LIST=pm_bol
 #echo '' ; echo "Debug> final build_only_dl_g: $build_only_dl_g" ; echo ''
+	fi
 
 	check_fetch_only
 	unset CONFIG_SEEN_LIST CONFIG_ONLY
@@ -2351,14 +2385,17 @@ fi
 
 cd $pd/$portdir
 
-if [ -n "$PM_PACKAGES_BUILD" ]; then
+if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 	case "$build_only_dl_g" in
 	*" $pd/$portdir "*)
+	[ -n "$PM_PACKAGES_BUILD" ] && PM_PACKAGES_BUILD=doing_build_only_dep
+	[ -n "$PM_DEL_BUILD_ONLY" ] && PM_DEL_BUILD_ONLY=doing_build_only_dep
 
 #echo '' ; echo "Debug> DOING BUILD ONLY DEP" ; echo ''
+	;;
 
-				PM_PACKAGES_BUILD=doing_build_only_dep ;;
-	*)			PM_PACKAGES_BUILD=pmp_build ;;
+	*)	[ -n "$PM_PACKAGES_BUILD" ] && PM_PACKAGES_BUILD=pmp_build
+		[ -n "$PM_DEL_BUILD_ONLY" ] && PM_DEL_BUILD_ONLY=pm_dbo ;;
 	esac
 fi
 
@@ -2650,6 +2687,9 @@ else
 		install_failed ${latest_pv}.tbz
 fi
 echo ''
+
+[ "$PM_DEL_BUILD_ONLY" = doing_build_only_dep ] &&
+	build_deps_il="$build_deps_il $new_port"
 
 # Remove saved libs that match newly installed files
 
