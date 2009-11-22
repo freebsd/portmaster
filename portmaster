@@ -196,6 +196,7 @@ safe_exit () {
 
 		if [ -n "$build_deps_il" ]; then
 		echo "===>>> Deleting installed build-only dependencies"
+			cd
 			for f in $build_deps_il; do
 				[ -n "$PM_VERBOSE" ] && echo "       $f"
 				pkg_delete -f $f
@@ -1678,7 +1679,6 @@ dependency_check () {
 
 		if [ -z "$RECURSE_THOROUGH" ]; then
 			rundeps=`pm_make run-depends-list | sort -u`
-			rundeps=" $rundeps "
 
 			for dep in $d_port_list; do
 				case "$rundeps" in
@@ -2575,7 +2575,8 @@ else
 	# XXX fetch
 
 	# Duplicated from pkg_init()
-	packages=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES`
+	[ -z "$packages" ] &&
+		packages=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES`
 	[ -n "$packages" ] || fail 'The value of PACKAGES cannot be empty'
 
 	ppd=$packages/portmaster-download
