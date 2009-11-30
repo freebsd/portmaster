@@ -2465,11 +2465,6 @@ fetch_package () {
 			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz; }
 	fi
 }
-fi
-
-# XXX Build or package?
-
-if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 	if [ -z "$PACKAGESITE" ]; then
 		release=`uname -r`
 		#release=7.0-RELEASE-p12
