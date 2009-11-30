@@ -2462,8 +2462,7 @@ fetch_package () {
 
 		fetch $fetch_args -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
 			pm_unlink ${ppd}/${1}.tbz;
-			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz ||
-				fail "Fetch for ${1}.tbz failed"; }
+			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz; }
 	fi
 }
 fi
@@ -2633,7 +2632,7 @@ if [ -z "$use_package" ]; then
 	eval pm_make $port_log_args || fail "make failed for $portdir"
 else
 	# XXX fetch
-	fetch_package $latest_pv
+	fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"
 fi
 
 # XXX Build or package?
