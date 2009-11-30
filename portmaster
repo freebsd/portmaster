@@ -315,6 +315,7 @@ usage () {
 	echo '--packages-build use packages for all build dependencies'
 	echo '--packages-if-newer use package if newer than installed even'
 	echo '   if the package is not the latest according to the ports tree'
+	echo '--always-fetch fetch package even if it already exists locally'
 	echo ''
 	echo '-l list installed ports by category'
 	echo '-L list installed ports by category, and search for updates'
@@ -426,6 +427,8 @@ for var in "$@" ; do
 	--packages-if-newer)	packages_init newer
 				PM_PACKAGES_NEWER=pmp_newer
 				export PM_PACKAGES_NEWER ;;
+	--always-fetch)		PM_ALWAYS_FETCH=pm_always_fetch
+				export PM_ALWAYS_FETCH ;;
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
 				PM_BUILD_ONLY_LIST=pm_bol
@@ -2422,6 +2425,49 @@ fi
 
 new_port=`pm_make -V PKGNAME`
 
+if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
+fetch_package () {
+	local do_fetch
+
+	# Duplicated from pkg_init()
+	[ -z "$packages" ] &&
+		packages=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES`
+	[ -n "$packages" ] || fail 'The value of PACKAGES cannot be empty'
+
+	[ -z "$ppd" ] && { ppd=$packages/portmaster-download; export ppd; }
+
+	if [ ! -d "$ppd" ]; then
+		[ -n "$PM_SU_VERBOSE" ] &&
+			echo "===>>> Creating $ppd"
+		pm_mkdir_s $ppd
+	fi
+
+	[ -z "$fetch_args" ] && {
+		fetch_args=`pm_make -f/usr/share/mk/bsd.port.mk -V FETCH_ARGS`;
+		export fetch_args; }
+
+	if [ -z "$PM_ALWAYS_FETCH" ]; then
+		if [ -e "${ppd}/${1}.tbz" ]; then
+			[ -n "$PM_VERBOSE" ] &&
+				echo "===>>> Package exists, skipping fetch"
+		else
+			do_fetch=1
+		fi
+	else
+		do_fetch=1
+	fi
+
+	if [ -n "$do_fetch" ]; then
+		[ -n "$PM_VERBOSE" ] && echo "===>>> Starting package fetch"
+
+		fetch $fetch_args -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
+			pm_unlink ${ppd}/${1}.tbz;
+			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz ||
+				fail "Fetch for ${1}.tbz failed"; }
+	fi
+}
+fi
+
 # XXX Build or package?
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
@@ -2463,6 +2509,13 @@ if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 	esac
 	latest_pv=`fetch -q -o - ${sitepath} 2>/dev/null | grep "href=\"${s}"`
 	unset s
+
+	if [ -z "$latest_pv" ]; then
+		fetch_package $new_port
+		if [ $? -eq 0 ]; then
+			latest_pv=$new_port
+		fi
+	fi
 
 	if [ -z "$latest_pv" ]; then
 		echo "===>>> Package and/or archive not found at:"
@@ -2510,22 +2563,29 @@ notnewer () {
 			echo "===>>> There is a package available ($latest_pv)"
 		fi
 	else
-		# Could happen if ports tree is out of date
 		case `pkg_version -t $new_port $latest_pv` in
-		\<)	use_package=up_old_tree
+		\<)	# Could happen if ports tree is out of date
+			use_package=up_old_tree
 			[ -n "$PM_VERBOSE" ] && {
 			echo "===>>> Available package ($latest_pv)";
 			echo "       is newer than ports tree ($new_port)"; } ;;
 		=)	;;	# Should not be reached
-		*)	echo ''
-			echo "===>>> The newest available package ($latest_pv)"
+		*)	# Packages like autoconf-2.1* vs. 2.6* can be false neg.
+			fetch_package $new_port
+			if [ $? -eq 0 ]; then
+				latest_pv=$new_port
+				use_package=up_auto
+			else
+				echo ''
+		echo "===>>> The newest available package ($latest_pv)"
 		echo "       is older than the version in ports ($new_port)"
-			if [ "$PM_PACKAGES" = only ]; then
-				if [ -n "$PM_FORCE" ]; then
-					use_package=up_force2
+				if [ "$PM_PACKAGES" = only ]; then
+					if [ -n "$PM_FORCE" ]; then
+						use_package=up_force2
 				echo "===>>> Installing anyway due to -f"
-				else
+					else
 	fail "Try --packages-if-newer, or do not use -PP/--packages-only"
+					fi
 				fi
 			fi ;;
 		esac
@@ -2573,28 +2633,7 @@ if [ -z "$use_package" ]; then
 	eval pm_make $port_log_args || fail "make failed for $portdir"
 else
 	# XXX fetch
-
-	# Duplicated from pkg_init()
-	[ -z "$packages" ] &&
-		packages=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES`
-	[ -n "$packages" ] || fail 'The value of PACKAGES cannot be empty'
-
-	ppd=$packages/portmaster-download
-
-	if [ ! -d "$ppd" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Creating $ppd"
-		pm_mkdir_s $ppd
-	fi
-	export ppd
-
-	[ -n "$PM_VERBOSE" ] && echo "===>>> Starting package fetch"
-
-	fetch_args=`pm_make -f/usr/share/mk/bsd.port.mk -V FETCH_ARGS`
-	fetch $fetch_args -o $ppd ${sitepath}${latest_pv}.tbz 2>/dev/null || {
-		pm_unlink ${ppd}/${latest_pv}.tbz;
-		fetch $fetch_args -o $ppd ${sitepath}${latest_pv}.tbz ||
-			fail "Fetch for ${latest_pv}.tbz failed"; }
+	fetch_package $latest_pv
 fi
 
 # XXX Build or package?
