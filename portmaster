@@ -309,7 +309,6 @@ usage () {
 	echo '--delete-build-only delete ports that are build-only dependencies'
 	echo '   after a successful run, only if installed this run'
 	echo ''
-	echo 'NOTE: The -P[P] options imply -G'
 	echo '-P|--packages use packages, but build port if not available'
 	echo '-PP|--packages-only fail if no package is available'
 	echo '--packages-build use packages for all build dependencies'
@@ -394,8 +393,6 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	export pd pdb distdir
 fi
 
-# XXX
-
 packages_init () {
 	local e1 e2
 
@@ -447,8 +444,6 @@ for var in "$@" ; do
 	*)			newopts="$newopts $var" ;;
 	esac
 done
-
-[ -n "$PM_PACKAGES" ] && { NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS"; }
 
 set -- $newopts
 unset var newopts
@@ -1639,7 +1634,7 @@ update_port () {
 		echo ''
 	elif [ -n "$UPDATE_REQ_BYS" ]; then
 		return 0
-	elif [ -n "$CONFIG_ONLY" ]; then
+	elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
 	echo "===>>> Continuing 'make config' dependency check for $portdir"
 	else
 		echo "===>>> Returning to dependency check for $portdir"
@@ -1665,14 +1660,12 @@ dependency_check () {
 	else
 		if [ -n "$SHOW_WORK" ]; then
 			echo ''
-		elif [ -n "$CONFIG_ONLY" ]; then
+		elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
 			echo "===>>> Starting recursive 'make config' check"
 		else
 			echo "===>>> Starting dependency check"
 		fi
 	fi
-
-# XXXX
 
 	if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
 
@@ -1818,7 +1811,7 @@ dependency_check () {
 
 	if [ -n "$SHOW_WORK" ]; then
 		safe_exit
-	elif [ -n "$CONFIG_ONLY" ]; then
+	elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
 	echo "===>>> Recursive 'make config' check complete for $portdir"
 		case "$PM_DEPTH" in *\>\>*) echo "	$PM_DEPTH" ;; esac
 	else
@@ -2032,7 +2025,8 @@ all_config () {
 	if [ -n "$CONFIG_ONLY" ]; then
 		[ -n "$FETCH_ONLY" ] && export ALL_FETCH=all_fetch
 
-		echo "===>>> Checking ports for recursive 'make config'"
+		[ -z "$PM_PACKAGES" ] &&
+			echo "===>>> Checking ports for recursive 'make config'"
 		[ -n "$PM_VERBOSE" ] &&
 		    { echo '' ; echo "===>>> Root ports:"; }
 		all_config $roots
@@ -2048,7 +2042,7 @@ all_config () {
 
 		check_fetch_only
 		if [ -n "$NO_DEP_UPDATES" ]; then
-		echo "===>>> The 'make config' check found no ports to update"
+			echo "===>>> All ports are up to date"
 			safe_exit
 		fi
 
@@ -2259,7 +2253,6 @@ dofetch () {
 }
 
 	# Handle the problem of manual fetching
-# XXX Not for -P/-PP
 	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make_b -V MASTER_SITES`
 
 	if [ -n "$master_sites" ]; then
@@ -2302,8 +2295,6 @@ dofetch () {
 fi
 
 if [ -n "$CONFIG_ONLY" ]; then
-
-# XXXX
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		# Keep in sync in multiport()
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
@@ -2317,10 +2308,13 @@ if [ -n "$CONFIG_ONLY" ]; then
 		fi
 	fi
 
-	config_type=config-conditional
-	[ -n "$FORCE_CONFIG" ] && config_type=config
-	[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Running 'make $config_type'"
-	pm_make_s $config_type
+	if [ -z "$PM_PACKAGES" ]; then
+		config_type=config-conditional
+		[ -n "$FORCE_CONFIG" ] && config_type=config
+		[ -n "$PM_SU_VERBOSE" ] &&
+			echo "===>>> Running 'make $config_type'"
+		pm_make_s $config_type
+	fi
 
 	CONFIG_SEEN_LIST="${CONFIG_SEEN_LIST}${portdir}:"
 
@@ -2371,7 +2365,6 @@ if [ -n "$CONFIG_ONLY" ]; then
 		unset URB_YES MASTER_RB_LIST ; URB_DONE_LIST=':'
 	fi
 
-# XXXX
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		unset run_dl_g
 		PM_BUILD_ONLY_LIST=pm_bol
@@ -2414,7 +2407,7 @@ if [ -z "$NO_DEP_UPDATES" ]; then
 	fi
 	cd $pd/$portdir
 elif [ -z "$NO_RECURSIVE_CONFIG" -a "$$" -eq "$PM_PARENT_PID" ]; then
-	echo "===>>> The 'make config' check found no dependencies to update"
+	echo "===>>> All dependencies are up to date"
 	echo ''
 fi
 
@@ -2626,11 +2619,8 @@ if [ -z "$use_package" ]; then
 
 	eval pm_make $port_log_args || fail "make failed for $portdir"
 else
-	# XXX fetch
 	fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"
 fi
-
-# XXX Build or package?
 
 # Ignore if no old port exists
 if [ -n "$upg_port" ]; then
@@ -2715,7 +2705,6 @@ if [ -z "$use_package" ]; then
 	eval pm_make_s -DNO_DEPENDS install $port_log_args ||
 		install_failed $new_port
 else
-	# XXX Install the package
 	echo "===>>> Installing package"
 	pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz ||
 		install_failed ${latest_pv}.tbz
