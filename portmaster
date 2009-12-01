@@ -411,7 +411,9 @@ e2="The --packages-build option and the -P[P] options are mutually exclusive"
 
 for var in "$@" ; do
 	case "$var" in
-	-P|--packages)		packages_init first
+	-PP[A-Za-z0-9]*|*[A-Za-z0-9]PP*)
+				fail "The -PP option must stand alone" ;;
+	--packages)		packages_init first
 				PM_PACKAGES=first ; export PM_PACKAGES ;;
 	-PP|--packages-only)	packages_init only
 				PM_PACKAGES=only ; export PM_PACKAGES ;;
@@ -887,7 +889,7 @@ fi
 #=============== End code relevant only to --features ===============
 
 # Save switches for potential child processes
-while getopts 'BCDFGHKLRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
@@ -897,6 +899,8 @@ while getopts 'BCDFGHKLRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
 	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
 	L)	LIST_PLUS=Lopt ;;
+	P)	packages_init first
+		PM_PACKAGES=first ; export PM_PACKAGES ;;
 	R)	RESTART=Ropt ; ARGS="-R $ARGS" ;;
 	a)	UPDATE_ALL=aopt ;;
 	b)	BACKUP=bopt; ARGS="-b $ARGS" ;;
