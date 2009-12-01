@@ -241,9 +241,8 @@ usage () {
 	echo 'Usage:'
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
-	echo "    [--packages-if-newer] [-m <arguments for make>]"
-	echo "    [--delete-build-only]"
-	echo "    [-x <glob pattern to exclude from building>]"
+	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
+	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
 	echo "${0##*/} [Common flags] <glob pattern of directories in $pdb>"
@@ -1668,9 +1667,6 @@ dependency_check () {
 	fi
 
 	if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
-
-#echo '' ; echo "Debug> d_port_list: $d_port_list"
-
 		local rundeps dep run_dl build_only_dl temp_bodlg
 
 		if [ -z "$RECURSE_THOROUGH" ]; then
@@ -1683,18 +1679,12 @@ dependency_check () {
 				esac
 			done
 
-#echo '' ; echo "Debug> build_only_dl: $build_only_dl"
-#echo '' ; echo "Debug> run_dl: $run_dl" ; echo ''
-
 			d_port_list="$build_only_dl $run_dl"
 		else
 			for dep in `pm_make run-depends-list | sort -u`; do
 				run_dl="$run_dl $dep"
 			done
 			build_only_dl=`pm_make build-depends-list | sort -u`
-
-#echo '' ; echo "Debug> build_only_dl: $build_only_dl"
-#echo '' ; echo "Debug> run_dl: $run_dl" ; echo ''
 		fi
 
 		run_dl_g="$run_dl_g $run_dl "
@@ -1714,9 +1704,6 @@ dependency_check () {
 		done
 
 		build_only_dl_g=" $temp_bodlg "
-
-#echo '' ; echo "Debug> build_only_dl_g: X${build_only_dl_g}X"
-#echo '' ; echo "Debug> run_dl_g: X${run_dl_g}X" ; echo ''
 	fi
 
 	local d_port origin iport conflicts glob confl_p udf
@@ -1903,7 +1890,6 @@ multiport () {
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 			unset run_dl_g
 			PM_BUILD_ONLY_LIST=pm_bol
-#echo '' ; echo "Debug> build_only_dl_g multiport: $build_only_dl_g" ; echo ''
 		fi
 	fi
 
@@ -2368,7 +2354,6 @@ if [ -n "$CONFIG_ONLY" ]; then
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		unset run_dl_g
 		PM_BUILD_ONLY_LIST=pm_bol
-#echo '' ; echo "Debug> final build_only_dl_g: $build_only_dl_g" ; echo ''
 	fi
 
 	check_fetch_only
@@ -2385,11 +2370,7 @@ if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 	case "$build_only_dl_g" in
 	*" $pd/$portdir "*)
 	[ -n "$PM_PACKAGES_BUILD" ] && PM_PACKAGES_BUILD=doing_build_only_dep
-	[ -n "$PM_DEL_BUILD_ONLY" ] && PM_DEL_BUILD_ONLY=doing_build_only_dep
-
-#echo '' ; echo "Debug> DOING BUILD ONLY DEP" ; echo ''
-	;;
-
+	[ -n "$PM_DEL_BUILD_ONLY" ] && PM_DEL_BUILD_ONLY=doing_build_only_dep ;;
 	*)	[ -n "$PM_PACKAGES_BUILD" ] && PM_PACKAGES_BUILD=pmp_build
 		[ -n "$PM_DEL_BUILD_ONLY" ] && PM_DEL_BUILD_ONLY=pm_dbo ;;
 	esac
@@ -2460,9 +2441,6 @@ fetch_package () {
 }
 	if [ -z "$PACKAGESITE" ]; then
 		release=`uname -r`
-		#release=7.0-RELEASE-p12
-		#release=8.0-RC1
-		#release=8.0-STABLE
 
 		case "$release" in
 		[678]\.[0-9]-STABLE)
@@ -2485,8 +2463,6 @@ fetch_package () {
 	fi
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
-
-#echo '' ; echo "Debug> sitepath: $sitepath" ; echo ''
 
 	[ -n "$PM_VERBOSE" ] && echo "===>>> Checking package repository"
 
@@ -2517,8 +2493,6 @@ fetch_package () {
 	case "$latest_pv" in
 	*%2[cC]*)	latest_pv=`echo $latest_pv | sed s#%2[cC]#,#` ;;
 	esac
-
-#echo '' ; echo "Debug> new_port: $new_port latest_pv: $latest_pv" ; echo ''
 
 notnewer () {
 	echo ''
