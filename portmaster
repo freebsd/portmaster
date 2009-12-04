@@ -2006,7 +2006,8 @@ all_config () {
 		CONFIG_SEEN_LIST="${CONFIG_SEEN_LIST}${origin}:"
 	done
 }
-	if [ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" ]; then
+	if [ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" \
+	    -a -z "$PM_PACKAGES" ]; then
 		(read_distinfos)&
 	fi
 	ports_by_category
