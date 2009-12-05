@@ -242,6 +242,7 @@ usage () {
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
+	echo "    [--local-packagedir=<path>]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -314,6 +315,8 @@ usage () {
 	echo '--packages-if-newer use package if newer than installed even'
 	echo '   if the package is not the latest according to the ports tree'
 	echo '--always-fetch fetch package even if it already exists locally'
+	echo '--local-packagedir=<path> where local packages can be found,'
+	echo '   will fall back to fetching if no local version exists'
 	echo ''
 	echo '-l list installed ports by category'
 	echo '-L list installed ports by category, and search for updates'
@@ -427,6 +430,8 @@ for var in "$@" ; do
 				export PM_PACKAGES_NEWER ;;
 	--always-fetch)		PM_ALWAYS_FETCH=pm_always_fetch
 				export PM_ALWAYS_FETCH ;;
+	--local-packagedir=*)	LOCAL_PACKAGEDIR=${var#--local-packagedir=}
+				export LOCAL_PACKAGEDIR ;;
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
 				PM_BUILD_ONLY_LIST=pm_bol
@@ -2479,13 +2484,24 @@ fetch_package () {
 	sitepath="${sitepath%/}/${portdir%/*}/"
 
 	[ -n "$PM_VERBOSE" ] &&
-		echo "===>>> Checking package repository for latest available version"
+	echo "===>>> Checking package repository for latest available version"
 
-	case "$new_port" in
-	*\.*)	s=${new_port%%\.*} ;;
-	*)	s=`pm_make -V LATEST_LINK` ;;
-	esac
-	latest_pv=`fetch -q -o - ${sitepath} 2>/dev/null | grep "href=\"${s}"`
+	if [ -n "$LOCAL_PACKAGEDIR" ]; then
+		s=`pm_make -V LATEST_LINK`
+		if [ -r "${LOCAL_PACKAGEDIR}/Latest/${s}.tbz" ]; then
+			local_package=${LOCAL_PACKAGEDIR}/Latest/${s}.tbz
+			latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}.tbz`
+			latest_pv=${latest_pv##*/}
+		fi
+	fi
+
+	if [ -z "$latest_pv" ]; then
+		case "$new_port" in
+		*\.*)	s=${new_port%%\.*} ;;
+		*)	s=`pm_make -V LATEST_LINK` ;;
+		esac
+		latest_pv=`fetch -q -o - ${sitepath} 2>/dev/null | grep "href=\"${s}"`
+	fi
 	unset s
 
 	if [ -z "$latest_pv" ]; then
@@ -2513,6 +2529,8 @@ notnewer () {
 	echo ''
 	echo "===>>> The newest available package ($latest_pv)"
 	echo "       is not newer than the installed version ($upg_port)"
+
+	unset local_package
 }
 
 	if [ "$latest_pv" = "$new_port" ]; then
@@ -2617,7 +2635,9 @@ if [ -z "$use_package" ]; then
 
 	eval pm_make $port_log_args || fail "make failed for $portdir"
 else
-	fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"
+	[ -z "$local_package" ] && {
+		fetch_package $latest_pv ||
+			fail "Fetch for ${latest_pv}.tbz failed"; }
 fi
 
 # Ignore if no old port exists
@@ -2703,6 +2723,8 @@ if [ -z "$use_package" ]; then
 	eval pm_make_s -DNO_DEPENDS install $port_log_args ||
 		install_failed $new_port
 else
+	[ -n "$local_package" ] && ppd=${local_package%/Latest*}/All
+
 	echo "===>>> Installing package"
 	pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz ||
 		install_failed ${latest_pv}.tbz
