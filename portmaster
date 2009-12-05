@@ -2790,12 +2790,17 @@ if [ -n "$MAKE_PACKAGE" ]; then
 	echo "	===>>> Package saved to $packages/All" ; echo ''
 fi
 
-[ -z "$DONT_POST_CLEAN" -a -z "$use_package" ] && {
-	pm_make clean NOCLEANDEPENDS=ncd2 ; echo ''; }
+if [ -z "$use_package" ]; then
+	[ -z "$DONT_POST_CLEAN" ] && {
+		pm_make clean NOCLEANDEPENDS=ncd2 ; echo ''; }
+elif grep -q DEPORIGIN $pdb/$new_port/+CONTENTS; then
+echo "===>>> Updating dependencies for $new_port to match installed versions"
+	update_contents $pdb/$new_port/+CONTENTS
+fi
 
 check_dependency_files $portdir $new_port
 if [ -s "$grep_deps" ]; then
-	echo "===>>> Updating package dependency entry for each dependent port"
+echo "===>>> Updating dependency entry for $new_port in each dependent port"
 	[ -n "$PM_VERBOSE" ] && echo ''
 	while read d_port; do
 		[ -n "$PM_VERBOSE" ] && echo "===>>> $d_port"
