@@ -1914,6 +1914,14 @@ multiport () {
 	safe_exit
 }
 
+make_config () {
+	config_type=config-conditional
+	[ -n "$FORCE_CONFIG" ] && config_type=config
+	[ -n "$PM_SU_VERBOSE" ] &&
+		echo "===>>> Running 'make $config_type'"
+	pm_make_s $config_type
+}
+
 #=============== End functions for main ===============
 
 # INIT Parent
@@ -2299,13 +2307,7 @@ if [ -n "$CONFIG_ONLY" ]; then
 		fi
 	fi
 
-	if [ -z "$PM_PACKAGES" ]; then
-		config_type=config-conditional
-		[ -n "$FORCE_CONFIG" ] && config_type=config
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Running 'make $config_type'"
-		pm_make_s $config_type
-	fi
+	[ -z "$PM_PACKAGES" ] && make_config
 
 	CONFIG_SEEN_LIST="${CONFIG_SEEN_LIST}${portdir}:"
 
@@ -2426,9 +2428,10 @@ fetch_package () {
 		export fetch_args; }
 
 	if [ -z "$PM_ALWAYS_FETCH" ]; then
-		if [ -e "${ppd}/${1}.tbz" ]; then
+		if [ -r "${ppd}/${1}.tbz" ]; then
 			[ -n "$PM_VERBOSE" ] &&
 				echo "===>>> Package exists, skipping fetch"
+			return 0
 		else
 			do_fetch=1
 		fi
@@ -2579,6 +2582,8 @@ fi
 
 if [ -z "$use_package" ]; then
 	if [ -n "$PM_PACKAGES" ]; then
+		make_config
+
 		if [ -z "$RECURSE_THOROUGH" ]; then
 			echo "===>>> Starting check for build dependencies"
 			dependency_check build-depends-list
