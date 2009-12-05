@@ -2383,7 +2383,7 @@ fi
 
 if [ -z "$NO_DEP_UPDATES" ]; then
 	if [ -z "$RECURSE_THOROUGH" ]; then
-		if [ ! "$PM_PACKAGES" = only ]; then
+		if [ -z "$PM_PACKAGES" ]; then
 			echo "===>>> Starting check for build dependencies"
 			dependency_check build-depends-list
 		fi
@@ -2437,11 +2437,17 @@ fetch_package () {
 	fi
 
 	if [ -n "$do_fetch" ]; then
-		[ -n "$PM_VERBOSE" ] && echo "===>>> Starting package fetch"
+		if [ -n "$PM_VERBOSE" ]; then
+			if [ -n "$2" ]; then
+				echo "===>>> Trying to fetch $1 directly"
+			else
+				echo "===>>> Starting package fetch"
+			fi
+		fi
 
 		fetch $fetch_args -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
 			pm_unlink ${ppd}/${1}.tbz;
-			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz; }
+			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
 	fi
 }
 	if [ -z "$PACKAGESITE" ]; then
@@ -2469,7 +2475,8 @@ fetch_package () {
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
 
-	[ -n "$PM_VERBOSE" ] && echo "===>>> Checking package repository"
+	[ -n "$PM_VERBOSE" ] &&
+		echo "===>>> Checking package repository for latest available version"
 
 	case "$new_port" in
 	*\.*)	s=${new_port%%\.*} ;;
@@ -2479,7 +2486,7 @@ fetch_package () {
 	unset s
 
 	if [ -z "$latest_pv" ]; then
-		fetch_package $new_port
+		fetch_package $new_port try
 		if [ $? -eq 0 ]; then
 			latest_pv=$new_port
 		fi
@@ -2537,7 +2544,7 @@ notnewer () {
 			echo "       is newer than ports tree ($new_port)"; } ;;
 		=)	;;	# Should not be reached
 		*)	# Packages like autoconf-2.1* vs. 2.6* can be false neg.
-			fetch_package $new_port
+			fetch_package $new_port try
 			if [ $? -eq 0 ]; then
 				latest_pv=$new_port
 				use_package=up_auto
@@ -2571,6 +2578,13 @@ echo "===>>> There is no valid package to install, building port instead"
 fi
 
 if [ -z "$use_package" ]; then
+	if [ -n "$PM_PACKAGES" ]; then
+		if [ -z "$RECURSE_THOROUGH" ]; then
+			echo "===>>> Starting check for build dependencies"
+			dependency_check build-depends-list
+		fi
+	fi
+
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; echo ''; }
 
