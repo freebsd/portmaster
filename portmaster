@@ -1829,6 +1829,16 @@ create_master_rb_list () {
 	[ -n "$MASTER_RB_LIST" ] && export MASTER_RB_LIST=" $MASTER_RB_LIST"
 }
 
+pca () {
+	if [ "$PM_PACKAGES" = only ]; then
+		echo install
+	elif [ -n "$PM_PACKAGES" ]; then
+		echo 'build and/or install'
+	else
+		echo build
+	fi
+}
+
 multiport () {
 	# Global
 	PM_MULTI_PORTS=':' ; PM_MULTI_BUILT=':'
@@ -1893,7 +1903,7 @@ multiport () {
 		check_fetch_only
 		unset CONFIG_SEEN_LIST CONFIG_ONLY
 		echo ''
-		echo "===>>> Starting build for multiple ports <<<==="
+		echo "===>>> Starting `pca` for multiple ports <<<==="
 		echo ''
 
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
@@ -2050,7 +2060,7 @@ all_config () {
 
 		unset CONFIG_SEEN_LIST CONFIG_ONLY
 		echo ''
-		echo "===>>> Starting build for ports that need updating <<<==="
+		echo "===>>> Starting `pca` for ports that need updating <<<==="
 		echo ''
 	fi
 
@@ -2366,7 +2376,7 @@ if [ -n "$CONFIG_ONLY" ]; then
 
 	check_fetch_only
 	unset CONFIG_SEEN_LIST CONFIG_ONLY
-	echo "===>>> Starting build for $portdir <<<==="
+	echo "===>>> Starting `pca` for $portdir <<<==="
 	echo ''
 fi
 
@@ -2481,7 +2491,6 @@ fetch_package () {
 
 	sitepath="${sitepath%/}/${portdir%/*}/"
 
-	[ -n "$PM_VERBOSE" ] &&
 	echo "===>>> Checking package repository for latest available version"
 
 	if [ -n "$LOCAL_PACKAGEDIR" ]; then
