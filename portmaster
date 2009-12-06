@@ -2019,10 +2019,8 @@ all_config () {
 		CONFIG_SEEN_LIST="${CONFIG_SEEN_LIST}${origin}:"
 	done
 }
-	if [ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" \
-	    -a -z "$PM_PACKAGES" ]; then
-		(read_distinfos)&
-	fi
+	[ -n "$DI_FILES" ] && (read_distinfos)&
+
 	ports_by_category
 	echo "===>>> Starting check of installed ports for available updates"
 
@@ -2236,10 +2234,8 @@ check_state || {
 	safe_exit 1; }
 
 # Do not start this in the background until we are sure we are going to build
-if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" -a -z "$PM_PACKAGES" \
-	-a -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" ]; then
-	echo ''; (read_distinfos)&
-fi
+[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && {
+	echo ''; (read_distinfos)& }
 
 # Do these things first time through, with or without 'make config'
 if [ -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
@@ -2415,16 +2411,18 @@ if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 fetch_package () {
 	local do_fetch
 
-	# Duplicated from pkg_init()
-	[ -z "$packages" ] &&
+	if [ -z "$ppd" ]; then
+		# Duplicated from pkg_init()
+		[ -z "$packages" ] &&
 		packages=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES`
-	[ -n "$packages" ] || fail 'The value of PACKAGES cannot be empty'
-
-	[ -z "$ppd" ] && { ppd=$packages/portmaster-download; export ppd; }
+		[ -n "$packages" ] ||
+			fail 'The value of PACKAGES cannot be empty'
+		ppd=$packages/portmaster-download
+		export ppd
+	fi
 
 	if [ ! -d "$ppd" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Creating $ppd"
+		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Creating $ppd"
 		pm_mkdir_s $ppd
 	fi
 
