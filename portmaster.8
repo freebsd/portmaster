@@ -33,7 +33,7 @@
 .Sh SYNOPSIS
 Common Flags:
 .Op Fl -force-config CGHgntvw [B|b] [f|i] [D|d]
-.Op Fl [--packages|--packages-only] [-P|-PP] | [--packages-build]
+.Op [--packages|--packages-only] [-P|-PP] | [--packages-build]
 .Op Fl -packages-if-newer
 .Op Fl -delete-build-only
 .Op Fl -always-fetch
@@ -206,7 +206,7 @@ There are a number of
 options available to save the time that would normally
 be spent building the port(s).
 Users interested in a reasonable balance between speed of
-installation and maximum performance should consider the 
+installation and maximum performance should consider the
 .Fl -packages-build
 option, perhaps combined with the
 .Fl -delete-build-only
@@ -253,7 +253,7 @@ the runtime dependencies will be checked to make sure
 they are up to date.
 If the
 .Fl g
-option is used, a package will be created for the new
+option is used a package will be created for the new
 (or newly installed) version.
 .Pp
 When installing a port or using the
@@ -373,7 +373,13 @@ only if installed this run
 .It Fl P|--packages
 use packages, but build port if not available
 .It Fl PP|--packages-only
-fail if no package is available
+fail if no package is available.
+The
+.Fl PP
+option must stand alone on the command line.
+In other words, you cannot do
+.Fl PPav
+(for example).
 .It Fl -packages-build
 use packages for all build dependencies
 .It Fl -packages-if-newer
@@ -383,7 +389,22 @@ the latest according to the ports tree
 fetch package even if it already exists locally
 .It Fl -local-packagedir=<path>
 where local packages can be found,
-will fall back to fetching if no local version exists
+will fall back to fetching if no local version exists.
+This option should point to the full path of a directory structure
+created in the same way that 'make package' (or the
+.Nm
+.Fl g
+option) creates it.
+I.e., the package files are contained in
+.Pa <path>/All ,
+there are LATEST_LINK symlinks in the
+.Pa <path>/Latest
+directory, and symlinks to the packages in
+.Pa <path>/All
+in the category subdirectories, such as
+.Pa <path>/devel ,
+.Pa <path>/ports-mgmt ,
+etc.
 .It Fl l
 list all installed ports by category
 .It Fl L
@@ -454,6 +475,22 @@ stores its backup packages in
 so that you can create both a backup package and
 a package of the newly installed port even if they
 have the same version.
+.Pp
+When using the
+.Fl -packages*
+options the package files will be downloaded to
+.Pa ${PACKAGES}/portmaster-download .
+.Nm
+will respect the
+.Ev PACKAGESITE
+and
+.Ev PACKAGEROOT
+(by default http://ftp.freebsd.org) variables.
+.Nm
+attempts to use both of these variables in the same
+way that
+.Xr pkg_add 1
+does.
 .Pp
 The
 .Ev UPGRADE_TOOL
@@ -531,10 +568,34 @@ along with their related options.
 # RECURSE_THOROUGH=topt
 #
 # Be verbose (-v)
-# PM_VERBOSE=
+# PM_VERBOSE=vopt
 #
 # Save copies of old shared libraries (recommended) (-w)
 # SAVE_SHARED=wopt
+#
+# Install a package if available (-P or --packages)
+# PM_PACKAGES=first
+#
+# Only install packages (-PP or --packages-only)
+# PM_PACKAGES=only
+#
+# Install packages for build-only dependencies (--packages-build)
+# PM_PACKAGES_BUILD=pmp_build
+# PM_BUILD_ONLY_LIST=pm_bol
+#
+# Delete build-only dependencies when finished (--delete-build-only)
+# PM_DEL_BUILD_ONLY=pm_dbo
+# PM_BUILD_ONLY_LIST=pm_bol
+#
+# Use packages if they are newer than installed (--packages-newer)
+# PM_PACKAGES=newer
+# PM_PACKAGES_NEWER=pmp_newer
+#
+# Always fetch new package files (--always-fetch)
+# PM_ALWAYS_FETCH=pm_always_fetch
+#
+# Specify a local package repository (--local-packagedir)
+# LOCAL_PACKAGEDIR=<path>
 .Ed
 .Pp
 .It Pa /var/db/pkg/*/+IGNOREME
@@ -572,6 +633,7 @@ run which includes the
 .Fl R
 option that a port has already been rebuilt,
 so it can be safely ignored if it is up to date.
+.Pp
 .It Pa /tmp/port_log-*
 If the
 .Fl H
@@ -662,8 +724,18 @@ Update one port:
 .Dl "portmaster fooport"
 .Dl "portmaster foo/fooport"
 .Pp
+Use a package if available:
+.Dl "portmaster --packages fooport-1.23"
+.Pp
 Update multiple ports:
 .Dl "portmaster fooport-1.23 barport baz/blahport"
+.Pp
+Build a port locally but use packages for build dependencies,
+then delete the build dependencies when finished:
+.Dl "portmaster --packages-build --delete-build-only fooport-1.23"
+.Pp
+Update a system using only packages that are available locally:
+.Dl "portmaster -PP --local-packagedir=<path> -a"
 .Pp
 Update all ports that need updating:
 .Dl "portmaster -a"
@@ -716,6 +788,7 @@ to avoid rebuilding ports already rebuilt on previous runs.
 However the first method (delete everything and reinstall) is preferred.
 .Sh SEE ALSO
 .Xr make 1 ,
+.Xr pkg_add 1 ,
 .Xr pkg_delete 1 ,
 .Xr su 1 ,
 .Xr ports 7 ,
