@@ -2528,12 +2528,13 @@ fetch_package () {
 		echo "       Check the pkg_add(1) man page for information"
 		echo "       on setting the PACKAGESITE environment variable"
 		fail 'No package archive found'
+	else
+		latest_pv=${latest_pv#*href=\"}
+		latest_pv=${latest_pv%%\.tbz*}
+		case "$latest_pv" in
+		*%2[cC]*)	latest_pv=`echo $latest_pv | sed s#%2[cC]#,#` ;;
+		esac
 	fi
-	latest_pv=${latest_pv#*href=\"}
-	latest_pv=${latest_pv%%\.tbz*}
-	case "$latest_pv" in
-	*%2[cC]*)	latest_pv=`echo $latest_pv | sed s#%2[cC]#,#` ;;
-	esac
 
 notnewer () {
 	echo ''
