@@ -2499,6 +2499,9 @@ fetch_package () {
 			local_package=${LOCAL_PACKAGEDIR}/Latest/${s}.tbz
 			latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}.tbz`
 			latest_pv=${latest_pv##*/}
+		else
+			[ -n "$PM_VERBOSE" ] &&
+	echo "===>>> No local package for $new_port exists, attempting fetch"
 		fi
 	fi
 
