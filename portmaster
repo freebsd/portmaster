@@ -331,7 +331,7 @@ usage () {
 	echo ''
 	echo '--check-depends cross-check and update dependency information for all ports'
 	echo ''
-	echo "--check-port-dbdir check for stale entries in $port_dbdir"
+	echo "--check-port-dbdir [-v] check for stale entries in $port_dbdir"
 	echo ''
 	echo "--list-origins list directories from $pd for root and leaf ports"
 	echo ''
@@ -835,7 +835,7 @@ IFS='
 fi
 
 if [ -n "$CHECK_PORT_DBDIR" ]; then
-	if [ "$2" = "-v" ]; then PM_VERBOSE=vopt; fi
+	if [ "$1" = "-v" ]; then PM_VERBOSE=vopt; fi
 
 	unique_list=':'
 
