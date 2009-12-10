@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 1, 2009
+.Dd December 2, 2009
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -770,7 +770,8 @@ to do a complete reinstallation of all your ports:
 .Dl "7. rm -rf /usr/local/lib/compat/pkg"
 .Dl "8. Manually check /usr/local and /var/db/pkg"
 .Dl "   to make sure that they are really empty"
-.Dl "9. portmaster `cat ~/installed-port-list`"
+.Dl "9. Re-install portmaster"
+.Dl "10. portmaster `cat ~/installed-port-list`"
 .Pp
 You probably want to use the -D option for the installation
 and then run --clean-distfiles[-all] again when you are done.
