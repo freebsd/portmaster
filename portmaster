@@ -414,7 +414,7 @@ e2="The --packages-build option and the -P[P] options are mutually exclusive"
 
 for var in "$@" ; do
 	case "$var" in
-	-PP[A-Za-z0-9]*|*[A-Za-z0-9]PP*)
+	-PP[A-Za-z0-9]*|-*[A-Za-z0-9]PP*)
 				fail "The -PP option must stand alone" ;;
 	--packages)		packages_init first
 				PM_PACKAGES=first ; export PM_PACKAGES ;;
@@ -1912,7 +1912,14 @@ multiport () {
 	if [ -n "$CONFIG_ONLY" ]; then
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 			PM_BUILD_ONLY_LIST=pmp_doing_build_deps
-			run_dl_g='' ; build_only_dl_g=''
+			for port in $worklist; do
+				case "$port" in
+				*/*)	run_dl_g="$run_dl_g ${pd}/${port} " ;;
+				*)
+			run_dl_g="$run_dl_g ${pd}/`origin_from_pdb $port` " ;;
+				esac
+			done
+			build_only_dl_g=''
 			export run_dl_g build_only_dl_g
 		fi
 		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
