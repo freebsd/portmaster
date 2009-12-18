@@ -423,8 +423,7 @@ for var in "$@" ; do
 	--packages-build)	packages_init build
 				unset PM_PACKAGES
 				PM_PACKAGES_BUILD=pmp_build
-				PM_BUILD_ONLY_LIST=pm_bol
-				export PM_PACKAGES_BUILD PM_BUILD_ONLY_LIST ;;
+				export PM_PACKAGES_BUILD ;;
 	--packages-if-newer)	packages_init newer
 				PM_PACKAGES_NEWER=pmp_newer
 				export PM_PACKAGES_NEWER ;;
@@ -434,8 +433,7 @@ for var in "$@" ; do
 				export LOCAL_PACKAGEDIR ;;
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
-				PM_BUILD_ONLY_LIST=pm_bol
-				export PM_DEL_BUILD_ONLY PM_BUILD_ONLY_LIST ;;
+				export PM_DEL_BUILD_ONLY ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -450,6 +448,11 @@ for var in "$@" ; do
 	*)			newopts="$newopts $var" ;;
 	esac
 done
+
+if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
+	PM_BUILD_ONLY_LIST=pm_bol
+	export PM_BUILD_ONLY_LIST
+fi
 
 set -- $newopts
 unset var newopts
