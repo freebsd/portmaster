@@ -1868,8 +1868,6 @@ create_master_rb_list () {
 post_config () {
 	local action
 
-	unset CONFIG_SEEN_LIST CONFIG_ONLY
-
 	action=build
 	if [ "$PM_PACKAGES" = only ]; then
 		action=install
@@ -1880,6 +1878,13 @@ post_config () {
 	echo ''
 	echo "===>>> Starting $action for $* <<<==="
 	echo ''
+
+	unset CONFIG_SEEN_LIST CONFIG_ONLY
+
+	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+		unset run_dl_g
+		PM_BUILD_ONLY_LIST=pm_bol
+	fi
 }
 
 multiport () {
@@ -1947,11 +1952,6 @@ multiport () {
 
 		check_fetch_only
 		post_config multiple ports
-
-		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-			unset run_dl_g
-			PM_BUILD_ONLY_LIST=pm_bol
-		fi
 	fi
 
 	export PM_BUILDING=pmbuildingmultiport
@@ -2116,11 +2116,7 @@ all_config () {
 
 		post_config for ports that need updating
 
-		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-			clean_build_only_list
-			unset run_dl_g
-			PM_BUILD_ONLY_LIST=pm_bol
-		fi
+		[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
 	fi
 
 	export PM_BUILDING=pmbuildingall
@@ -2420,11 +2416,6 @@ if [ -n "$CONFIG_ONLY" ]; then
 
 	check_fetch_only
 	post_config $portdir
-
-	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-		unset run_dl_g
-		PM_BUILD_ONLY_LIST=pm_bol
-	fi
 fi
 
 [ -z "$PM_BUILDING" ] && export PM_BUILDING=pmbuildingmain
