@@ -1126,7 +1126,10 @@ pm_pkg_create () {
 	local pkgdir
 
 	if [ "$1" = "${packages}" ]; then
-		pm_mkdir_s ${1}/All ${1}/Latest ${1}/${portdir%/*}
+		for pkgdir in All Latest ${portdir%/*}; do
+			pm_mkdir_s ${packages}/${pkgdir} ||
+				fail "Cannot mkdir -p $pkgdir"
+		done
 		pkgdir=${packages}/All
 		echo "===>>> Creating a package for new version $2"
 	else
@@ -2518,7 +2521,7 @@ fetch_package () {
 				release=packages-${release%%\.*}-stable ;;
 		[678]\.[0-9]-RELEASE*)
 				release=packages-${release%-RELEASE*}-release ;;
-		9\.0-CURRENT)	release=packages-8-current ;;	# XXX
+		9\.0-CURRENT)	release=packages-8-stable ;;	# XXX
 		*RC[0-9]*)	release=${release%-RC[0-9]}
 				release=packages-${release}-release ;;
 		*BETA[0-9]*)	release=${release%-BETA[0-9]}
