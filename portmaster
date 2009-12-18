@@ -1674,6 +1674,19 @@ update_port () {
 	return 0
 }
 
+clean_build_only_list () {
+	local dep temp_bodlg
+
+	for dep in $build_only_dl_g; do
+		case "$run_dl_g" in
+		*" ${dep} "*)	;;
+		*)	temp_bodlg="$temp_bodlg $dep" ;;
+		esac
+	done
+
+	build_only_dl_g=" $temp_bodlg "
+}
+
 dependency_check () {
 	# Global: doing_dep_check
 	# Global: run_dl_g build_only_dl_g
@@ -1700,7 +1713,7 @@ dependency_check () {
 	fi
 
 	if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
-		local rundeps dep run_dl build_only_dl temp_bodlg
+		local rundeps dep run_dl build_only_dl
 
 		if [ -z "$RECURSE_THOROUGH" ]; then
 			rundeps=`pm_make run-depends-list | sort -u`
@@ -1729,14 +1742,7 @@ dependency_check () {
 			esac
 		done
 
-		for dep in $build_only_dl_g; do
-			case "$run_dl_g" in
-			*" ${dep} "*)	;;
-			*)		temp_bodlg="$temp_bodlg $dep" ;;
-			esac
-		done
-
-		build_only_dl_g=" $temp_bodlg "
+		clean_build_only_list
 	fi
 
 	local d_port origin iport conflicts glob confl_p udf
@@ -1919,12 +1925,6 @@ multiport () {
 			run_dl_g="$run_dl_g ${pd}/`origin_from_pdb $port` " ;;
 				esac
 			done
-			build_only_dl_g=''
-			export run_dl_g build_only_dl_g
-		fi
-		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
-			build_deps_il=''
-			export build_deps_il
 		fi
 
 		for port in $worklist; do
@@ -2016,6 +2016,14 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		CONFIG_SEEN_LIST=':' ; CONFIG_ONLY=config_only
 		NO_DEP_UPDATES=no_dep_updates
 		export CONFIG_SEEN_LIST CONFIG_ONLY NO_DEP_UPDATES
+
+		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+			run_dl_g='' ; build_only_dl_g=''
+			export run_dl_g build_only_dl_g
+		fi
+		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
+			build_deps_il='' ; export build_deps_il
+		fi
 	fi
 
 	[ -n "$NO_BACKUP" -a -z "$MAKE_PACKAGE" ] || init_packages
@@ -2052,6 +2060,9 @@ all_config () {
 		origin=`origin_from_pdb $iport`
 		case "$CONFIG_SEEN_LIST" in *:${origin}:*) continue ;; esac
 
+		[ -n "$PM_BUILD_ONLY_LIST" ] &&
+			run_dl_g="$run_dl_g ${pd}/${origin} "
+
 		check_exclude $iport || continue
 
 		PM_DEPTH=
@@ -2064,6 +2075,9 @@ all_config () {
 
 	ports_by_category
 	echo "===>>> Starting check of installed ports for available updates"
+
+	[ -n "$PM_BUILD_ONLY_LIST" ] &&
+		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
 	if [ -n "$CONFIG_ONLY" ]; then
 		[ -n "$FETCH_ONLY" ] && export ALL_FETCH=all_fetch
@@ -2093,6 +2107,12 @@ all_config () {
 		echo ''
 		echo "===>>> Starting `pca` for ports that need updating <<<==="
 		echo ''
+
+		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+			clean_build_only_list
+			unset run_dl_g
+			PM_BUILD_ONLY_LIST=pm_bol
+		fi
 	fi
 
 	export PM_BUILDING=pmbuildingall
@@ -2336,18 +2356,8 @@ dofetch () {
 fi
 
 if [ -n "$CONFIG_ONLY" ]; then
-	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		# Keep in sync in multiport()
-		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-			PM_BUILD_ONLY_LIST=pmp_doing_build_deps
-			run_dl_g='' ; build_only_dl_g=''
-			export run_dl_g build_only_dl_g
-		fi
-		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
-			build_deps_il=''
-			export build_deps_il
-		fi
-	fi
+	[ "$$" -eq "$PM_PARENT_PID" -a -n "$PM_BUILD_ONLY_LIST" ] &&
+		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
 	[ -z "$PM_PACKAGES" ] && make_config
 
@@ -2400,15 +2410,15 @@ if [ -n "$CONFIG_ONLY" ]; then
 		unset URB_YES MASTER_RB_LIST ; URB_DONE_LIST=':'
 	fi
 
-	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-		unset run_dl_g
-		PM_BUILD_ONLY_LIST=pm_bol
-	fi
-
 	check_fetch_only
 	unset CONFIG_SEEN_LIST CONFIG_ONLY
 	echo "===>>> Starting `pca` for $portdir <<<==="
 	echo ''
+
+	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+		unset run_dl_g
+		PM_BUILD_ONLY_LIST=pm_bol
+	fi
 fi
 
 [ -z "$PM_BUILDING" ] && export PM_BUILDING=pmbuildingmain
