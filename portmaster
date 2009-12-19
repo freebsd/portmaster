@@ -2781,7 +2781,8 @@ else
 	[ -n "$local_package" ] && ppd=${local_package%/Latest*}/All
 
 	echo "===>>> Installing package"
-	pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz ||
+	# -i == --no-deps, -f == --force
+	pkg_add -i -f ${ppd}/${latest_pv}.tbz ||
 		install_failed ${latest_pv}.tbz
 fi
 echo ''
