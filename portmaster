@@ -1128,7 +1128,7 @@ pm_pkg_create () {
 	if [ "$1" = "${packages}" ]; then
 		for pkgdir in All Latest ${portdir%/*}; do
 			pm_mkdir_s ${packages}/${pkgdir} ||
-				fail "Cannot mkdir -p $pkgdir"
+				fail "Cannot mkdir -p ${packages}/${pkgdir}"
 		done
 		pkgdir=${packages}/All
 		echo "===>>> Creating a package for new version $2"
