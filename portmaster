@@ -1093,6 +1093,8 @@ check_for_updates () {
 	# No need for check_exclude here because it is already
 	# run in the places that call check_for_updates().
 	check_interactive $iport $port_ver || return 0
+	[ -n "$CONFIG_ONLY" ] && num_of_deps=$(( $num_of_deps + 1 ))
+	dep_of_deps=$(( $dep_of_deps + 1 ))
 	update_port $iport $port_ver || return 1
 	return 0
 }
@@ -1646,6 +1648,10 @@ check_fetch_only () {
 	safe_exit
 }
 
+term_printf () {
+	printf "\033]0;${0##*/}: ${PM_PARENT_PORT}${1}\007"
+}
+
 update_port () {
 	local update_to
 
@@ -1653,7 +1659,12 @@ update_port () {
 
 	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
 
-	[ -n "$PM_DEPTH" ] && echo "	$PM_DEPTH >> ${1#$pd/}"
+	if [ -n "$PM_DEPTH" ]; then
+		echo "	$PM_DEPTH >> ${1#$pd/}"
+		term_printf " >> ${1#$pd/} (${dep_of_deps}/${num_of_deps})"
+	else
+#echo '' ; echo "Debug> NO PM_DEPTH HERE" ; echo ''
+	fi
 
 	[ -n "$doing_dep_check" -o \
 	    \( -n "$UPDATE_ALL" -a -n "$CONFIG_ONLY" \) ] &&
@@ -1836,6 +1847,9 @@ dependency_check () {
 			check_for_updates $iport $origin || fail 'Update failed'
 		else
 			check_interactive $origin || continue
+			[ -n "$CONFIG_ONLY" ] &&
+				num_of_deps=$(( $num_of_deps + 1 ))
+			dep_of_deps=$(( $dep_of_deps + 1 ))
 			update_port $origin
 		fi
 	done
@@ -1881,10 +1895,21 @@ post_config () {
 
 	unset CONFIG_SEEN_LIST CONFIG_ONLY
 
+	dep_of_deps=0
+
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		unset run_dl_g
 		PM_BUILD_ONLY_LIST=pm_bol
 	fi
+}
+
+init_parent_port () {
+	PM_PARENT_PORT=$1
+	num_of_deps=0
+	dep_of_deps=0
+	export PM_PARENT_PORT num_of_deps dep_of_deps
+
+	term_printf
 }
 
 multiport () {
@@ -1892,7 +1917,7 @@ multiport () {
 	PM_MULTI_PORTS=':' ; PM_MULTI_BUILT=':'
 	export PM_MULTI_PORTS PM_MULTI_BUILT
 
-	local port worklist_temp worklist portlist
+	local port worklist_temp worklist portlist numports num
 
 	# Expand globs and check that the directories exist
 	for port in $@; do
@@ -1921,6 +1946,7 @@ multiport () {
 		esac
 	done
 
+	numports=0
 	for port in $worklist_temp; do
 		check_exclude $port || continue
 		check_interactive $port || continue
@@ -1928,6 +1954,7 @@ multiport () {
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
 		PM_MULTI_PORTS="${PM_MULTI_PORTS}${port}:"
+		numports=$(( $numports + 1 ))
 	done
 
 	echo "===>>> Working on multiple ports:"
@@ -1945,9 +1972,12 @@ multiport () {
 			done
 		fi
 
+		num=1
 		for port in $worklist; do
+			init_parent_port "$port ${num}/${numports}"
 			($0 $ARGS $port) || fail "Update for $port failed"
 			. $IPC_SAVE
+			num=$(( $num + 1 ))
 		done
 
 		check_fetch_only
@@ -1955,6 +1985,7 @@ multiport () {
 	fi
 
 	export PM_BUILDING=pmbuildingmultiport
+	num=1
 	for port in $worklist; do
 		case "$PM_MULTI_BUILT" in *:${port}:*) continue ;; esac
 
@@ -1962,11 +1993,15 @@ multiport () {
 		*/*)	;;	# Ok to proceed
 		*)	# If an installed version does not exist at this
 			# point it probably got updated as a dependency
-			[ -d "$pdb/$port" ] || continue
-			;;
+			if [ ! -d "$pdb/$port" ]; then
+				numports=$(( $numports - 1 ))
+				continue
+			fi ;;
 		esac
+		init_parent_port "$port ${num}/${numports}"
 		($0 $ARGS $port) || fail "Update for $port failed"
 		. $IPC_SAVE
+		num=$(( $num + 1 ))
 	done
 	safe_exit
 }
@@ -2083,6 +2118,8 @@ all_config () {
 	done
 }
 	[ -n "$DI_FILES" ] && (read_distinfos)&
+
+	init_parent_port All
 
 	ports_by_category
 	echo "===>>> Starting check of installed ports for available updates"
@@ -2284,6 +2321,7 @@ pm_cd $pd/$portdir || no_valid_port
 
 if [ -z "$PM_DEPTH" ]; then
 	PM_DEPTH=${upg_port:-$portdir}
+	[ -z "$PM_PARENT_PORT" ] && init_parent_port $portdir
 else
 	PM_DEPTH="$PM_DEPTH >> ${upg_port:-$portdir}"
 fi
@@ -2447,6 +2485,8 @@ elif [ -z "$NO_RECURSIVE_CONFIG" -a "$$" -eq "$PM_PARENT_PID" ]; then
 	echo "===>>> All dependencies are up to date"
 	echo ''
 fi
+
+[ "$$" -eq "$PM_PARENT_PID" ] && term_printf
 
 if [ -n "$NO_ACTION" -a -z "$CONFIG_ONLY" ]; then
 	[ -n "$PM_VERBOSE" ] && echo "===>>> Build canceled due to -n flag"
