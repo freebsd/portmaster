@@ -208,6 +208,8 @@ safe_exit () {
 
 		# Save state for the parent process to read back in
 		echo "CUR_DEPS='$CUR_DEPS'" >> $IPC_SAVE
+		echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
+		echo "dep_of_deps='$dep_of_deps'" >> $IPC_SAVE
 		if [ -z "$CONFIG_ONLY" ]; then
 			echo "DISPLAY_LIST='$DISPLAY_LIST'" >> $IPC_SAVE
 			echo "INSTALLED_LIST='$INSTALLED_LIST'" >> $IPC_SAVE
@@ -1093,8 +1095,6 @@ check_for_updates () {
 	# No need for check_exclude here because it is already
 	# run in the places that call check_for_updates().
 	check_interactive $iport $port_ver || return 0
-	[ -n "$CONFIG_ONLY" ] && num_of_deps=$(( $num_of_deps + 1 ))
-	dep_of_deps=$(( $dep_of_deps + 1 ))
 	update_port $iport $port_ver || return 1
 	return 0
 }
@@ -1655,6 +1655,10 @@ term_printf () {
 update_port () {
 	local update_to
 
+#[ -n "$CONFIG_ONLY" ] && { echo '' ; echo "Debug> num_deps $num_of_deps"; }
+	[ -n "$CONFIG_ONLY" ] && num_of_deps=$(( $num_of_deps + 1 ))
+	dep_of_deps=$(( $dep_of_deps + 1 ))
+
 	[ -n "$2" ] && update_to=" to $2"
 
 	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
@@ -1847,9 +1851,6 @@ dependency_check () {
 			check_for_updates $iport $origin || fail 'Update failed'
 		else
 			check_interactive $origin || continue
-			[ -n "$CONFIG_ONLY" ] &&
-				num_of_deps=$(( $num_of_deps + 1 ))
-			dep_of_deps=$(( $dep_of_deps + 1 ))
 			update_port $origin
 		fi
 	done
