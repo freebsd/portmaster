@@ -457,7 +457,7 @@ for var in "$@" ; do
 	esac
 done
 
-if [ "$$" -eq "$PM_PARENT_PID" ]; then		# XXXXX!!!!!
+if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
 		PM_BUILD_ONLY_LIST=pm_bol
 		export PM_BUILD_ONLY_LIST
@@ -577,7 +577,7 @@ IFS='
 			echo "	===>>> but there is no installed version"
 			echo ''
 				if [ -n "$CHECK_DEPENDS" ]; then
-		echo -n "	===>>> Delete this dependency data? [n] "
+		echo -n "	===>>> Delete this dependency data? y/[n] "
 					read answer
 					case "$answer" in
 					[yY]) unset prev_line line ; continue ;;
@@ -784,7 +784,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 				echo "===>>> Deleting $f"
 				pm_unlink $df
 			else
-				echo -n "===>>> Delete stale file: ${f}? [y] "
+				echo -n "===>>> Delete stale file: ${f}? n/[y] "
 				read answer
 				case "$answer" in
 				[nN]*)	continue ;;
@@ -892,7 +892,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 		*)	[ -n "$PM_VERBOSE" ] && echo ''
 			echo ''
 			echo "	===>>> $dbdir does not seem to be installed"
-			echo -n "	===>>> Delete ${dir}? [n] "
+			echo -n "	===>>> Delete ${dir}? y/[n] "
 			read answer
 			case "$answer" in
 			[yY])	pm_rm_s -rf $dir ;;
@@ -1273,7 +1273,7 @@ find_and_delete_distfiles () {
 				continue
 			fi
 
-			echo -n "===>>> Delete $file? [n] "
+			echo -n "===>>> Delete $file? y/[n] "
 			read answer
 			case "$answer" in
 			[yY])	pm_unlink $file ;;
@@ -1353,7 +1353,7 @@ delete_stale_distfiles () {
 				continue
 			fi
 
-			echo -n "===>>> Delete $file? [n] "
+			echo -n "===>>> Delete $file? y/[n] "
 			read answer
 			case "$answer" in
 			[yY])	pm_unlink $file ;;
@@ -1389,7 +1389,7 @@ delete_all_distfiles () {
 		echo ''
 		if [ -n "$dist_list_files" ]; then
 			echo "===>>> However, the list of files in $dist_list"
-	echo -n "       should be current.  Delete the files on this list? [n] "
+	echo -n "       should be current.  Delete the files on this list? y/[n] "
 			local answer f ; read answer
 			case "$answer" in
 			[yY])	for f in $dist_list_files; do
@@ -1410,11 +1410,11 @@ delete_all_distfiles () {
 		delete_all=delete_all
 	else
 		echo "===>>> Delete old and new distfiles for $origin"
-		echo -n "       without prompting? [n] "
+		echo -n "       without prompting? y/[n] "
 		local answer ; read answer
 		case "$answer" in
 		[yY])	delete_all=delete_all2 ;;
-		*)	echo -n "===>>> Delete the current distfiles? [n] "
+		*)	echo -n "===>>> Delete the current distfiles? y/[n] "
 			read answer
 			case "$answer" in
 			[yY])	delete_current=delete_current ;;
@@ -1495,7 +1495,7 @@ if [ -n "$EXPUNGE" ]; then
 			dep=${dep%/+CON*} ; echo "	${dep##*/}"
 		done
 		echo ''
-		echo -n "===>>> Delete this dependency data? [n] "
+		echo -n "===>>> Delete this dependency data? y/[n] "
 		read answer
 		case "$answer" in
 		[yY])	for f in $deplist; do
@@ -1541,7 +1541,7 @@ if [ -n "$CLEAN_STALE" ]; then
 
 		pkg_info $iport
 
-		echo -n "===>>> ${iport} is no longer depended on, delete? [n] "
+		echo -n "===>>> ${iport} is no longer depended on, delete? y/[n] "
 		read answer
 		case "$answer" in
 		[yY])	if [ -n "$BACKUP" ]; then
@@ -1558,7 +1558,7 @@ if [ -n "$CLEAN_STALE" ]; then
 
 			exec $0 -s $ARGS
 			;;
-		*) echo -n "	===>>> Keep listing $iport as a dependency? [n] "
+		*) echo -n "	===>>> Keep listing $iport as a dependency? y/[n] "
 			read answer
 			case "$answer" in
 			[yY])	no_del_list="${no_del_list}${iport}:" ;;
@@ -1606,7 +1606,7 @@ check_interactive () {
 		echo "===>>> +IGNOREME file is present for $1"
 	fi
 
-	echo '' ; echo -n "===>>> Update ${1}${update_to}? [y] "
+	echo '' ; echo -n "===>>> Update ${1}${update_to}? n/[y] "
 	local answer ; read answer
 	case "$answer" in
 	[nN]*)	INTERACTIVE_NO="${INTERACTIVE_NO}${1}:" ; return 1 ;;
@@ -2094,13 +2094,13 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 	if [ -n "$files" ]; then
 		echo "===>>> There are 'install complete' flags from a previous"
-		echo -n "       -[rf] run of ${0##*/}, delete them? [n] "
+		echo -n "       -[rf] run of ${0##*/}, delete them? y/[n] "
 		read answer
 		case "$answer" in
 		[yY]) [ -n "$PM_SU_VERBOSE" ] &&
 			echo "===>>> Deleting 'install complete' flags"
 		pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
-		*) echo -n "===>>> Enable the -R option? [n] "
+		*) echo -n "===>>> Enable the -R option? y/[n] "
 			read answer
 			case "$answer" in
 			[yY]) RESTART=Ropt ; ARGS="-R $ARGS" ;;
@@ -2341,7 +2341,7 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 				echo ''
 				echo "===>>> $upg_port has an +IGNOREME file"
 				echo ''
-				echo -n "===>>> Update anyway? [n] "
+				echo -n "===>>> Update anyway? y/[n] "
 				read answer
 				case "$answer" in
 				[yY]) ;;	# Let it build
