@@ -208,11 +208,13 @@ safe_exit () {
 
 		# Save state for the parent process to read back in
 		echo "CUR_DEPS='$CUR_DEPS'" >> $IPC_SAVE
-		echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
 		echo "dep_of_deps='$dep_of_deps'" >> $IPC_SAVE
 		if [ -z "$CONFIG_ONLY" ]; then
 			echo "DISPLAY_LIST='$DISPLAY_LIST'" >> $IPC_SAVE
 			echo "INSTALLED_LIST='$INSTALLED_LIST'" >> $IPC_SAVE
+
+			[ -n "$PM_DEL_BUILD_ONLY" ] &&
+			echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
 		elif [ -z "$NO_DEP_UPDATES" ]; then
 			echo 'unset NO_DEP_UPDATES' >> $IPC_SAVE
 		fi
@@ -226,18 +228,6 @@ safe_exit () {
 		fi
 		[ -n "$URB_YES" ] &&
 			echo "URB_DONE_LIST='$URB_DONE_LIST'" >> $IPC_SAVE
-		if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
-			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
-			echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
-			rundep_list=`uniquify_list $rundep_list`
-			echo "rundep_list='$rundep_list'" >> $IPC_SAVE
-			for f in $rundep_list; do
-				eval echo "export $f=\'\$$f\'" >> $IPC_SAVE
-				eval echo "export ${f}_p=\'\$${f}_p\'" >> $IPC_SAVE
-			done
-		fi
-		[ -n "$PM_DEL_BUILD_ONLY" ] &&
-			echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
 	fi
 
 	exit ${1:-0}
@@ -1667,19 +1657,30 @@ term_printf () {
 update_port () {
 	local update_to
 
-#[ -n "$CONFIG_ONLY" ] && { echo '' ; echo "Debug> num_deps $num_of_deps"; }
-	[ -n "$CONFIG_ONLY" ] && num_of_deps=$(( $num_of_deps + 1 ))
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
 	[ -n "$2" ] && update_to=" to $2"
 
+	if [ -n "$CONFIG_ONLY" ]; then
+		num_of_deps=$(( $num_of_deps + 1 ))
+		case "$1" in
+		*/*)	build_l="${build_l}\tInstall $1\n" ;;
+		*)	build_l="${build_l}\tUpgrade ${1#$pd/}${update_to}\n" ;;
+		esac
+#echo '' ; echo "Debug> num_deps $num_of_deps"
+	fi
+
 	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
 
 	if [ -n "$PM_DEPTH" ]; then
-		echo "	$PM_DEPTH >> ${1#$pd/}"
-		term_printf " >> ${1#$pd/} (${dep_of_deps}/${num_of_deps})"
+		echo "	${PM_DEPTH}>> ${1#$pd/}"
+term_printf "${PM_DEPTH#$PM_PARENT_PORT}>> ${1#$pd/} (${dep_of_deps}/${num_of_deps})"
 	else
+		if [ -n "$UPDATE_ALL" ]; then
+		term_printf " >> ${1#$pd/} (${dep_of_deps}/${num_of_deps})"
+		else
 #echo '' ; echo "Debug> NO PM_DEPTH HERE" ; echo ''
+		fi
 	fi
 
 	[ -n "$doing_dep_check" -o \
@@ -1695,6 +1696,7 @@ update_port () {
 	fi
 
 	if [ -n "$UPDATE_ALL" ]; then
+		term_printf " (${num_of_deps})"
 		echo "===>>> Returning to update check of installed ports"
 		echo ''
 	elif [ -n "$UPDATE_REQ_BYS" ]; then
@@ -1702,6 +1704,7 @@ update_port () {
 	elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
 	echo "===>>> Continuing 'make config' dependency check for $portdir"
 	else
+term_printf "${PM_DEPTH#$PM_PARENT_PORT}(${dep_of_deps}/${num_of_deps})"
 		echo "===>>> Returning to dependency check for $portdir"
 	fi
 	return 0
@@ -1914,7 +1917,34 @@ create_master_rb_list () {
 }
 
 post_config () {
-	local action
+	local num answer action
+
+	[ $num_of_deps -gt 0 ] && num=" (${num_of_deps})"
+	term_printf "$num"
+
+# XXX
+	echo ''
+	echo "===>>> If you choose to proceed, the following will be done:"
+	if [ -z "$UPDATE_ALL" ]; then
+# XXX Needs something here for multiport()
+		if [ -n "$upg_port" ]; then
+			cd $pd/$portdir && new_port=`pm_make -V PKGNAME`
+			case `pkg_version -t $upg_port $new_port` in
+			\<)	echo "	Upgrade $upg_port to $new_port" ;;
+			=)	echo "	Re-install $upg_port" ;;
+			\>)	echo "	Downgrade $upg_port to $new_port" ;;
+			esac
+		else
+			echo "	Install $portdir"
+		fi
+	fi
+	[ -n "$build_l" ] && echo -e "$build_l"
+	echo -n "===>>> Proceed? n/[y] "
+	read answer
+	case "$answer" in
+	[nN]*)	safe_exit ;;
+	esac
+	unset build_l
 
 	action=build
 	if [ "$PM_PACKAGES" = only ]; then
@@ -1948,15 +1978,19 @@ post_config () {
 			[ "$real_rundep" = 'no' ] &&
 			eval build_only_dl_g=\"${build_only_dl_g}\$${var}_p \"
 
+#[ "$real_rundep" = 'no' ] && printf "\nDebug> Inserting $var into bodlg\n\n"
+
 			eval unset $var ${var}_p
 		done
+
+#echo "Debug> build_only_dl_g: X${build_only_dl_g}X" ; echo ''
 
 		unset run_dl_g rundep_list
 		PM_BUILD_ONLY_LIST=pm_bol
 	fi
 }
 
-init_parent_port () {
+init_term_printf () {
 	PM_PARENT_PORT=$1
 	num_of_deps=0
 	dep_of_deps=0
@@ -2027,7 +2061,7 @@ multiport () {
 
 		num=1
 		for port in $worklist; do
-			init_parent_port "$port ${num}/${numports}"
+			init_term_printf "$port ${num}/${numports}"
 			($0 $ARGS $port) || fail "Update for $port failed"
 			. $IPC_SAVE
 			num=$(( $num + 1 ))
@@ -2051,7 +2085,7 @@ multiport () {
 				continue
 			fi ;;
 		esac
-		init_parent_port "$port ${num}/${numports}"
+		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || fail "Update for $port failed"
 		. $IPC_SAVE
 		num=$(( $num + 1 ))
@@ -2113,8 +2147,8 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 
 	if [ -z "$NO_RECURSIVE_CONFIG" ]; then
 		CONFIG_SEEN_LIST=':' ; CONFIG_ONLY=config_only
-		NO_DEP_UPDATES=no_dep_updates
-		export CONFIG_SEEN_LIST CONFIG_ONLY NO_DEP_UPDATES
+		NO_DEP_UPDATES=no_dep_updates ; build_l=''
+		export CONFIG_SEEN_LIST CONFIG_ONLY NO_DEP_UPDATES build_l
 
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 			run_dl_g='' ; build_only_dl_g='' ; rundep_list=''
@@ -2172,7 +2206,7 @@ all_config () {
 }
 	[ -n "$DI_FILES" ] && (read_distinfos)&
 
-	init_parent_port All
+	init_term_printf All
 
 	ports_by_category
 	echo "===>>> Starting check of installed ports for available updates"
@@ -2373,10 +2407,10 @@ case "$CONFIG_SEEN_LIST" in *:${portdir}:*) safe_exit ;; esac
 pm_cd $pd/$portdir || no_valid_port
 
 if [ -z "$PM_DEPTH" ]; then
-	PM_DEPTH=${upg_port:-$portdir}
-	[ -z "$PM_PARENT_PORT" ] && init_parent_port $portdir
+	PM_DEPTH="${upg_port:-$portdir} "
+	[ -z "$PM_PARENT_PORT" ] && init_term_printf ${upg_port:-$portdir}
 else
-	PM_DEPTH="$PM_DEPTH >> ${upg_port:-$portdir}"
+	PM_DEPTH="${PM_DEPTH}>> ${upg_port:-$portdir} "
 fi
 
 echo ''
@@ -2468,6 +2502,21 @@ if [ -n "$CONFIG_ONLY" ]; then
 	if [ ! "$$" -eq "$PM_PARENT_PID" ]; then
 		# Save state for the parent process to read back in
 		echo "CONFIG_SEEN_LIST='$CONFIG_SEEN_LIST'" > $IPC_SAVE
+# XXX config
+		echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
+		echo "build_l='$build_l'" >> $IPC_SAVE
+
+		if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
+			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
+			echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
+			rundep_list=`uniquify_list $rundep_list`
+			echo "rundep_list='$rundep_list'" >> $IPC_SAVE
+			for f in $rundep_list; do
+				eval echo "export $f=\'\$$f\'" >> $IPC_SAVE
+				eval echo "export ${f}_p=\'\$${f}_p\'" >> $IPC_SAVE
+			done
+		fi
+
 		safe_exit
 	elif [ -n "$UPDATE_REQ_BYS" ]; then
 		export URB_YES=urb_yes
@@ -2546,7 +2595,7 @@ if [ -n "$NO_ACTION" -a -z "$CONFIG_ONLY" ]; then
 	safe_exit
 fi
 
-new_port=`pm_make -V PKGNAME`
+[ -z "$new_port" ] && new_port=`pm_make -V PKGNAME`
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 fetch_package () {
