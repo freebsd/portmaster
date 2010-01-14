@@ -1784,31 +1784,27 @@ dependency_check () {
 	fi
 
 	if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
-		local rundeps dep run_dl build_only_dl
+		local rundeps dep varname run_dl build_only_dl
 
 		rundeps=`pm_make run-depends-list | sort -u`
 
+		for dep in $d_port_list; do
+			case "$rundeps" in
+			*${dep}*)
+				varname=`echo ${dep#$pd/} | sed 's#[-+/\.]#_#g'`
+				rundep_list="$rundep_list $varname"
+				eval $varname=\"$portdir \$$varname\"
+				eval ${varname}_p=$dep
+				eval export $varname ${varname}_p
+
+				run_dl="$run_dl $dep" ;;
+			*)	build_only_dl="$build_only_dl $dep" ;;
+			esac
+		done
+
 		if [ -z "$RECURSE_THOROUGH" ]; then
-			for dep in $d_port_list; do
-				case "$rundeps" in
-				*${dep}*)
-# XXX Need to figure out -t case
-	varname=`echo ${dep#$pd/} | sed 's#[-+/\.]#_#g'`
-	rundep_list="$rundep_list $varname"
-	eval $varname=\"$portdir \$$varname\"
-	eval ${varname}_p=$dep
-	eval export $varname ${varname}_p
-
-					run_dl="$run_dl $dep" ;;
-				*)	build_only_dl="$build_only_dl $dep" ;;
-				esac
-			done
-
 			d_port_list="$build_only_dl $run_dl"
 		else
-			for dep in $rundeps; do
-				run_dl="$run_dl $dep"
-			done
 			build_only_dl=`pm_make build-depends-list | sort -u`
 		fi
 
