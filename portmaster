@@ -42,16 +42,14 @@ umask 022
 version () {
 	local rcs cvs
 
-	rcs='$Id: portmaster,v 2.54 2009/09/15 07:50:11 dougb Exp $'
 	cvs='$FreeBSD$'
 
-	rcs="${rcs#*,v }" ; rcs="${rcs%% *}"
 	cvs="${cvs#*,v }" ; cvs="${cvs#*/portmaster }" ; cvs="${cvs%% *}"
 
 	echo ''
 	[ "${cvs#$}" != 'FreeBSD$' ] &&
 		{ echo "===>>> Version $cvs" ; return 0; }
-	echo "===>>> Development version $rcs"
+	echo "===>>> Version unknown!"
 }
 
 fail () {
@@ -242,7 +240,7 @@ usage () {
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
-	echo "    [--local-packagedir=<path>]"
+	echo "    [--local-packagedir=<path>] [--no-confirm]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -298,6 +296,8 @@ usage () {
 	echo "-m <arguments for the 'make' command line>"
 	echo "-x <avoid building or updating ports that match this pattern>"
 	echo '   Can be specified more than once'
+	echo '--no-confirm do not ask user to confirm list of ports to be'
+	echo '   installed and/or updated before proceeding'
 	echo ''
 	echo '--show-work list what ports are and would be installed'
 	echo ''
@@ -436,6 +436,8 @@ for var in "$@" ; do
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
 				export PM_DEL_BUILD_ONLY ;;
+	--no-confirm)		PM_NO_CONFIRM=pm_no_confirm
+				export PM_NO_CONFIRM ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -1944,18 +1946,24 @@ create_master_rb_list () {
 post_config () {
 	local numdeps answer action
 
-	[ $num_of_deps -gt 0 ] && numdeps=" (${num_of_deps})"
-	term_printf "$numdeps"
+	if [ $num_of_deps -gt 0 ]; then
+		numdeps=" (${num_of_deps})"
+		term_printf "$numdeps"
 
-	echo ''
-	echo "===>>> If you choose to proceed, the following will be done:"
-	echo -e "$build_l"
-	echo -n "===>>> Proceed? y/n [y] "
-	read answer
-	case "$answer" in
-	[nN]*)	safe_exit ;;
-	esac
-	unset build_l
+		if [ -z "$PM_NO_CONFIRM" ]; then
+			echo ''
+echo "===>>> The following actions will be taken if you choose to proceed:"
+			echo -e "$build_l"
+			echo -n "===>>> Proceed? y/n [y] "
+			read answer
+			case "$answer" in
+			[nN]*)	safe_exit ;;
+			esac
+			unset build_l
+		fi
+	else
+		term_printf
+	fi
 
 	action=build
 	if [ "$PM_PACKAGES" = only ]; then
