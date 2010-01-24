@@ -1685,7 +1685,7 @@ update_build_l () {
 update_port () {
 	local update_to
 
-	update_to=" to $2"
+	[ -n "$2" ] && update_to=" to $2"
 	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
@@ -1944,13 +1944,14 @@ create_master_rb_list () {
 }
 
 post_config () {
-	local numdeps answer action
+	local action
 
 	if [ $num_of_deps -gt 0 ]; then
-		numdeps=" (${num_of_deps})"
-		term_printf "$numdeps"
+		term_printf " (${num_of_deps})"
 
 		if [ -z "$PM_NO_CONFIRM" ]; then
+			local answer
+
 			echo ''
 echo "===>>> The following actions will be taken if you choose to proceed:"
 			echo -e "$build_l"
