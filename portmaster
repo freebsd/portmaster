@@ -1958,7 +1958,10 @@ echo "===>>> The following actions will be taken if you choose to proceed:"
 			echo -n "===>>> Proceed? y/n [y] "
 			read answer
 			case "$answer" in
-			[nN]*)	safe_exit ;;
+			[nN]*)	echo ''
+echo "===>>> If you would like to upgrade or install some, but not"
+echo "       all of the above try adding '-i' to the command line."
+				safe_exit ;;
 			esac
 			unset build_l
 		fi
