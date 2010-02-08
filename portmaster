@@ -199,7 +199,7 @@ safe_exit () {
 			cd
 			for f in $build_deps_il; do
 				[ -n "$PM_VERBOSE" ] && echo "       $f"
-				pkg_delete -f $f
+				pm_pkg_delete_s -f $f
 			done
 			echo ''
 		fi
@@ -1666,10 +1666,7 @@ check_fetch_only () {
 
 term_printf () {
 	[ -n "$PM_NO_TERM_TITLE" ] && return
-
-	case "$TERM" in
-	cons25)	return ;;
-	esac
+	[ "$TERM" = cons25 ] && return
 
 	printf "\033]0;${0##*/}: ${PM_PARENT_PORT}${1}\007"
 }
@@ -2702,7 +2699,7 @@ fetch_package () {
 		fi
 
 		fetch $fetch_args -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
-			pm_unlink ${ppd}/${1}.tbz;
+			pm_unlink_s ${ppd}/${1}.tbz;
 			fetch $fetch_args -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
 	fi
 }
