@@ -1666,10 +1666,16 @@ update_build_l () {
 	case "$1" in
 	*/*)	origin=$1 ; iport=`iport_from_origin $origin`
 		if [ -z "$iport" ]; then
+			case "$build_l" in
+			*\ $origin\\*)	return ;;
+			esac
 			build_l="${build_l}\tInstall $origin\n"
 			return
 		fi ;;
-	*)	origin=`origin_from_pdb $1` ; iport=$1 ;;
+	*)	origin=`origin_from_pdb $1` ; iport=$1
+		case "$build_l" in
+		*\ $iport\ *)	return ;;
+		esac ;;
 	esac
 
 	pm_cd $pd/$origin && new_port=`pm_make -V PKGNAME`
