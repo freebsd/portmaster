@@ -240,7 +240,7 @@ usage () {
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
-	echo "    [--local-packagedir=<path>] [--no-confirm]"
+	echo "    [--local-packagedir=<path>] [--no-confirm] [--no-term-title]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -298,6 +298,7 @@ usage () {
 	echo '   Can be specified more than once'
 	echo '--no-confirm do not ask user to confirm list of ports to be'
 	echo '   installed and/or updated before proceeding'
+	echo '--no-term-title do not update the xterm title bar'
 	echo ''
 	echo '--show-work list what ports are and would be installed'
 	echo ''
@@ -438,6 +439,8 @@ for var in "$@" ; do
 				export PM_DEL_BUILD_ONLY ;;
 	--no-confirm)		PM_NO_CONFIRM=pm_no_confirm
 				export PM_NO_CONFIRM ;;
+	--no-term-title)	PM_NO_TERM_TITLE=pm_no_term_title
+				export PM_NO_TERM_TITLE ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -1657,6 +1660,8 @@ check_fetch_only () {
 }
 
 term_printf () {
+	[ -n "$PM_NO_TERM_TITLE" ] && return
+
 	case "$TERM" in
 	cons25)	return ;;
 	esac
