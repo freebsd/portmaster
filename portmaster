@@ -2471,7 +2471,7 @@ if [ -n "$CONFIG_ONLY" -a "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -n "$upg_port" ]; then
 		update_build_l $upg_port
 	else
-		build_l="${build_l}\tInstall $portdir\n"
+		update_build_l $portdir
 	fi
 fi
 
