@@ -1657,6 +1657,10 @@ check_fetch_only () {
 }
 
 term_printf () {
+	case "$TERM" in
+	cons25)	return ;;
+	esac
+
 	printf "\033]0;${0##*/}: ${PM_PARENT_PORT}${1}\007"
 }
 
