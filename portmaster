@@ -246,6 +246,7 @@ usage () {
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
 	echo "    [--local-packagedir=<path>] [--no-confirm] [--no-term-title]"
+	echo "    [--index]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -304,6 +305,7 @@ usage () {
 	echo '--no-confirm do not ask user to confirm list of ports to be'
 	echo '   installed and/or updated before proceeding'
 	echo '--no-term-title do not update the xterm title bar'
+	echo "--index use $pd/INDEX-[6-9] to check if a port is out of date"
 	echo ''
 	echo '--show-work list what ports are and would be installed'
 	echo ''
@@ -350,7 +352,7 @@ usage () {
 
 pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
-		fail "Cannot cd to port directory: $pd/$origin"; }
+		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH;
 		 unset -v MASTER_RB_LIST CONFIG_SEEN_LIST;
@@ -446,6 +448,7 @@ for var in "$@" ; do
 				export PM_NO_CONFIRM ;;
 	--no-term-title)	PM_NO_TERM_TITLE=pm_no_term_title
 				export PM_NO_TERM_TITLE ;;
+	--index)		PM_INDEX=pm_index ; export PM_INDEX ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -2209,6 +2212,41 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	if [ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" \
 	    -a -z "$PM_PACKAGES" ]; then
 		export DI_FILES=`pm_mktemp DI-FILES`
+	fi
+
+# XXX
+	if [ -n "$PM_INDEX" ]; then
+		pm_cd_pd
+		if [ -z "$FETCHINDEX" ]; then
+			FETCHINDEX=`pm_make_b -V FETCHINDEX`
+			[ -n "$FETCHINDEX" ] ||
+			fail 'The value of FETCHINDEX cannot be empty'
+		fi
+		if [ -z "$MASTER_SITE_INDEX" ]; then
+			MASTER_SITE_INDEX=`pm_make_b -V MASTER_SITE_INDEX`
+			[ -n "$MASTER_SITE_INDEX" ] ||
+			fail 'The value of MASTER_SITE_INDEX cannot be empty'
+		fi
+		if [ -z "$INDEXDIR" ]; then
+			INDEXDIR=`pm_make_b -V INDEXDIR`
+			[ -n "$INDEXDIR" ] ||
+			fail 'The value of INDEXDIR cannot be empty'
+		fi
+		if [ -z "$INDEXFILE" ]; then
+			INDEXFILE=`pm_make_b -V INDEXFILE`
+			[ -n "$INDEXFILE" ] ||
+			fail 'The value of INDEXFILE cannot be empty'
+		fi
+
+		i="${INDEXDIR}/${INDEXFILE}"
+
+		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Fetching INDEX file"
+		$PM_SU_CMD $FETCHINDEX ${i}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
+		temp_index=`pm_mktemp index`
+		bunzip2 < ${i}.bz2 > $temp_index
+		pm_install_s $temp_index $i
+		
+		unset i temp_index
 	fi
 
 	if [ $# -gt 1 -a -z "$REPLACE_ORIGIN" ]; then
