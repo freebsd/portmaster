@@ -2238,15 +2238,16 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 			fail 'The value of INDEXFILE cannot be empty'
 		fi
 
-		i="${INDEXDIR}/${INDEXFILE}"
+		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
+		export PM_INDEX
 
-		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Fetching INDEX file"
-		$PM_SU_CMD $FETCHINDEX ${i}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
+		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Updating INDEX file"
+		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
 		temp_index=`pm_mktemp index`
-		bunzip2 < ${i}.bz2 > $temp_index
+		bunzip2 < ${PM_INDEX}.bz2 > $temp_index
 		pm_install_s $temp_index $i
 		
-		unset i temp_index
+		unset temp_index
 	fi
 
 	if [ $# -gt 1 -a -z "$REPLACE_ORIGIN" ]; then
