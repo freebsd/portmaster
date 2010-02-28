@@ -473,6 +473,42 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
 		fail Package installation support requires FreeBSD 6.4 or newer
 	fi
+
+# XXX
+	if [ -n "$PM_INDEX" ]; then
+		pm_cd_pd
+		if [ -z "$FETCHINDEX" ]; then
+			FETCHINDEX=`pm_make_b -V FETCHINDEX`
+			[ -n "$FETCHINDEX" ] ||
+			fail 'The value of FETCHINDEX cannot be empty'
+		fi
+		if [ -z "$MASTER_SITE_INDEX" ]; then
+			MASTER_SITE_INDEX=`pm_make_b -V MASTER_SITE_INDEX`
+			[ -n "$MASTER_SITE_INDEX" ] ||
+			fail 'The value of MASTER_SITE_INDEX cannot be empty'
+		fi
+		if [ -z "$INDEXDIR" ]; then
+			INDEXDIR=`pm_make_b -V INDEXDIR`
+			[ -n "$INDEXDIR" ] ||
+			fail 'The value of INDEXDIR cannot be empty'
+		fi
+		if [ -z "$INDEXFILE" ]; then
+			INDEXFILE=`pm_make_b -V INDEXFILE`
+			[ -n "$INDEXFILE" ] ||
+			fail 'The value of INDEXFILE cannot be empty'
+		fi
+
+		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
+
+		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Updating INDEX file"
+		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
+		temp_index=`pm_mktemp index`
+		bunzip2 < ${PM_INDEX}.bz2 > $temp_index
+		pm_install_s $temp_index $PM_INDEX
+
+		unlink $temp_index
+		unset temp_index
+	fi
 fi
 
 set -- $newopts
@@ -492,7 +528,7 @@ iport_from_origin () {
 
 origin_from_pdb () {
 	local o
-	o=`grep '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null`
+	o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null`
 	echo ${o#@comment ORIGIN:}
 }
 
@@ -1004,6 +1040,26 @@ check_state () {
 	return 0
 }
 
+# XXX
+
+parse_index () {
+	local line
+
+	line=`grep -m1 .*\|${pd}/${1}\|.* $PM_INDEX`
+
+	case "$2" in
+	name)		echo ${line%%|*} ;;
+	localbase)	echo $line | cut -f 3 -d\| ;;
+	comment)	echo $line | cut -f 4 -d\| ;;
+	descr)		echo $line | cut -f 5 -d\| ;;
+	maintainer)	echo $line | cut -f 6 -d\| ;;
+	category)	echo $line | cut -f 7 -d\| ;;
+	b-deps)		echo $line | cut -f 8 -d\| ;;
+	r-deps)		echo $line | cut -f 9 -d\| ;;
+	www)		echo $line | cut -f 10 -d\| ;;
+	esac
+}
+
 check_for_updates () {
 	# Global: num_updates
 	local list_only nf iport origin port_ver udf do_update
@@ -1024,8 +1080,20 @@ check_for_updates () {
 		fi
 		return 0
 	fi
+# XXX
 
-	if [ -d "$pd/$origin" ]; then
+	if [ -n "$PM_INDEX" ]; then
+		port_ver=`parse_index $origin name`
+
+		case `pkg_version -t $iport $port_ver` in
+		\<)	do_update=update_index
+#echo ''; echo "Debug> Found one from the INDEX!"; echo ''
+		;;
+		=)	;;	# Potential future use
+		esac
+	fi
+
+	if [ -d "$pd/$origin" -a -z "$do_update" ]; then
 		if ! pm_cd $pd/$origin; then
 			if [ -e "$pdb/$iport/+IGNOREME" ]; then
 			echo "	===>>> Warning: Unable to cd to $pd/$origin"
@@ -1088,7 +1156,7 @@ check_for_updates () {
 				fi ;;
 			esac
 		fi
-	else
+	elif [ -z "$do_update" ]; then
 		find_moved_port $origin $iport $nf
 
 		# If the port has moved, we have to update it, otherwise ignore
@@ -2214,42 +2282,6 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		export DI_FILES=`pm_mktemp DI-FILES`
 	fi
 
-# XXX
-	if [ -n "$PM_INDEX" ]; then
-		pm_cd_pd
-		if [ -z "$FETCHINDEX" ]; then
-			FETCHINDEX=`pm_make_b -V FETCHINDEX`
-			[ -n "$FETCHINDEX" ] ||
-			fail 'The value of FETCHINDEX cannot be empty'
-		fi
-		if [ -z "$MASTER_SITE_INDEX" ]; then
-			MASTER_SITE_INDEX=`pm_make_b -V MASTER_SITE_INDEX`
-			[ -n "$MASTER_SITE_INDEX" ] ||
-			fail 'The value of MASTER_SITE_INDEX cannot be empty'
-		fi
-		if [ -z "$INDEXDIR" ]; then
-			INDEXDIR=`pm_make_b -V INDEXDIR`
-			[ -n "$INDEXDIR" ] ||
-			fail 'The value of INDEXDIR cannot be empty'
-		fi
-		if [ -z "$INDEXFILE" ]; then
-			INDEXFILE=`pm_make_b -V INDEXFILE`
-			[ -n "$INDEXFILE" ] ||
-			fail 'The value of INDEXFILE cannot be empty'
-		fi
-
-		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
-		export PM_INDEX
-
-		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Updating INDEX file"
-		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
-		temp_index=`pm_mktemp index`
-		bunzip2 < ${PM_INDEX}.bz2 > $temp_index
-		pm_install_s $temp_index $i
-		
-		unset temp_index
-	fi
-
 	if [ $# -gt 1 -a -z "$REPLACE_ORIGIN" ]; then
 		multiport $@
 	fi
@@ -2790,7 +2822,7 @@ fetch_package () {
 		fi
 
 		for s in ${new_port%\.*} ${new_port%%\.*} ${new_port%-*}; do
-			latest_pv=`grep "href=\"${s}" $dirlist`
+			latest_pv=`grep -m1 "href=\"${s}" $dirlist`
 			[ -n "$latest_pv" ] && break
 		done
 	fi
