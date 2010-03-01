@@ -23,7 +23,13 @@ if [ -z "$PM_PARENT_PID" ]; then
 
 	set -o allexport
 	# Read a global rc file first
-	[ -r /etc/portmaster.rc ] && . /etc/portmaster.rc
+	if [ -r /etc/portmaster.rc ]; then
+		echo '' ; echo "===>>> WARNING"
+		echo '       Your portmaster.rc is in /etc, however support for the file in this'
+		echo '       location is deprecated, and will be removed in a future version.'
+		echo '' ; echo '       The proper location for this file is /usr/local/etc'
+		echo '' ; . /etc/portmaster.rc
+	fi
 	[ -r /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
 
 	# Read a local one next, and allow the command line to override
@@ -246,7 +252,7 @@ usage () {
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
 	echo "    [--local-packagedir=<path>] [--no-confirm] [--no-term-title]"
-	echo "    [--index]"
+	echo "    [--index] [--index-only]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -306,6 +312,7 @@ usage () {
 	echo '   installed and/or updated before proceeding'
 	echo '--no-term-title do not update the xterm title bar'
 	echo "--index use $pd/INDEX-[6-9] to check if a port is out of date"
+	echo '--index-only do not try to use /usr/ports'
 	echo ''
 	echo '--show-work list what ports are and would be installed'
 	echo ''
@@ -380,31 +387,6 @@ pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
 
 #=============== End functions we always want to have ===============
 
-# Do this here so it can use the fancy functions above, and default values
-# can be overridden in the rc files
-if [ "$$" -eq "$PM_PARENT_PID" ]; then
-	if [ -z "$pd" ]; then
-		pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR`
-		[ -n "$pd" ] || fail 'The value of PORTSDIR cannot be empty'
-	fi
-	if [ -z "$pdb" ]; then
-		pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR`
-		[ -n "$pdb" ] || fail 'The value of PKG_DBDIR cannot be empty'
-	fi
-	if [ -z "$distdir" ]; then
-		distdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -VDISTDIR`
-		[ -n "$distdir" ] || fail 'The value of DISTDIR cannot be empty'
-		# In case it is a symlink
-		distdir="${distdir}/"
-	fi
-	if [ -z "$port_dbdir" ]; then
-		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR`
-		[ -n "$port_dbdir" ] && export port_dbdir
-	fi
-
-	export pd pdb distdir
-fi
-
 packages_init () {
 	local e1 e2
 
@@ -449,6 +431,8 @@ for var in "$@" ; do
 	--no-term-title)	PM_NO_TERM_TITLE=pm_no_term_title
 				export PM_NO_TERM_TITLE ;;
 	--index)		PM_INDEX=pm_index ; export PM_INDEX ;;
+	--index-only)		PM_INDEX=pm_index ; PM_INDEX_ONLY=pm_index_only
+				export PM_INDEX PM_INDEX_ONLY ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -464,7 +448,37 @@ for var in "$@" ; do
 	esac
 done
 
+# Do this here so it can use the fancy functions above, and default values
+# can be overridden in the rc files
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
+	if [ -z "$pd" ]; then
+		pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
+		[ -n "$pd" -o -n "$PM_INDEX_ONLY" ] ||
+			fail 'The value of PORTSDIR cannot be empty'
+	fi
+	if [ -z "$pdb" ]; then
+		pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR 2>/dev/null`
+		if [ -z "$pdb" ]; then
+			if [ -d /var/db/pkg ]; then
+				pdb='/var/db/pkg'
+			else
+				fail 'The value of PKG_DBDIR cannot be empty'
+			fi
+		fi
+	fi
+	if [ -z "$distdir" -a "$PM_PACKAGES" != only ]; then
+		distdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
+		# In case it is a symlink
+		distdir="${distdir%/}/"
+	fi
+	if [ -z "$port_dbdir" ]; then
+		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
+		[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir='/var/db/ports'
+		[ -n "$port_dbdir" ] && export port_dbdir
+	fi
+
+	export pd pdb distdir
+
 	if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
 		PM_BUILD_ONLY_LIST=pm_bol
 		export PM_BUILD_ONLY_LIST
@@ -475,39 +489,47 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 
 # XXX
+
 	if [ -n "$PM_INDEX" ]; then
-		pm_cd_pd
+		[ -d "$pd" ] && pm_cd_pd
 		if [ -z "$FETCHINDEX" ]; then
-			FETCHINDEX=`pm_make_b -V FETCHINDEX`
-			[ -n "$FETCHINDEX" ] ||
-			fail 'The value of FETCHINDEX cannot be empty'
+			[ -d "$pd" ] && FETCHINDEX=`pm_make_b -V FETCHINDEX`
+			[ -n "$FETCHINDEX" ] || FETCHINDEX='fetch -am -o'
 		fi
 		if [ -z "$MASTER_SITE_INDEX" ]; then
+			[ -d "$pd" ] &&
 			MASTER_SITE_INDEX=`pm_make_b -V MASTER_SITE_INDEX`
 			[ -n "$MASTER_SITE_INDEX" ] ||
-			fail 'The value of MASTER_SITE_INDEX cannot be empty'
+			MASTER_SITE_INDEX='http://www.FreeBSD.org/ports/'
 		fi
 		if [ -z "$INDEXDIR" ]; then
-			INDEXDIR=`pm_make_b -V INDEXDIR`
-			[ -n "$INDEXDIR" ] ||
-			fail 'The value of INDEXDIR cannot be empty'
+			[ -d "$pd" ] && INDEXDIR=`pm_make_b -V INDEXDIR`
+			[ -n "$INDEXDIR" ] || INDEXDIR="$TMPDIR"
 		fi
 		if [ -z "$INDEXFILE" ]; then
-			INDEXFILE=`pm_make_b -V INDEXFILE`
-			[ -n "$INDEXFILE" ] ||
-			fail 'The value of INDEXFILE cannot be empty'
+			[ -d "$pd" ] && INDEXFILE=`pm_make_b -V INDEXFILE`
+			if [ -z "$INDEXFILE" ]; then
+				ver=`uname -r`
+				INDEXFILE=INDEX-${ver%%\.*}
+				unset ver
+			fi
 		fi
 
 		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
-
+		index_time=`stat -f '%Ua' $PM_INDEX`
 		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Updating INDEX file"
 		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
-		temp_index=`pm_mktemp index`
-		bunzip2 < ${PM_INDEX}.bz2 > $temp_index
-		pm_install_s $temp_index $PM_INDEX
-
-		unlink $temp_index
-		unset temp_index
+		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX` ]; then
+#echo '' ; echo "Debug> Updating INDEX" ; echo ''
+			temp_index=`pm_mktemp index`
+			bunzip2 < ${PM_INDEX}.bz2 > $temp_index
+			pm_install_s $temp_index $PM_INDEX
+			unlink $temp_index
+			unset temp_index
+		else
+#echo '' ; echo "Debug> NOT updating INDEX" ; echo ''
+		fi
+		unset index_time
 	fi
 fi
 
@@ -815,6 +837,8 @@ delete_empty_dist_subdirs () {
 #=============== Begin code relevant only to --features ===============
 
 if [ -n "$CLEAN_DISTFILES" ]; then
+	[ "$distdir" != '/' ] || fail 'There is no DISTDIR to clean'
+
 	# Set the file name here since we are usually called in a subshell
 	DI_FILES=`pm_mktemp DI-FILES`
 	read_distinfos
@@ -895,6 +919,9 @@ IFS='
 fi
 
 if [ -n "$CHECK_PORT_DBDIR" ]; then
+	[ -d "$port_dbdir" ] ||
+		fail 'PORT_DBIR is empty, or the directory $port_dbdir does not exist'
+
 	if [ "$1" = "-v" ]; then PM_VERBOSE=vopt; fi
 
 	unique_list=':'
@@ -1043,7 +1070,9 @@ check_state () {
 # XXX
 
 parse_index () {
-	local line
+	local pd line
+
+	[ -z "$pd" -a -n "$PM_INDEX_ONLY" ] && pd=/usr/ports
 
 	line=`grep -m1 .*\|${pd}/${1}\|.* $PM_INDEX`
 
@@ -1057,6 +1086,32 @@ parse_index () {
 	b-deps)		echo $line | cut -f 8 -d\| ;;
 	r-deps)		echo $line | cut -f 9 -d\| ;;
 	www)		echo $line | cut -f 10 -d\| ;;
+	esac
+}
+
+check_pkg_version () {
+	local iport port_ver udf
+
+	iport=$1 ; port_ver=$2 ; udf=$3
+
+	case `pkg_version -t $iport $port_ver` in
+	\<)	return 1 ;;
+	=)	return ;;
+	\>)	if [ -n "$PM_VERBOSE" ]; then
+			echo "	===>>> Port version $port_ver does not"
+			echo "	===>>> seem newer than installed $iport"
+		fi
+		if [ -n "$PM_FORCE" ]; then
+			check_restart_and_udf $udf $iport || return 1
+		elif [ -n "$URB_YES" ]; then
+			case "$MASTER_RB_LIST" in *" $iport "*)
+				if ! check_restart_and_udf $udf $iport; then
+					return 1
+				else
+					URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
+				fi ;;
+			esac
+		fi ;;
 	esac
 }
 
@@ -1085,15 +1140,12 @@ check_for_updates () {
 	if [ -n "$PM_INDEX" ]; then
 		port_ver=`parse_index $origin name`
 
-		case `pkg_version -t $iport $port_ver` in
-		\<)	do_update=update_index
-#echo ''; echo "Debug> Found one from the INDEX!"; echo ''
-		;;
-		=)	;;	# Potential future use
-		esac
+		check_pkg_version $iport $port_ver || { do_update=update_index ;
+#echo ''; echo "Debug> Found one from the INDEX!"; echo '';
+}
 	fi
 
-	if [ -d "$pd/$origin" -a -z "$do_update" ]; then
+	if [ -d "$pd/$origin" -a -z "$do_update" -a -z "$PM_INDEX_ONLY" ]; then
 		if ! pm_cd $pd/$origin; then
 			if [ -e "$pdb/$iport/+IGNOREME" ]; then
 			echo "	===>>> Warning: Unable to cd to $pd/$origin"
@@ -1110,12 +1162,12 @@ check_for_updates () {
 		if [ "$iport" = "$port_ver" ]; then
 			if [ -n "$PM_FORCE" ]; then
 				check_restart_and_udf $udf $iport ||
-					do_update=do_update
+					do_update=do_update_force
 			elif [ -n "$URB_YES" ]; then
 		# Outdent
 		case "$MASTER_RB_LIST" in *" $iport "*)
 			if ! check_restart_and_udf $udf $iport; then
-				do_update=do_update2
+				do_update=do_update_urb
 			else
 				URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
 			fi ;;
@@ -1123,40 +1175,19 @@ check_for_updates () {
 		# Outdent
 			elif [ -n "$PM_MULTI_PORTS" ]; then
 				case "$PM_MULTI_PORTS" in
-				*:${iport}:*)	do_update=do_update7 ;;
-				*:${origin}:*)	do_update=do_update8 ;;
+				*:${iport}:*)	do_update=do_update_mi ;;
+				*:${origin}:*)	do_update=do_update_mo ;;
 				esac
 			elif [ -n "$LIST_PLUS" ]; then
-				check_state
+				[ -z "$PM_INDEX_ONLY" ] && check_state
 				return 0
 			elif [ -n "$LIST" ]; then
 				return 0
 			fi
 		else
-			case `pkg_version -t $iport $port_ver` in
-			\<)	do_update=do_update3 ;;
-			=)	;;	# Should not be reached
-			\>)	if [ -n "$PM_VERBOSE" ]; then
-				echo "	===>>> Port version $port_ver does not"
-				echo "	===>>> seem newer than installed $iport"
-				fi
-				if [ -n "$PM_FORCE" ]; then
-					check_restart_and_udf $udf $iport ||
-						do_update=do_update4
-				elif [ -n "$URB_YES" ]; then
-		# Outdent
-		case "$MASTER_RB_LIST" in *" $iport "*)
-			if ! check_restart_and_udf $udf $iport; then
-				do_update=do_update5
-			else
-				URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
-			fi ;;
-		esac
-		# Outdent
-				fi ;;
-			esac
+			check_pkg_version $iport $port_ver $udf || do_update=do_update_check
 		fi
-	elif [ -z "$do_update" ]; then
+	elif [ -z "$do_update" -a -z "$PM_INDEX_ONLY" ]; then
 		find_moved_port $origin $iport $nf
 
 		# If the port has moved, we have to update it, otherwise ignore
@@ -1171,7 +1202,7 @@ check_for_updates () {
 			echo "	===>>> New version available: $port_ver"
 			[ -e "$pdb/$iport/+IGNOREME" ] &&
 				echo "	===>>> +IGNOREME file is present for $1"
-			check_state
+			[ -z "$PM_INDEX_ONLY" ] && check_state
 			num_updates=$(( $num_updates + 1 ))
 		else
 			unset moved_npd
@@ -1646,6 +1677,9 @@ if [ -n "$CLEAN_STALE" ]; then
 fi
 
 #=============== End code relevant only to getopts features ===============
+
+[ "$distdir" = '/' -a "$PM_PACKAGES" != only ] && fail 'The value of DISTDIR cannot be empty'
+
 #=============== Begin functions for main ===============
 
 already_done () {
