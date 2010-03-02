@@ -1255,14 +1255,16 @@ init_packages () {
 
 	init_packages_var
 
-	pbu=$PACKAGES/portmaster-backup
+	if [ -z "$NO_BACKUP" ]; then
+		pbu=$PACKAGES/portmaster-backup
 
-	if [ ! -d "$pbu" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Creating $pbu"
-		pm_mkdir_s $pbu
+		if [ ! -d "$pbu" ]; then
+			[ -n "$PM_SU_VERBOSE" ] &&
+				echo "===>>> Creating $pbu"
+			pm_mkdir_s $pbu
+		fi
+		export pbu
 	fi
-	export pbu
 }
 
 pm_pkg_create () {
@@ -1290,15 +1292,19 @@ pm_pkg_create () {
 				NB_DELETE="${NB_DELETE}${pkg} "
 			fi
 		elif [ "$1" = "$PACKAGES" ]; then
-			local pkg latest_link
+			local pkg ; pkg=`echo $2.*`
 
-			pkg=`echo $2.*`
-			pm_cd_pd $portdir
-			latest_link=`pm_make -V LATEST_LINK`
-			cd ${1}/Latest
-			ln -sf ../All/$pkg ${latest_link}.tbz
+			if [ -z "$PM_INDEX_ONLY" ]; then
+				local latest_link
+
+				pm_cd_pd $portdir
+				latest_link=`pm_make -V LATEST_LINK`
+				cd ${1}/Latest
+				$PM_SU_CMD ln -sf ../All/$pkg ${latest_link}.tbz
+			fi
+
 			cd ${1}/${portdir%/*}
-			ln -sf ../All/$pkg $pkg
+			$PM_SU_CMD ln -sf ../All/$pkg $pkg
 			echo "  ===>>> Package saved to ${1}/All" ; echo ''
 		fi
 	else
@@ -1915,11 +1921,11 @@ gen_dep_list () {
 
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		pm_cd_pd $portdir
-		list=`pm_make $1 | sort -u`
+		list=`pm_make $* | sort -u`
 	else
 		local temp_list l
 
-		case "$1" in
+		case "$*" in
 		'build-depends-list run-depends-list'|all-depends-list)
 		temp_list="`parse_index $portdir b-deps` `parse_index $portdir r-deps`" ;;
 		build-depends-list) temp_list=`parse_index $portdir b-deps` ;;
@@ -3161,7 +3167,7 @@ if [ -z "$use_package" ]; then
 	eval pm_make_s -DNO_DEPENDS install $port_log_args ||
 		install_failed $new_port
 else
-	[ -n "$local_package" ] && ppd=${local_package%/Latest*}/All
+	[ -n "$local_package" ] && ppd=${LOCAL_PACKAGEDIR}/All
 
 	echo "===>>> Installing package"
 	if $PM_SU_CMD pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz; then
