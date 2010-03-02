@@ -251,8 +251,8 @@ usage () {
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
-	echo "    [--local-packagedir=<path>] [--no-confirm] [--no-term-title]"
-	echo "    [--index] [--index-only]"
+	echo "    [--local-packagedir=<path>] [--delete-packages]"
+	echo "    [--no-confirm] [--no-term-title] [--index|--index-only]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -332,6 +332,7 @@ usage () {
 	echo '--always-fetch fetch package even if it already exists locally'
 	echo '--local-packagedir=<path> where local packages can be found,'
 	echo '   will fall back to fetching if no local version exists'
+	echo '--delete-packages after installing from a package, delete it'
 	echo ''
 	echo '-l list installed ports by category'
 	echo '-L list installed ports by category, and search for updates'
@@ -423,6 +424,8 @@ for var in "$@" ; do
 				export PM_ALWAYS_FETCH ;;
 	--local-packagedir=*)	LOCAL_PACKAGEDIR=${var#--local-packagedir=}
 				export LOCAL_PACKAGEDIR ;;
+	--delete-packages)	PM_DELETE_PACKAGES=pm_delete_packages
+				export PM_DELETE_PACKAGES ;;
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
 				export PM_DEL_BUILD_ONLY ;;
@@ -451,42 +454,6 @@ done
 # Do this here so it can use the fancy functions above, and default values
 # can be overridden in the rc files
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
-	if [ -z "$pd" ]; then
-		pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
-		[ -n "$pd" -o -n "$PM_INDEX_ONLY" ] ||
-			fail 'The value of PORTSDIR cannot be empty'
-	fi
-	if [ -z "$pdb" ]; then
-		pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR 2>/dev/null`
-		if [ -z "$pdb" ]; then
-			if [ -d /var/db/pkg ]; then
-				pdb='/var/db/pkg'
-			else
-				fail 'The value of PKG_DBDIR cannot be empty'
-			fi
-		fi
-	fi
-	if [ -z "$distdir" -a "$PM_PACKAGES" != only ]; then
-		distdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
-		# In case it is a symlink
-		distdir="${distdir%/}/"
-	fi
-	if [ -z "$port_dbdir" ]; then
-		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
-		[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir='/var/db/ports'
-		[ -n "$port_dbdir" ] && export port_dbdir
-	fi
-
-	export pd pdb distdir
-
-	if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
-		PM_BUILD_ONLY_LIST=pm_bol
-		export PM_BUILD_ONLY_LIST
-	fi
-	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
-		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
-		fail Package installation support requires FreeBSD 6.4 or newer
-	fi
 
 # XXX
 
@@ -520,16 +487,64 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Updating INDEX file"
 		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
 		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX` ]; then
-#echo '' ; echo "Debug> Updating INDEX" ; echo ''
 			temp_index=`pm_mktemp index`
 			bunzip2 < ${PM_INDEX}.bz2 > $temp_index
 			pm_install_s $temp_index $PM_INDEX
 			unlink $temp_index
 			unset temp_index
-		else
-#echo '' ; echo "Debug> NOT updating INDEX" ; echo ''
 		fi
 		unset index_time
+	fi
+
+	if [ -z "$pd" ]; then
+		if [ -z "$PORTSDIR" ]; then
+			pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
+		else
+			pd=$PORTSDIR
+		fi
+		if [ -z "$pd" ]; then
+			if [ -n "$PM_INDEX_ONLY" ]; then
+				pd=`head -1 $PM_INDEX | cut -f 2 -d\|`
+				pd=${pd%/*}
+				pd=${pd%/*}
+			fi
+		fi
+		[ -z "$pd" ] && fail 'The value of PORTSDIR cannot be empty'
+	fi
+	if [ -z "$pdb" ]; then
+		if [ -z "$PKG_DBDIR" ]; then
+			pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR 2>/dev/null`
+		else
+			pdb=$PKG_DBDIR
+		fi
+		if [ -z "$pdb" ]; then
+			if [ -d /var/db/pkg ]; then
+				pdb='/var/db/pkg'
+			else
+				fail 'The value of PKG_DBDIR cannot be empty'
+			fi
+		fi
+	fi
+	if [ -z "$distdir" -a "$PM_PACKAGES" != only ]; then
+		distdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
+		# In case it is a symlink
+		distdir="${distdir%/}/"
+	fi
+	if [ -z "$port_dbdir" ]; then
+		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
+		[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir='/var/db/ports'
+		[ -n "$port_dbdir" ] && export port_dbdir
+	fi
+
+	export pd pdb distdir
+
+	if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
+		PM_BUILD_ONLY_LIST=pm_bol
+		export PM_BUILD_ONLY_LIST
+	fi
+	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
+		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
+		fail Package installation support requires FreeBSD 6.4 or newer
 	fi
 fi
 
@@ -1140,9 +1155,7 @@ check_for_updates () {
 	if [ -n "$PM_INDEX" ]; then
 		port_ver=`parse_index $origin name`
 
-		check_pkg_version $iport $port_ver || { do_update=update_index ;
-#echo ''; echo "Debug> Found one from the INDEX!"; echo '';
-}
+		check_pkg_version $iport $port_ver || { do_update=update_index ; }
 	fi
 
 	if [ -d "$pd/$origin" -a -z "$do_update" -a -z "$PM_INDEX_ONLY" ]; then
@@ -1406,7 +1419,7 @@ set_distfiles_and_subdir () {
 	[ -z "$dist_list_files" ] && find_dl_distfiles $1
 
 	if [ -d "$pd/$1" ]; then
-		pm_cd $pd/$1 || fail "cd to $pd/$1 failed"
+		pm_cd_pd $1
 	else
 		return 1
 	fi
@@ -1802,7 +1815,11 @@ update_build_l () {
 		origin=`origin_from_pdb $1` ;;
 	esac
 
-	pm_cd $pd/$origin && new_port=`pm_make -V PKGNAME`
+	if [ -z "$PM_INDEX_ONLY" ]; then
+		pm_cd $pd/$origin && new_port=`pm_make -V PKGNAME`
+	else
+		new_port=`parse_index $origin name`
+	fi
 
 	case `pkg_version -t $iport $new_port 2>/dev/null` in
 	\<)	build_l="${build_l}\tUpgrade $iport to $new_port\n" ;;
@@ -1893,6 +1910,32 @@ clean_build_only_list () {
 	build_only_dl_g=" `uniquify_list $temp_bodlg` "
 }
 
+gen_dep_list () {
+	local list
+
+	if [ -z "$PM_INDEX_ONLY" ]; then
+		pm_cd_pd $portdir
+		list=`pm_make $1 | sort -u`
+	else
+		local temp_list l
+
+		case "$1" in
+		'build-depends-list run-depends-list'|all-depends-list)
+		temp_list="`parse_index $portdir b-deps` `parse_index $portdir r-deps`" ;;
+		build-depends-list) temp_list=`parse_index $portdir b-deps` ;;
+		run-depends-list) temp_list=`parse_index $portdir r-deps` ;;
+		esac
+
+		temp_list=`uniquify_list $temp_list`
+
+		for l in $temp_list ; do
+			list="$list `grep -m1 ^${l}\| $PM_INDEX | cut -f 2 -d \|`"
+		done
+	fi
+
+	echo "$list"
+}
+
 dependency_check () {
 	# Global: doing_dep_check
 	# Global: run_dl_g build_only_dl_g
@@ -1902,8 +1945,7 @@ dependency_check () {
 	# Print a message here because sometimes list generation takes
 	# a long time to return.
 	echo "===>>> Gathering dependency list for $portdir from ports"
-	pm_cd_pd $portdir
-	d_port_list=`pm_make $1 | sort -u`
+	d_port_list=`gen_dep_list $1`
 
 	if [ -z "$d_port_list" ]; then
 		echo "===>>> No dependencies for $portdir"
@@ -1922,11 +1964,11 @@ dependency_check () {
 	if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
 		local rundeps dep varname run_dl build_only_dl
 
-		rundeps=`pm_make run-depends-list | sort -u`
+		rundeps=" `gen_dep_list run-depends-list` "
 
 		for dep in $d_port_list; do
 			case "$rundeps" in
-			*${dep}*)
+			*" ${dep} "*)
 				varname=`echo ${dep#$pd/} | sed 's#[-+/\.]#_#g'`
 				rundep_list="$rundep_list $varname"
 				eval $varname=\"$portdir \$$varname\"
@@ -1941,7 +1983,7 @@ dependency_check () {
 		if [ -z "$RECURSE_THOROUGH" ]; then
 			d_port_list="$build_only_dl $run_dl"
 		else
-			build_only_dl=`pm_make build-depends-list | sort -u`
+			build_only_dl=`gen_dep_list build-depends-list`
 		fi
 
 		run_dl_g="$run_dl_g $run_dl "
@@ -1982,24 +2024,26 @@ dependency_check () {
 		[ -z "$URB_YES" ] &&
 			case "$CUR_DEPS" in *:${origin}:*) continue ;; esac
 
-		conflicts=''
-		if pm_cd $d_port; then
-			grep -ql ^CONFLICTS Makefile &&
-				conflicts=`pm_make_b -V CONFLICTS`
-		else
-			fail "Cannot cd to $d_port"
-		fi
-		for glob in $conflicts; do
-			confl_p=`pkg_info -I $glob 2>/dev/null`
-			if [ -n "$confl_p" ]; then
-				confl_p=${confl_p%% *}
-				echo ''
-				echo "===>>> The dependency for ${origin}"
-				echo "       seems to be handled by $confl_p"
-				echo ''
-				d_port="$pd/`origin_from_pdb $confl_p`"
+		if [ -z "$PM_INDEX_ONLY" ]; then
+			conflicts=''
+			if pm_cd $d_port; then
+				grep -ql ^CONFLICTS Makefile &&
+					conflicts=`pm_make_b -V CONFLICTS`
+			else
+				fail "Cannot cd to $d_port"
 			fi
-		done
+			for glob in $conflicts; do
+				confl_p=`pkg_info -I $glob 2>/dev/null`
+				if [ -n "$confl_p" ]; then
+					confl_p=${confl_p%% *}
+					echo ''
+					echo "===>>> The dependency for ${origin}"
+					echo "       seems to be handled by $confl_p"
+					echo ''
+					d_port="$pd/`origin_from_pdb $confl_p`"
+				fi
+			done
+		fi
 
 		# In case d_port changed above
 		origin="${d_port#$pd/}" ; iport=`iport_from_origin ${origin}`
@@ -2275,8 +2319,9 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		if [ -n "$PLB" ]; then
 			LOCALBASE_COMPAT="$PLB/lib/compat"
 		else
-			if [ -d /usr/local ]; then
-				LOCALBASE_COMPAT='/usr/local/lib/compat'
+			PLB=`head -1 $PM_INDEX | cut -f 3 -d\|`
+			if [ -d "$PLB" ]; then
+				LOCALBASE_COMPAT="${PLB}/lib/compat"
 			else
 				fail 'The value of LOCALBASE cannot be empty'
 			fi
@@ -2519,7 +2564,7 @@ elif [ -z "$portdir" ]; then
 	no_valid_port
 fi
 
-if [ ! -d "$pd/$portdir" ]; then
+if [ ! -d "$pd/$portdir" -a -z "$PM_INDEX_ONLY" ]; then
 	find_moved_port $portdir $upg_port || no_valid_port
 	[ -n "$moved_npd" ] || no_valid_port
 	[ -d "$pd/$moved_npd" ] || no_valid_port
@@ -2582,7 +2627,7 @@ fi
 # Should only be reached for multiport already built as a dependency
 case "$CONFIG_SEEN_LIST" in *:${portdir}:*) safe_exit ;; esac
 
-pm_cd $pd/$portdir || no_valid_port
+[ -z "$PM_INDEX_ONLY" ] && { pm_cd $pd/$portdir || no_valid_port; }
 
 if [ -z "$PM_DEPTH" ]; then
 	PM_DEPTH="${upg_port:-$portdir} "
@@ -2602,6 +2647,8 @@ fi
 echo ''
 [ "$$" -eq "$PM_PARENT_PID" -a -n "$upg_port" ] &&
 	echo "===>>> Currently installed version: $upg_port"
+
+if [ -z "$PM_INDEX_ONLY" ]; then
 echo "===>>> Port directory: $pd/$portdir"
 
 check_state || {
@@ -2669,6 +2716,7 @@ dofetch () {
 		echo ''
 	fi
 fi
+fi	# [ -z "$PM_INDEX_ONLY" ]
 
 if [ -n "$CONFIG_ONLY" ]; then
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$PM_BUILD_ONLY_LIST" ] &&
@@ -2743,7 +2791,7 @@ fi
 
 [ -z "$PM_BUILDING" ] && export PM_BUILDING=pmbuildingmain
 
-pm_cd_pd $portdir
+[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 
 if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 	case "$build_only_dl_g" in
@@ -2765,7 +2813,7 @@ if [ -z "$NO_DEP_UPDATES" ]; then
 		echo "===>>> Starting check for all dependencies"
 		dependency_check all-depends-list
 	fi
-	cd $pd/$portdir
+	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 elif [ -z "$NO_RECURSIVE_CONFIG" -a "$$" -eq "$PM_PARENT_PID" ]; then
 	echo "===>>> All dependencies are up to date"
 	echo ''
@@ -2776,7 +2824,13 @@ if [ -n "$NO_ACTION" -a -z "$CONFIG_ONLY" ]; then
 	safe_exit
 fi
 
-[ -z "$new_port" ] && new_port=`pm_make -V PKGNAME`
+if [ -z "$new_port" ]; then
+	if [ -z "$PM_INDEX_ONLY" ]; then
+		new_port=`pm_make -V PKGNAME`
+	else
+		new_port=`parse_index $portdir name`
+	fi
+fi
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 fetch_package () {
@@ -2820,7 +2874,8 @@ fetch_package () {
 			fi
 		fi
 
-		fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
+		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Fetching ${1}.tbz"
+		$PM_SU_CMD fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
 			pm_unlink_s ${ppd}/${1}.tbz;
 			fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
 	fi
@@ -2853,14 +2908,21 @@ fetch_package () {
 	echo "===>>> Checking package repository for latest available version"
 
 	if [ -n "$LOCAL_PACKAGEDIR" ]; then
-		s=`pm_make -V LATEST_LINK`
-		if [ -r "${LOCAL_PACKAGEDIR}/Latest/${s}.tbz" ]; then
-			local_package=${LOCAL_PACKAGEDIR}/Latest/${s}.tbz
-			latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}.tbz`
-			latest_pv=${latest_pv##*/}
+		if [ -z "$PM_INDEX_ONLY" ]; then
+			s=`pm_make -V LATEST_LINK`
+			if [ -r "${LOCAL_PACKAGEDIR}/Latest/${s}.tbz" ]; then
+				local_package=${LOCAL_PACKAGEDIR}/Latest/${s}.tbz
+				latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}.tbz`
+				latest_pv=${latest_pv##*/}
+			else
+				[ -n "$PM_VERBOSE" ] &&
+		echo "===>>> No local package for $new_port exists, attempting fetch"
+			fi
 		else
-			[ -n "$PM_VERBOSE" ] &&
-	echo "===>>> No local package for $new_port exists, attempting fetch"
+			if [ -r "${LOCAL_PACKAGEDIR}/All/${new_port}.tbz" ]; then
+				local_package=${LOCAL_PACKAGEDIR}/All/${new_port}.tbz
+				latest_pv=${local_package##*/}
+			fi
 		fi
 	fi
 
@@ -2913,7 +2975,7 @@ notnewer () {
 	if [ "$latest_pv" = "$new_port" ]; then
 		use_package=up_equal
 		[ -n "$PM_VERBOSE" ] &&
-	echo "===>>> Available package ($latest_pv) matches the ports tree"
+	echo "===>>> Available package ($latest_pv) matches the current version"
 	elif [ -n "$latest_pv" -a -n "$PM_PACKAGES_NEWER" ]; then
 		if [ -n "$upg_port" ]; then
 			case `pkg_version -t $upg_port $latest_pv` in
@@ -3066,13 +3128,13 @@ if [ -n "$upg_port" ]; then
 	[ -n "$PM_SU_VERBOSE" ] &&
 		echo "===>>> Running pkg_delete for $upg_port"
 	pm_pkg_delete_s -f $upg_port
-	cd $pd/$portdir
+	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 fi
 
 if [ -z "$RECURSE_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 	echo '' ; echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
-	cd $pd/$portdir
+	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 fi
 
 install_failed () {
@@ -3102,8 +3164,13 @@ else
 	[ -n "$local_package" ] && ppd=${local_package%/Latest*}/All
 
 	echo "===>>> Installing package"
-	pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz ||
+	if $PM_SU_CMD pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz; then
+		[ -n "$PM_DELETE_PACKAGES" ] && {
+			[ -n "$PM_VERBOSE" ] && echo "===>>> Deleting ${latest_pv}.tbz";
+			pm_unlink_s ${ppd}/${latest_pv}.tbz; }
+	else
 		install_failed ${latest_pv}.tbz
+	fi
 fi
 echo ''
 
