@@ -28,7 +28,7 @@ if [ -z "$PM_PARENT_PID" ]; then
 		echo '       Your portmaster.rc is in /etc, however support for the file in this'
 		echo '       location is deprecated, and will be removed in a future version.'
 		echo '' ; echo '       The proper location for this file is /usr/local/etc'
-		echo '' ; . /etc/portmaster.rc
+		echo '' ; sleep 5 ; . /etc/portmaster.rc
 	fi
 	[ -r /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
 
@@ -1267,6 +1267,8 @@ fail 'The value of PACKAGES cannot be empty and the directory must be writable'
 init_packages () {
 	# Global: pbu
 
+	[ -n "$FETCH_ONLY" ] && return
+
 	init_packages_var
 
 	[ -n "$NO_BACKUP" ] && return
@@ -2393,7 +2395,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-	[ -n "$NO_BACKUP" -a -z "$MAKE_PACKAGE" ] || init_packages_var
+	[ -n "$NO_BACKUP" -a -z "$MAKE_PACKAGE" ] || init_packages
 	[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && export NB_DELETE
 
 	# Set the file name here so it's visible to the children
@@ -2897,7 +2899,7 @@ fetch_package () {
 		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Fetching ${1}.tbz"
 		$PM_SU_CMD fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
 			pm_unlink_s ${ppd}/${1}.tbz;
-			fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
+			$PM_SU_CMD fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
 	fi
 }
 	if [ -z "$PACKAGESITE" ]; then
