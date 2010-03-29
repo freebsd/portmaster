@@ -1237,13 +1237,13 @@ init_packages_var () {
 
 	PACKAGES=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES 2>/dev/null`
 	if [ -z "$PACKAGES" ]; then
-		if [ -d /usr/ports/packages ]; then
+		if [ -d /usr/ports/packages -a -w /usr/ports/packages ]; then
 			PACKAGES='/usr/ports/packages'
 		else
-			if [ -d /usr/ports/ ]; then
+			if [ -d /usr/ports/ -a -w /usr/ports/ ]; then
 				PACKAGES='/usr/ports/packages'
 			else
-				fail 'The value of PACKAGES cannot be empty'
+fail 'The value of PACKAGES cannot be empty and the directory must be writable'
 			fi
 		fi
 	fi
@@ -1255,16 +1255,16 @@ init_packages () {
 
 	init_packages_var
 
-	if [ -z "$NO_BACKUP" ]; then
-		pbu=$PACKAGES/portmaster-backup
+	[ -n "$NO_BACKUP" ] && return
 
-		if [ ! -d "$pbu" ]; then
-			[ -n "$PM_SU_VERBOSE" ] &&
-				echo "===>>> Creating $pbu"
-			pm_mkdir_s $pbu
-		fi
-		export pbu
+	pbu=$PACKAGES/portmaster-backup
+
+	if [ ! -d "$pbu" ]; then
+		[ -n "$PM_SU_VERBOSE" ] &&
+			echo "===>>> Creating $pbu"
+		pm_mkdir_s $pbu
 	fi
+	export pbu
 }
 
 pm_pkg_create () {
@@ -2379,7 +2379,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-	[ -n "$NO_BACKUP" -a -z "$MAKE_PACKAGE" ] || init_packages
+	[ -n "$NO_BACKUP" -a -z "$MAKE_PACKAGE" ] || init_packages_var
 	[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && export NB_DELETE
 
 	# Set the file name here so it's visible to the children
