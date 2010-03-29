@@ -1030,7 +1030,21 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;;
 	p)	portdir="${OPTARG#$pd/}" ; portdir=${portdir%/} ;;
-	r)	UPDATE_REQ_BYS=ropt ; portdir=`origin_from_pdb $OPTARG` ;;
+	r)	UPDATE_REQ_BYS=ropt
+		if [ -d "$pdb/$OPTARG" ]; then
+			glob_dirs=$OPTARG
+		else
+			port=`globstrip $OPTARG`
+			glob_dirs=`find $pdb -maxdepth 1 -type d -name ${port}\*`
+			case "$glob_dirs" in
+			*\*|'') fail "$pdb/$port does not exist" ;;
+			# Match a newline in multiple responses from find
+			*'
+'*)				fail 'The argument to -r must match only one port' ;;
+			esac
+			unset port
+		fi
+		portdir=`origin_from_pdb ${glob_dirs##*/}` ; unset glob_dirs ;;
 	s)	CLEAN_STALE=sopt ;;
 	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
 	u)	echo "===>>> The -u option has been deprecated" ; echo '' ;;
