@@ -141,16 +141,14 @@ safe_exit () {
 	[ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ] &&
 		files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 	if [ -n "$files" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Deleting 'install complete' flags"
+		pm_sv Deleting \'install complete\' flags
 		pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete
 	fi
 	# Outdent
 			fi
 			if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a \
 			    -n "$NB_DELETE" ]; then
-				[ -n "$PM_SU_VERBOSE" ] &&
-		echo "===>>> Deleting safety packages for successful installs"
+				pm_sv Deleting safety packages for successful installs
 				pm_cd $pbu || fail "Cannot cd to $pbu"
 				pm_rm_s $NB_DELETE
 			fi
@@ -158,8 +156,7 @@ safe_exit () {
 
 		[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
 		if [ -d "$pbu" ]; then
-			[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Removing empty backup package directory"
+			pm_sv Removing empty backup package directory
 			pm_rmdir_s $pbu
 		fi
 
@@ -386,6 +383,8 @@ pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
 pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
 pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
 
+pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SUDO $*"; }
+
 #=============== End functions we always want to have ===============
 
 packages_init () {
@@ -484,7 +483,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
 		index_time=`stat -f '%Ua' $PM_INDEX`
-		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Updating INDEX file"
+		pm_sv Updating INDEX file
 		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
 		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX` ]; then
 			temp_index=`pm_mktemp index`
@@ -1276,8 +1275,7 @@ init_packages () {
 	pbu=$PACKAGES/portmaster-backup
 
 	if [ ! -d "$pbu" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Creating $pbu"
+		pm_sv Creating $pbu
 		pm_mkdir_s $pbu
 	fi
 	export pbu
@@ -1285,6 +1283,8 @@ init_packages () {
 
 pm_pkg_create () {
 	local pkgdir
+
+	init_packages
 
 	if [ "$1" = "$PACKAGES" ]; then
 		for pkgdir in All Latest ${portdir%/*}; do
@@ -1376,13 +1376,12 @@ delete_dist_list () {
 
 	local dir
 
-	[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Deleting $dist_list"
+	pm_sv Deleting $dist_list
 	pm_unlink_s $dist_list
 
 	dir=`find ${dist_list%/distfiles} -type d -empty 2>/dev/null`
 	if [ -d "$dir" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Deleting the $dir directory"
+		pm_sv Deleting the $dir directory
 		pm_rmdir_s $dir
 	fi
 }
@@ -1695,11 +1694,7 @@ if [ -n "$CLEAN_STALE" ]; then
 		echo -n "===>>> ${iport} is no longer depended on, delete? y/n [n] "
 		read answer
 		case "$answer" in
-		[yY])	if [ -n "$BACKUP" ]; then
-				[ -z "$PACKAGES" ] && init_packages
-				pm_pkg_create $pbu $iport
-			fi
-
+		[yY])	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
 			[ -z "$DONT_SCRUB_DISTFILES" ] &&
 				delete_all_distfiles $origin
 
@@ -2319,8 +2314,7 @@ multiport () {
 make_config () {
 	config_type=config-conditional
 	[ -n "$FORCE_CONFIG" ] && config_type=config
-	[ -n "$PM_SU_VERBOSE" ] &&
-		echo "===>>> Running 'make $config_type'"
+	pm_sv Running \'make $config_type\'
 	pm_cd_pd $portdir
 	pm_make_s $config_type
 }
@@ -2367,10 +2361,9 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		echo -n "       -[rf] run of ${0##*/}, delete them? y/n [n] "
 		read answer
 		case "$answer" in
-		[yY]) [ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Deleting 'install complete' flags"
-		pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
-		*) echo -n "===>>> Enable the -R option? y/n [n] "
+		[yY])	pm_sv Deleting \'install complete\' flags
+			pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
+		*)	echo -n "===>>> Enable the -R option? y/n [n] "
 			read answer
 			case "$answer" in
 			[yY]) RESTART=Ropt ; ARGS="-R $ARGS" ;;
@@ -2865,7 +2858,7 @@ fetch_package () {
 	fi
 
 	if [ ! -d "$ppd" ]; then
-		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Creating $ppd"
+		pm_sv Creating $ppd
 		pm_mkdir_s $ppd
 	fi
 
@@ -2896,7 +2889,7 @@ fetch_package () {
 			fi
 		fi
 
-		[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Fetching ${1}.tbz"
+		pm_sv Fetching ${1}.tbz
 		$PM_SU_CMD fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null || {
 			pm_unlink_s ${ppd}/${1}.tbz;
 			$PM_SU_CMD fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
@@ -3121,13 +3114,11 @@ if [ -n "$upg_port" ]; then
 		done
 		if [ -n "$temp" ]; then
 			if [ ! -d "$LOCALBASE_COMPAT/pkg" ]; then
-				[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Creating $LOCALBASE_COMPAT/pkg for -w"
+				pm_sv Creating $LOCALBASE_COMPAT/pkg for -w
 				pm_mkdir_s $LOCALBASE_COMPAT/pkg
 			fi
 
-			[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Copying old shared libraries for -w"
+			pm_sv Copying old shared libraries for -w
 			$PM_SU_CMD cp -p $temp $LOCALBASE_COMPAT/pkg/
 		fi
 
@@ -3141,14 +3132,12 @@ if [ -n "$upg_port" ]; then
 		# Delete any existing versions of the new port
 		iport=`iport_from_origin $portdir`
 		if [ -n "$iport" ]; then
-			[ -n "$PM_SU_VERBOSE" ] &&
-				echo "===>>> Running pkg_delete for $iport"
+			pm_sv Running pkg_delete for $iport
 			pm_pkg_delete_s -f $iport
 		fi
 	fi
 
-	[ -n "$PM_SU_VERBOSE" ] &&
-		echo "===>>> Running pkg_delete for $upg_port"
+	pm_sv Running pkg_delete for $upg_port
 	pm_pkg_delete_s -f $upg_port
 	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 fi
@@ -3169,7 +3158,7 @@ install_failed () {
 }
 
 if [ -z "$use_package" ]; then
-	[ -n "$PM_SU_VERBOSE" ] && echo "===>>> Running make install"
+	pm_sv Running make install
 
 	if [ -n "$PM_SU_UNSET_PORT_LOG_ARGS" ]; then
 		unset port_log_args
@@ -3210,8 +3199,7 @@ if [ -z "$temp" -a -d "$LOCALBASE_COMPAT/pkg" ]; then
 	done
 
 	if [ -n "$files" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-	echo "===>>> Removing old shared libraries, and running ldconfig"
+		pm_sv Removing old shared libraries, and running ldconfig
 		pm_rm_s $files
 		$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
 	fi
@@ -3220,8 +3208,7 @@ fi
 
 [ -z "$temp" ] && temp=`find $LOCALBASE_COMPAT/pkg -type d -empty 2>/dev/null`
 if [ -d "$temp" ]; then
-	[ -n "$PM_SU_VERBOSE" ] &&
-		echo "===>>> Deleting the empty $LOCALBASE_COMPAT/pkg"
+	pm_sv Deleting the empty $LOCALBASE_COMPAT/pkg
 	pm_rmdir_s $temp
 fi
 unset temp
@@ -3237,8 +3224,7 @@ if [ -n "$distfiles" ]; then
 	dist_list=`pm_make_b -V OPTIONSFILE`
 	dist_list="${dist_list%options}distfiles"
 	if [ ! -d "${dist_list%/distfiles}" ]; then
-		[ -n "$PM_SU_VERBOSE" ] &&
-			echo "===>>> Creating ${dist_list%/distfiles}"
+		pm_sv Creating ${dist_list%/distfiles}
 		pm_mkdir_s ${dist_list%/distfiles}
 	fi
 
@@ -3264,8 +3250,7 @@ if [ -n "$distfiles" ]; then
 			echo "${ds}$file" >> $DI_FILES
 	done
 
-	[ -n "$PM_SU_VERBOSE" ] &&
-		echo "===>>> Installing $dist_list"
+	pm_sv Installing $dist_list
 	pm_install_s $dist_list_temp $dist_list
 	pm_unlink $dist_list_temp ; unset ds dist_list_temp
 fi
@@ -3291,7 +3276,8 @@ fi
 
 if [ -z "$use_package" ]; then
 	[ -z "$DONT_POST_CLEAN" ] && {
-		pm_make clean NOCLEANDEPENDS=ncd2 ; echo ''; }
+		pm_sv Running \'make clean\'
+		pm_make_s clean NOCLEANDEPENDS=ncd2 ; echo ''; }
 fi
 
 check_dependency_files $portdir $new_port
