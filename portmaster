@@ -36,6 +36,8 @@ if [ -z "$PM_PARENT_PID" ]; then
 	[ -r "$HOME/.portmasterrc" ] && . $HOME/.portmasterrc
 	set +o allexport
 
+	my_environment=`set`
+
 	# If we are already root, unset this to avoid potential conflict
 	euid=`ps -o uid $$` ; euid=${euid##* }
 	[ "$euid" -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
@@ -1062,19 +1064,43 @@ unset -f packages_init
 
 [ -n "$PM_EXCL" ] && export PM_EXCL
 
+test_command_line () {
+	local var envar
+
+	for var in $my_environment; do
+		case "$var" in
+		${1}=*)	envar=$1 ;;
+		${2}=*)	envar=$2 ;;
+		esac
+	done
+
+	if [ -n "$envar" ]; then
+		unset $envar
+		return 0
+	fi
+
+	return 1
+}
+
 # Error checking for getopts
 [ -n "$PM_FORCE" -a "$INTERACTIVE_UPDATE" ] &&
 	fail "The -f and -i options are mutually exclusive"
-[ -n "$BACKUP" -a -n "$NO_BACKUP" ] &&
-	fail "The -b and -B options are mutually exclusive"
-[ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ] &&
-	fail "The -d and -D options are mutually exclusive"
+if [ -n "$BACKUP" -a -n "$NO_BACKUP" ]; then
+	test_command_line NO_BACKUP BACKUP ||
+		fail "The -b and -B options are mutually exclusive"
+fi
+if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
+	test_command_line ALWAYS_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
+		fail "The -d and -D options are mutually exclusive"
+fi
 [ -n "$FETCH_ONLY" -a -n "$NO_RECURSIVE_CONFIG" ] &&
-	fail "The -F and -G options are mutually exclusive"
+	unset NO_RECURSIVE_CONFIG
 [ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_PACKAGES_BUILD" ] &&
 	fail 'The --packages-build and -G options are mutually exclusive'
 [ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_DEL_BUILD_ONLY" ] &&
 	fail 'The --delete-build-only and -G options are mutually exclusive'
+
+unset my_environment
 
 #=============== Begin functions for getopts features and main ===============
 
