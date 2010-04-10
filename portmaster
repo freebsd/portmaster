@@ -308,10 +308,12 @@ usage () {
 	echo "-m <arguments for the 'make' command line>"
 	echo "-x <avoid building or updating ports that match this pattern>"
 	echo '   Can be specified more than once'
+	echo ''
 	echo '--no-confirm do not ask user to confirm list of ports to be'
 	echo '   installed and/or updated before proceeding'
 	echo '--no-term-title do not update the xterm title bar'
-	echo "--index use $pd/INDEX-[6-9] to check if a port is out of date"
+	echo ''
+	echo '--index use INDEX-[6-9] to check if a port is out of date'
 	echo '--index-only do not try to use /usr/ports'
 	echo ''
 	echo '--show-work list what ports are and would be installed'
@@ -387,7 +389,7 @@ pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
 pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
 pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
 
-pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SUDO $*"; }
+pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
 
 #=============== End functions we always want to have ===============
 
@@ -457,9 +459,6 @@ done
 # Do this here so it can use the fancy functions above, and default values
 # can be overridden in the rc files
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
-
-# XXX
-
 	if [ -n "$PM_INDEX" ]; then
 		[ -d "$pd" ] && pm_cd_pd
 		if [ -z "$FETCHINDEX" ]; then
@@ -489,7 +488,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		index_time=`stat -f '%Ua' $PM_INDEX 2>/dev/null`
 		pm_sv Updating INDEX file
 		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
-		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX` ]; then
+		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX 2>/dev/null` ]; then
 			temp_index=`pm_mktemp index`
 			bunzip2 < ${PM_INDEX}.bz2 > $temp_index
 			pm_install_s $temp_index $PM_INDEX
@@ -862,10 +861,8 @@ find_glob_dirs () {
 	local pattern
 
 	pattern=`globstrip $1`
-echo "Debug> pattern: $pattern"
 
 	glob_dirs=`find $pdb -maxdepth 1 -type d -name ${pattern}\*`
-echo "Debug> glob_dirs: $glob_dirs"
 	case "$glob_dirs" in
 	# Match a newline in multiple responses from find
 	*'
@@ -1145,8 +1142,6 @@ check_state () {
 	return 0
 }
 
-# XXX
-
 parse_index () {
 	local pd line
 
@@ -1213,11 +1208,9 @@ check_for_updates () {
 		fi
 		return 0
 	fi
-# XXX
 
 	if [ -n "$PM_INDEX" ]; then
 		port_ver=`parse_index $origin name`
-
 		check_pkg_version $iport $port_ver || { do_update=update_index ; }
 	fi
 
@@ -2299,7 +2292,7 @@ multiport () {
 				*)	local dir
 					for dir in $glob_dirs; do
 					worklist_temp="$worklist_temp ${dir#$pdb/}"
-					done;;
+					done ;;
 				esac
 				unset glob_dirs
 			fi ;;
