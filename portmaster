@@ -249,7 +249,7 @@ usage () {
 	echo ''
 	echo 'Usage:'
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
-	echo "    [[--packages|--packages-only] [-P|-PP] | [--packages-build]]"
+	echo "    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
 	echo "    [--local-packagedir=<path>] [--delete-packages]"
 	echo "    [--no-confirm] [--no-term-title] [--index|--index-only]"
@@ -271,7 +271,7 @@ usage () {
 	echo ''
 	echo "${0##*/} -[l|L]"
 	echo ''
-	echo "${0##*/} [-b D|d] -e <full name of port directory in $pdb>"
+	echo "${0##*/} [-b D|d] -e <name/glob of port directory in $pdb>"
 	echo "${0##*/} [-b D|d] -s"
 	echo ''
 	echo "${0##*/} [--force-config] [-aftv] -F"
@@ -319,6 +319,7 @@ usage () {
 	echo '-o replace the installed port with a port from a different origin'
 	echo '[-R] -r rebuild port, and all ports that depend on it'
 	echo '-R used with -[rf] to skip ports updated on a previous run'
+	echo ''
 	echo '-a check all ports, update as necessary'
 	echo ''
 	echo '--delete-build-only delete ports that are build-only dependencies'
@@ -485,7 +486,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		fi
 
 		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
-		index_time=`stat -f '%Ua' $PM_INDEX`
+		index_time=`stat -f '%Ua' $PM_INDEX 2>/dev/null`
 		pm_sv Updating INDEX file
 		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
 		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX` ]; then
@@ -850,6 +851,32 @@ delete_empty_dist_subdirs () {
 	find -d $distdir -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
 }
 
+# Takes a pattern as input
+# Return values:
+# 0 - Matched one and only one directory in $pdb
+# 1 - No match
+# 2 - Matched multiple directories
+#
+find_glob_dirs () {
+	# Global: glob_dirs
+	local pattern
+
+	pattern=`globstrip $1`
+echo "Debug> pattern: $pattern"
+
+	glob_dirs=`find $pdb -maxdepth 1 -type d -name ${pattern}\*`
+echo "Debug> glob_dirs: $glob_dirs"
+	case "$glob_dirs" in
+	# Match a newline in multiple responses from find
+	*'
+'*)		return 2 ;;
+	$pdb/*)	return ;;
+	esac
+
+	unset glob_dirs
+	return 1
+}
+
 #=============== End functions relevant to --features and main ===============
 #=============== Begin code relevant only to --features ===============
 
@@ -1036,15 +1063,11 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 		if [ -d "$pdb/$OPTARG" ]; then
 			glob_dirs=$OPTARG
 		else
-			port=`globstrip $OPTARG`
-			glob_dirs=`find $pdb -maxdepth 1 -type d -name ${port}\*`
-			case "$glob_dirs" in
-			*\*|'') fail "$pdb/$port does not exist" ;;
-			# Match a newline in multiple responses from find
-			*'
-'*)				fail 'The argument to -r must match only one port' ;;
+			find_glob_dirs $OPTARG
+			case $? in
+			1)	fail "$pdb/$OPTARG does not exist" ;;
+			2)	fail 'The argument to -r must match only one port' ;;
 			esac
-			unset port
 		fi
 		portdir=`origin_from_pdb ${glob_dirs##*/}` ; unset glob_dirs ;;
 	s)	CLEAN_STALE=sopt ;;
@@ -1662,7 +1685,14 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 fi
 
 if [ -n "$EXPUNGE" ]; then
-	[ -d "$pdb/$EXPUNGE" ] || fail "No such directory/port: $pdb/$EXPUNGE"
+	if [ ! -d "$pdb/$EXPUNGE" ]; then
+		if find_glob_dirs $EXPUNGE; then
+			EXPUNGE=${glob_dirs#$pdb/}
+			unset glob_dirs
+		else
+			fail "No such directory/port: $pdb/$EXPUNGE"
+		fi
+	fi
 
 	origin=`origin_from_pdb $EXPUNGE`
 	deplist=`grep -l DEPORIGIN:$origin$ $pdb/*/+CONTENTS`
@@ -2263,16 +2293,15 @@ multiport () {
 		*)	if [ -d "$pdb/$port" ]; then
 				worklist_temp="$worklist_temp $port"
 			else
-				# Keep synched with code in MAIN
-				local glob_dirs dir
-				port=`globstrip $port`
-		glob_dirs=`find $pdb -maxdepth 1 -type d -name ${port}\*`
-				case "$glob_dirs" in
-				*\*|'') fail "$pdb/$port does not exist" ;;
-				*)	for dir in $glob_dirs; do
-				worklist_temp="$worklist_temp ${dir#$pdb/}"
-					done ;;
+				find_glob_dirs $port
+				case $? in
+				1)	fail "$pdb/$port does not exist" ;;
+				*)	local dir
+					for dir in $glob_dirs; do
+					worklist_temp="$worklist_temp ${dir#$pdb/}"
+					done;;
 				esac
+				unset glob_dirs
 			fi ;;
 		esac
 	done
@@ -2415,8 +2444,16 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-	[ -n "$NO_BACKUP" -a -z "$MAKE_PACKAGE" ] || init_packages
+	[ -z "$NO_BACKUP" ] && init_packages
 	[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && export NB_DELETE
+	if [ -n "$MAKE_PACKAGE" ]; then
+		init_packages_var
+
+		if [ ! -d "$PACKAGES" ]; then
+			pm_sv Creating $PACKAGES
+			pm_mkdir_s $PACKAGES
+		fi
+	fi
 
 	# Set the file name here so it's visible to the children
 	if [ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" \
@@ -2556,40 +2593,47 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
-		# Keep synched with code in multiport()
-		glob_dirs=`find $pdb -maxdepth 1 -type d -name ${argv}\*`
-		case "$glob_dirs" in
-		*\*|'')	echo '' ; no_valid_port ;;
-		# Match a newline in multiple responses from find
-		*'
-'*)			multiport $glob_dirs ;;
-		$pdb/*)	upg_port=${glob_dirs#$pdb/} ;;
-		*)	echo '' ; no_valid_port ;;
+		find_glob_dirs $argv
+		case $? in
+		1)	echo '' ; no_valid_port ;;
+		2)	multiport $glob_dirs ;;
+		0)	upg_port=${glob_dirs#$pdb/} ;;
 		esac
+		unset glob_dirs
 	fi
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
 	[ -d "$pd/$portdir" ] || { echo ''
-		echo "===>>> The first argument must be a directory in $pd"
+		echo "===>>> The first argument to -o must be a directory in $pd"
 		echo '' ; no_valid_port; }
-	upg_port=${2#$pdb/} ; upg_port="${upg_port%/}"
-	if [ -d "$pdb/$upg_port" ]; then
-		ro_opd=`origin_from_pdb $upg_port`	# Old port directory
-	else
-		ro_opd=${upg_port#$pd/}			# Portupgrade syntax
-		upg_port=`iport_from_origin $ro_opd`
-		if [ -z "$upg_port" -o ! -d "$pdb/$upg_port" ]; then
-			if grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS; then
-				unset upg_port
+
+	arg2=${2#$pd/} ; arg2=${arg2#$pdb/} ; arg2=${arg2%/}
+
+	case "$arg2" in
+	*/*)	ro_opd=$arg2 ; upg_port=`iport_from_origin $ro_opd` ;;
+	*)	if [ -d "$pdb/$arg2" ]; then
+			upg_port=$arg2
+		else
+			find_glob_dirs $arg2 && upg_port=${glob_dirs#$pdb/}
+			unset glob_dirs
+		fi
+		[ -n "$upg_port" ] && ro_opd=`origin_from_pdb $upg_port`
+	esac
+	unset arg2
+
+	if [ -z "$upg_port" ]; then
+		if grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS; then
+			unset upg_port
 			PM_MAKE_ARGS="-DFORCE_PKG_REGISTER $PM_MAKE_ARGS"
-			else
-				echo ''
-			echo "===>>> The second argument can be a port in $pdb,"
-				echo "       or a port directory from $pd"
-				echo '' ; no_valid_port
-			fi
+		else
+			echo ''
+			echo "===>>> The second argument to -o can be a port in $pdb,"
+			echo "       or a port directory from $pd"
+			echo '' ; no_valid_port
 		fi
 	fi
+
+	PM_MAKE_ARGS="-DDISABLE_CONFLICTS $PM_MAKE_ARGS"
 fi
 
 if [ -n "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
