@@ -2067,7 +2067,7 @@ dependency_check () {
 		clean_build_only_list
 	fi
 
-	local d_port origin iport conflicts glob confl_p udf
+	local d_port origin iport udf
 
 	# Do not export, for THIS parent process only
 	[ -n "$CONFIG_ONLY" ] && doing_dep_check=doing_dep_check
@@ -2094,6 +2094,8 @@ dependency_check () {
 			case "$CUR_DEPS" in *:${origin}:*) continue ;; esac
 
 		if [ -z "$PM_INDEX_ONLY" ]; then
+			local conflicts glob confl_p
+
 			conflicts=''
 			if pm_cd $d_port; then
 				grep -ql ^CONFLICTS Makefile &&
