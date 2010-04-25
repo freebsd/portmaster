@@ -567,8 +567,23 @@ iport_from_origin () {
 
 origin_from_pdb () {
 	local o
-	o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null`
-	echo ${o#@comment ORIGIN:}
+	o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
+		echo ${o#@comment ORIGIN:}; return 0; }
+
+	case "$1" in bsdpan-*) return 3 ;; esac
+
+	if [ -e "$pdb/$1/+IGNOREME" ]; then
+		if [ -n "$PM_VERBOSE" -o -n "$LIST_ORIGINS" ]; then
+			echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+			echo "	===>>> $pdb/$1/+IGNOREME exists" >&2
+			echo '' >&2
+		fi
+		return 2
+	else
+		echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+		echo '' >&2
+	fi
+	return 1
 }
 
 check_regular_file () {
@@ -780,9 +795,7 @@ read_distinfos () {
 		[ -d $pkg ] || continue
 		iport=${pkg#$pdb/}
 
-		case "$iport" in bsdpan-*) continue ;; esac
-
-		origin=`origin_from_pdb $iport`
+		origin=`origin_from_pdb $iport` || continue
 
 		if [ ! -d "$pd/$origin" ]; then
 			find_moved_port $origin $iport nonfatal >/dev/null
@@ -915,20 +928,13 @@ IFS='
 
 		iport=${pkg#$pdb/}
 
-		case "$iport" in bsdpan-*)
-		echo "===>>> BSDPAN ports do not record dependencies ($iport)"
-		continue ;; esac
-
 		echo "===>>> Checking $iport"
 
 		[ -r "$pkg/+CONTENTS" ] || {
 			echo "	===>>> Warning: No +CONTENTS file!";
 			continue; }
 
-		origin=`origin_from_pdb ${pkg#$pdb/}`
-		[ -n "$origin" ] || {
-			echo "	===>>> Warning: No ORIGIN in +CONTENTS file";
-			continue; }
+		origin=`origin_from_pdb $iport` || continue
 
 		if [ ! -d "$pd/$origin" ]; then
 			echo "	===>>> $pd/$origin does not exist"
@@ -972,7 +978,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 		unset unique_name
 
 		iport=${pkg#$pdb/}
-		origin=`origin_from_pdb $iport`
+		origin=`origin_from_pdb $iport` || continue
 
 		if [ ! -d "$pd/$origin" ]; then
 			find_moved_port $origin $iport nonfatal >/dev/null
@@ -1018,7 +1024,7 @@ if [ -n "$LIST_ORIGINS" ]; then
 	ports_by_category
 
 	for iport in $roots $leaves; do
-		origin=`origin_from_pdb $iport`
+		origin=`origin_from_pdb $iport` || continue
 		echo $origin
 	done
 
@@ -1196,18 +1202,7 @@ check_for_updates () {
 
 	iport=$1
 
-	case "$iport" in bsdpan-*)	[ -n "$PM_VERBOSE" ] &&
-	echo "	===>>> BSDPAN ports cannot be upgraded with portmaster"
-	return 0 ;; esac
-
-	origin=${2:-`origin_from_pdb $iport`}
-	if [ -z "$origin" ]; then
-		if [ -n "$PM_VERBOSE" ]; then
-			echo "===>>> No ORIGIN in $pdb/$iport/+CONTENTS"
-			echo ''
-		fi
-		return 0
-	fi
+	origin=${2:-`origin_from_pdb $iport`} || return 0
 
 	if [ -n "$PM_INDEX" ]; then
 		port_ver=`parse_index $origin name`
@@ -2476,11 +2471,7 @@ all_config () {
 
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
-		case "$iport" in bsdpan-*)	[ -n "$PM_VERBOSE" ] &&
-		echo "	===>>> BSDPAN ports cannot be upgraded with portmaster"
-		continue ;; esac
-
-		origin=`origin_from_pdb $iport`
+		origin=`origin_from_pdb $iport` || continue
 		case "$CONFIG_SEEN_LIST" in *:${origin}:*) continue ;; esac
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] &&
@@ -2634,15 +2625,16 @@ else
 fi
 
 if [ -n "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
-	portdir=`origin_from_pdb $upg_port`
-	if [ ! -n "$portdir" ]; then
-		case "$upg_port" in
-		bsdpan-*)	echo ''
+	portdir=`origin_from_pdb $upg_port` || {
+	case "$?" in
+	3)	echo ''
 		echo "===>>> BSDPAN ports cannot be upgraded with portmaster"
-			echo "       (${upg_port})"; echo ''; safe_exit ;;
-		*)	fail "No ORIGIN in $pdb/$upg_port/+CONTENTS" ;;
-		esac
-	fi
+		echo "       (${upg_port})"; echo ''; safe_exit ;;
+	2)	[ -z "$PM_VERBOSE" ] && {
+		echo "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present";
+		echo ''; }; safe_exit ;;
+	*)	fail 'Cannot continue' ;;
+	esac ; }
 elif [ -z "$portdir" ]; then
 	no_valid_port
 fi
