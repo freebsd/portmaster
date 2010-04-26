@@ -2471,7 +2471,20 @@ all_config () {
 
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
-		origin=`origin_from_pdb $iport` || continue
+		origin=`origin_from_pdb $iport` || {
+			case "$?" in
+			3) ;;
+			2) [ -z "$PM_VERBOSE" ] &&
+				echo "	===>>> No ORIGIN for $iport, and +IGNOREME is present"
+				echo "	===>>> Skipping"
+				echo '' ;;
+			*)	fail 'Cannot continue' ;;
+			esac;
+
+			# Prevent the user from getting reprompted during build
+			CUR_DEPS="${CUR_DEPS}${iport}:";
+			continue; }
+
 		case "$CONFIG_SEEN_LIST" in *:${origin}:*) continue ;; esac
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] &&
