@@ -369,7 +369,8 @@ pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH;
 		 unset -v MASTER_RB_LIST CONFIG_SEEN_LIST;
 		 /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
-pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1; }
+pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
+		fail "mktemp for $1 failed"; }
 pm_unlink () { /bin/test -e $1 && /bin/unlink $1; }
 
 # Superuser versions for commands that need root privileges
@@ -3161,7 +3162,8 @@ if [ -z "$use_package" ]; then
 	unset sleep
 
 	if [ -n "$HIDE_BUILD" ]; then
-		port_log=`mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}`
+		port_log=`mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}` ||
+			fail "mktemp for $1 failed"
 		port_log_args=">> $port_log 2>&1"
 		echo "===>>> Logging build to $port_log"
 	fi
