@@ -128,87 +128,85 @@ kill_bad_children () {
 	done
 }
 
-safe_exit () {
+parent_exit () {
 	local files p f show_list
 
-	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		if [ -s "$DI_FILES" ]; then
-			grep -q '%%%%%%%%%%%%' $DI_FILES || kill_bad_children
-		fi
-		[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] &&
-			kill_bad_children
-
-		if [ -z "$TRAP" ]; then
-			if [ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ]; then
-	# Outdent
-	[ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ] &&
-		files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
-	if [ -n "$files" ]; then
-		pm_sv Deleting \'install complete\' flags
-		pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete
+	if [ -s "$DI_FILES" ]; then
+		grep -q '%%%%%%%%%%%%' $DI_FILES || kill_bad_children
 	fi
-	# Outdent
-			fi
-			if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a \
-			    -n "$NB_DELETE" ]; then
-				pm_sv Deleting safety packages for successful installs
-				pm_cd $pbu || fail "Cannot cd to $pbu"
-				pm_rm_s $NB_DELETE
+	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && kill_bad_children
+
+	if [ -z "$TRAP" ]; then
+		if [ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ]; then
+			[ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ] &&
+				files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
+			if [ -n "$files" ]; then
+				pm_sv Deleting \'install complete\' flags
+				pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete
 			fi
 		fi
-
-		[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
-		if [ -d "$pbu" ]; then
-			pm_sv Removing empty backup package directory
-			pm_rmdir_s $pbu
+		if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a -n "$NB_DELETE" ]; then
+			pm_sv Deleting safety packages for successful installs
+			pm_cd $pbu || fail "Cannot cd to $pbu"
+			pm_rm_s $NB_DELETE
 		fi
+	fi
 
-		for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do pm_unlink $f ; done
+	[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
+	if [ -d "$pbu" ]; then
+		pm_sv Removing empty backup package directory
+		pm_rmdir_s $pbu
+	fi
 
-		case "$DISPLAY_LIST" in
-		*' '*)	if [ -n "$TRAP" ]; then
-	echo "===>>> There are messages from installed ports to display,"
-	echo "       but first take a moment to review the error messages"
-	echo -n "       above.  Then press Enter when ready to proceed. "
-				read DISCARD
-				echo ''
-			fi
+	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do pm_unlink $f ; done
 
-			[ -n "$PAGER" ] && p=$PAGER || p='less -e'
-			( for f in $DISPLAY_LIST; do
-				echo "===>>> pkg-message for $f"
-					cat $pdb/$f/+DISPLAY
-					echo ''
-				done
-			echo "===>>> Done displaying pkg-message files" ) | $p
-			;;
-		esac
-
-		if [ -n "$INSTALLED_LIST" ]; then
-			if [ -n "$UPDATE_ALL" -o -n "$PM_MULTI_PORTS" ]; then
-				show_list=all
-			else
-				case "$INSTALLED_LIST" in
-				*\\n\\t*)	show_list=all ;;
-				*\\n)		show_list=one ;;
-				esac
-			fi
-			case "$show_list" in
-			all) echo "===>>> The following actions were performed:"
-				echo -e $INSTALLED_LIST ;;
-			one)	echo "===>>> $ilist complete" ; echo '' ;;
-			esac
-		fi
-
-		if [ -n "$build_deps_il" ]; then
-		echo "===>>> Deleting installed build-only dependencies"
-			cd
-			for f in $build_deps_il; do
-				[ -n "$PM_VERBOSE" ] && echo "       $f"
-				pm_pkg_delete_s -f $f
-			done
+	case "$DISPLAY_LIST" in
+	*' '*)	if [ -n "$TRAP" ]; then
+			echo "===>>> There are messages from installed ports to display,"
+			echo "       but first take a moment to review the error messages"
+			echo -n "       above.  Then press Enter when ready to proceed. "
+			read DISCARD
 			echo ''
 		fi
+
+		[ -n "$PAGER" ] && p=$PAGER || p='less -e'
+		( for f in $DISPLAY_LIST; do
+			echo "===>>> pkg-message for $f" ; cat $pdb/$f/+DISPLAY ; echo ''
+		done
+		echo "===>>> Done displaying pkg-message files" ) | $p
+		;;
+	esac
+
+	if [ -n "$INSTALLED_LIST" ]; then
+		if [ -n "$UPDATE_ALL" -o -n "$PM_MULTI_PORTS" ]; then
+			show_list=all
+		else
+			case "$INSTALLED_LIST" in
+			*\\n\\t*)	show_list=all ;;
+			*\\n)		show_list=one ;;
+			esac
+		fi
+		case "$show_list" in
+		all)	echo "===>>> The following actions were performed:"
+			echo -e $INSTALLED_LIST ;;
+		one)	echo "===>>> $ilist complete" ; echo '' ;;
+		esac
+	fi
+
+	if [ -n "$build_deps_il" ]; then
+		echo "===>>> Deleting installed build-only dependencies"
+		cd
+		for f in $build_deps_il; do
+			[ -n "$PM_VERBOSE" ] && echo "       $f"
+			pm_pkg_delete_s -f $f
+		done
+		echo ''
+	fi
+}
+
+safe_exit () {
+	if [ "$$" -eq "$PM_PARENT_PID" ]; then
+		parent_exit
 	else
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
 
@@ -2614,25 +2612,24 @@ else
 		echo "===>>> The first argument to -o must be a directory in $pd"
 		echo '' ; no_valid_port; }
 
+	upg_port=`iport_from_origin $portdir`
+
 	arg2=${2#$pd/} ; arg2=${arg2#$pdb/} ; arg2=${arg2%/}
 
 	case "$arg2" in
-	*/*)	ro_opd=$arg2 ; upg_port=`iport_from_origin $ro_opd` ;;
+	*/*)	ro_opd=$arg2 ; ro_upg_port=`iport_from_origin $ro_opd` ;;
 	*)	if [ -d "$pdb/$arg2" ]; then
-			upg_port=$arg2
+			ro_upg_port=$arg2
 		else
-			find_glob_dirs $arg2 && upg_port=${glob_dirs#$pdb/}
+			find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
 			unset glob_dirs
 		fi
-		[ -n "$upg_port" ] && ro_opd=`origin_from_pdb $upg_port`
+		[ -n "$ro_upg_port" ] && ro_opd=`origin_from_pdb $ro_upg_port`
 	esac
 	unset arg2
 
-	if [ -z "$upg_port" ]; then
-		if grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS; then
-			unset upg_port
-			PM_MAKE_ARGS="-DFORCE_PKG_REGISTER $PM_MAKE_ARGS"
-		else
+	if [ -z "$ro_upg_port" ]; then
+		if ! grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS; then
 			echo ''
 			echo "===>>> The second argument to -o can be a port in $pdb,"
 			echo "       or a port directory from $pd"
@@ -2643,7 +2640,7 @@ else
 	PM_MAKE_ARGS="-DDISABLE_CONFLICTS $PM_MAKE_ARGS"
 fi
 
-if [ -n "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
+if [ -n "$upg_port" -a -z "$portdir" ]; then
 	portdir=`origin_from_pdb $upg_port` || {
 	case "$?" in
 	3)	echo ''
@@ -2663,12 +2660,8 @@ if [ ! -d "$pd/$portdir" -a -z "$PM_INDEX_ONLY" ]; then
 	[ -n "$moved_npd" ] || no_valid_port
 	[ -d "$pd/$moved_npd" ] || no_valid_port
 
-	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		$0 $ARGS -o $moved_npd $upg_port
-		safe_exit
-	else
-		exec $0 $ARGS -o $moved_npd $upg_port
-	fi
+	[ "$$" -eq "$PM_PARENT_PID" ] && parent_exit
+	exec $0 $ARGS -o $moved_npd $upg_port
 fi
 [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ] &&
 	upg_port=`iport_from_origin ${portdir}`
@@ -3176,12 +3169,14 @@ else
 fi
 
 # Ignore if no old port exists
-if [ -n "$upg_port" ]; then
+if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 	UPGRADE_PORT=$upg_port
+	[ -n "$ro_upg_port" ] && UPGRADE_PORT="$ro_upg_port"
+
 	UPGRADE_PORT_VER=`echo $UPGRADE_PORT | sed 's#.*-\(.*\)#\1#'`
 	export UPGRADE_PORT UPGRADE_PORT_VER
 
-	[ -z "$NO_BACKUP" ] && pm_pkg_create $pbu $upg_port
+	[ -z "$NO_BACKUP" ] && pm_pkg_create $pbu $UPGRADE_PORT
 
 	if [ -n "$SAVE_SHARED" ]; then
 		ldconfig_out=`pm_mktemp ldconfig`
@@ -3189,7 +3184,7 @@ if [ -n "$upg_port" ]; then
 		    grep -v ^$LOCALBASE_COMPAT > $ldconfig_out
 
 		unset temp
-		for file in `pkg_info -q -L $upg_port | sort - $ldconfig_out | \
+		for file in `pkg_info -q -L $UPGRADE_PORT | sort - $ldconfig_out | \
 		    uniq -d`; do
 			temp="${temp}$file "
 		done
@@ -3208,18 +3203,18 @@ if [ -n "$upg_port" ]; then
 
 	find_dl_distfiles $portdir
 
-	if [ -n "$REPLACE_ORIGIN" ]; then
-		# upg_port will be the port we are replacing
-		# Delete any existing versions of the new port
-		iport=`iport_from_origin $portdir`
-		if [ -n "$iport" ]; then
-			pm_sv Running pkg_delete for $iport
-			pm_pkg_delete_s -f $iport
-		fi
+	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then
+		# Delete any existing versions of the old port
+		pm_sv Running pkg_delete for $ro_upg_port
+		pm_pkg_delete_s -f $ro_upg_port
 	fi
 
-	pm_sv Running pkg_delete for $upg_port
-	pm_pkg_delete_s -f $upg_port
+	# Could be empty if -o
+	if [ -n "$upg_port" ]; then
+		pm_sv Running pkg_delete for $upg_port
+		pm_pkg_delete_s -f $upg_port
+	fi
+
 	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 fi
 
@@ -3230,6 +3225,10 @@ if [ -z "$RECURSE_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 fi
 
 install_failed () {
+	local upg_port
+
+	[ -n "$ro_upg_port" ] && upg_port="$ro_upg_port"
+
 	if [ -z "$NO_BACKUP" -a -n "$upg_port" ]; then
 		echo ''
 		echo "===>>> A backup package for $upg_port should"
