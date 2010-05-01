@@ -250,7 +250,7 @@ usage () {
 	echo "    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
 	echo "    [--local-packagedir=<path>] [--delete-packages]"
-	echo "    [--no-confirm] [--no-term-title] [--index|--index-only]"
+	echo "    [--no-confirm] [--no-term-title] [--index|--index-first|--index-only]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
@@ -311,7 +311,8 @@ usage () {
 	echo '   installed and/or updated before proceeding'
 	echo '--no-term-title do not update the xterm title bar'
 	echo ''
-	echo '--index use INDEX-[6-9] to check if a port is out of date'
+	echo '--index use INDEX-[6-9] exclusively to check if a port is up to date'
+	echo '--index-first use the INDEX for status, but double-check with the port'
 	echo '--index-only do not try to use /usr/ports'
 	echo ''
 	echo '--show-work list what ports are and would be installed'
@@ -409,6 +410,18 @@ e2="The --packages-build option and the -P[P] options are mutually exclusive"
 	esac
 }
 
+cross_idx () {
+	local e1
+
+e1='The --index, --index-first, and --index-only options are mutually exclusive'
+
+	case "$1" in
+	index)		[ -n "$PM_INDEX_FIRST" -o -n "$PM_INDEX_ONLY" ] && fail $e1 ;;
+	first)		[ -n "$PM_INDEX" -o -n "$PM_INDEX_ONLY" ] && fail $e1 ;;
+	only)		[ -n "$PM_INDEX" -o -n "$PM_INDEX_FIRST" ] && fail $e1 ;;
+	esac
+}
+
 for var in "$@" ; do
 	case "$var" in
 	-PP[A-Za-z0-9]*|-*[A-Za-z0-9]PP*)
@@ -437,9 +450,11 @@ for var in "$@" ; do
 				export PM_NO_CONFIRM ;;
 	--no-term-title)	PM_NO_TERM_TITLE=pm_no_term_title
 				export PM_NO_TERM_TITLE ;;
-	--index)		PM_INDEX=pm_index ; export PM_INDEX ;;
+	--index)		cross_idx index ; PM_INDEX=pm_index ; export PM_INDEX ;;
+	--index-first)		PM_INDEX=pm_index ; PM_INDEX_FIRST=pm_index_first
+				cross_idx first ; export PM_INDEX PM_INDEX_FIRST ;;
 	--index-only)		PM_INDEX=pm_index ; PM_INDEX_ONLY=pm_index_only
-				export PM_INDEX PM_INDEX_ONLY ;;
+				cross_idx only ; export PM_INDEX PM_INDEX_ONLY ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
@@ -454,6 +469,11 @@ for var in "$@" ; do
 	*)			newopts="$newopts $var" ;;
 	esac
 done
+
+unset var
+
+[ -n "$PM_INDEX" -a -n "$CHECK_PORT_DBDIR" ] &&
+	fail 'The --index* and --check-port-dbdir options are mutually exclusive'
 
 # Do this here so it can use the fancy functions above, and default values
 # can be overridden in the rc files
@@ -484,10 +504,10 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		fi
 
 		PM_INDEX="${INDEXDIR}/${INDEXFILE}"
-		index_time=`stat -f '%Ua' $PM_INDEX 2>/dev/null`
+		index_time=`stat -f '%Ua' ${PM_INDEX}.bz2 2>/dev/null`
 		pm_sv Updating INDEX file
 		$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
-		if [ $index_time -ne `stat -f '%Ua' $PM_INDEX 2>/dev/null` ]; then
+		if [ $index_time -ne `stat -f '%Ua' ${PM_INDEX}.bz2 2>/dev/null` ]; then
 			temp_index=`pm_mktemp index`
 			bunzip2 < ${PM_INDEX}.bz2 > $temp_index
 			pm_install_s $temp_index $PM_INDEX
@@ -495,6 +515,9 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			unset temp_index
 		fi
 		unset index_time
+
+		PM_INDEX_PORTS=`pkg_version -Ivl\< $PM_INDEX | cut -f1 -d\<`
+		export PM_INDEX_PORTS
 	fi
 
 	if [ -z "$pd" ]; then
@@ -1039,7 +1062,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
 	D)	DONT_SCRUB_DISTFILES=Dopt; ARGS="-D $ARGS" ;;
 	F)	FETCH_ONLY=Fopt; ARGS="-F $ARGS" ;;
-	G)	NO_RECURSIVE_CONFIG=Gopt; unset FORCE_CONFIG; ARGS="-G $ARGS" ;;
+	G)	NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS" ;;
 	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
 	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
 	L)	LIST_PLUS=Lopt ;;
@@ -1085,7 +1108,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	esac
 done
 shift $(( $OPTIND - 1 ))
-unset -f packages_init
+unset -f packages_init cross_idx
 
 [ -n "$PM_EXCL" ] && export PM_EXCL
 
@@ -1118,13 +1141,15 @@ if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
 	test_command_line ALWAYS_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
 		fail "The -d and -D options are mutually exclusive"
 fi
-[ -n "$FETCH_ONLY" -a -n "$NO_RECURSIVE_CONFIG" ] &&
-	unset NO_RECURSIVE_CONFIG
-[ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_PACKAGES_BUILD" ] &&
-	fail 'The --packages-build and -G options are mutually exclusive'
-[ -n "$NO_RECURSIVE_CONFIG" -a -n "$PM_DEL_BUILD_ONLY" ] &&
-	fail 'The --delete-build-only and -G options are mutually exclusive'
-
+if [ -n "$NO_RECURSIVE_CONFIG" ]; then
+	[ -n "$FETCH_ONLY" ] && unset NO_RECURSIVE_CONFIG
+	[ -n "$PM_PACKAGES_BUILD" ] &&
+		fail 'The --packages-build and -G options are mutually exclusive'
+	[ -n "$PM_DEL_BUILD_ONLY" ] &&
+		fail 'The --delete-build-only and -G options are mutually exclusive'
+	[ -n "$FORCE_CONFIG" ] &&
+		fail 'The --force-config and -G options are mutually exclusive'
+fi
 unset my_environment
 
 #=============== Begin functions for getopts features and main ===============
@@ -1195,7 +1220,7 @@ check_pkg_version () {
 
 check_for_updates () {
 	# Global: num_updates
-	local list_only nf iport origin port_ver udf do_update
+	local list_only nf iport origin port_ver skip udf do_update
 
 	[ "$1" = 'list' ] && { list_only=list_only; nf=nonfatal; shift; }
 
@@ -1204,15 +1229,14 @@ check_for_updates () {
 	origin=${2:-`origin_from_pdb $iport`} || return 0
 
 	if [ -n "$PM_INDEX" ]; then
-		if port_ver=`parse_index $origin name`; then
-			check_pkg_version $iport $port_ver ||
-				{ do_update=update_index ; }
-		else
-			echo "	===>>> Warning: No INDEX entry for $origin"
-		fi
+		case "$PM_INDEX_PORTS" in
+		*${iport}*) port_ver=`parse_index $origin name` ; do_update=upd_idx ;;
+		esac
+
+		[ -n "$PM_INDEX_FIRST" ] || skip=index_skip
 	fi
 
-	if [ -d "$pd/$origin" -a -z "$do_update" -a -z "$PM_INDEX_ONLY" ]; then
+	if [ -d "$pd/$origin" -a -z "$do_update" -a -z "$skip" ]; then
 		if ! pm_cd $pd/$origin; then
 			if [ -e "$pdb/$iport/+IGNOREME" ]; then
 			echo "	===>>> Warning: Unable to cd to $pd/$origin"
@@ -1224,7 +1248,14 @@ check_for_updates () {
 		fi
 		port_ver=`pm_make -V PKGNAME`
 		[ -z "$port_ver" ] && fail "Is $pd/$origin/Makefile missing?"
+	elif [ -z "$do_update" -a -z "$skip" ]; then
+		find_moved_port $origin $iport $nf
 
+		# If the port has moved, we have to update it, otherwise ignore
+		[ -n "$moved_npd" ] && do_update=do_update6
+	fi
+
+	if [ -z "$do_update" -a -n "$port_ver" ]; then
 		udf="$pdb/$iport/PM_UPGRADE_DONE_FLAG"
 		if [ "$iport" = "$port_ver" ]; then
 			if [ -n "$PM_FORCE" ]; then
@@ -1254,11 +1285,6 @@ check_for_updates () {
 		else
 			check_pkg_version $iport $port_ver $udf || do_update=do_update_check
 		fi
-	elif [ -z "$do_update" -a -z "$PM_INDEX_ONLY" ]; then
-		find_moved_port $origin $iport $nf
-
-		# If the port has moved, we have to update it, otherwise ignore
-		[ -n "$moved_npd" ] && do_update=do_update6
 	fi
 
 	[ -z "$do_update" ] && {
@@ -1269,7 +1295,7 @@ check_for_updates () {
 			echo "	===>>> New version available: $port_ver"
 			[ -e "$pdb/$iport/+IGNOREME" ] &&
 				echo "	===>>> +IGNOREME file is present for $1"
-			[ -z "$PM_INDEX_ONLY" ] && check_state
+			[ -z "$PM_INDEX_ONLY" ] && { pm_cd_pd $origin ;  check_state; }
 			num_updates=$(( $num_updates + 1 ))
 		else
 			unset moved_npd
