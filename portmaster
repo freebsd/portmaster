@@ -173,7 +173,7 @@ parent_exit () {
 		( for f in $DISPLAY_LIST; do
 			echo "===>>> pkg-message for $f" ; cat $pdb/$f/+DISPLAY ; echo ''
 		done
-		echo "===>>> Done displaying pkg-message files" ) | $PAGER
+		echo "===>>> Done displaying pkg-message files" ; echo '' ) | $PAGER
 		;;
 	esac
 
@@ -1363,7 +1363,7 @@ pm_pkg_create () {
 		pkgdir=${PACKAGES}/All
 		echo "===>>> Creating a package for new version $2"
 	else
-		pkgdir=$1
+		pkgdir=$1 ; echo ''
 		echo "===>>> Creating a backup package for old version $2"
 	fi
 
@@ -2602,7 +2602,7 @@ all_config () {
 		fi
 	done
 
-	echo "===>>> Update check of installed ports complete"
+	echo "===>>> Update check of installed ports complete" ; echo ''
 	safe_exit
 fi
 
