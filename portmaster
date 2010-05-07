@@ -454,10 +454,12 @@ for var in "$@" ; do
 				export PM_NO_TERM_TITLE ;;
 	--no-index-fetch)	PM_NO_INDEX_FETCH=pm_no_index_fetch ;;
 	--index)		cross_idx index ; PM_INDEX=pm_index ; export PM_INDEX ;;
-	--index-first)		PM_INDEX=pm_index ; PM_INDEX_FIRST=pm_index_first
-				cross_idx first ; export PM_INDEX PM_INDEX_FIRST ;;
-	--index-only)		PM_INDEX=pm_index ; PM_INDEX_ONLY=pm_index_only
-				cross_idx only ; export PM_INDEX PM_INDEX_ONLY ;;
+	--index-first)		cross_idx first ; PM_INDEX=pm_index
+				PM_INDEX_FIRST=pm_index_first
+				export PM_INDEX PM_INDEX_FIRST ;;
+	--index-only)		cross_idx only ; PM_INDEX=pm_index
+				PM_INDEX_ONLY=pm_index_only
+				export PM_INDEX PM_INDEX_ONLY ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
