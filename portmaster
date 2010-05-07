@@ -249,7 +249,7 @@ usage () {
 	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
 	echo "    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
-	echo "    [--local-packagedir=<path>] [--delete-packages]"
+	echo "    [--local-packagedir=<path>] [--packages-local] [--delete-packages]"
 	echo "    [--no-confirm] [--no-term-title] [--no-index-fetch]"
 	echo "    [--index|--index-first|--index-only]"
 	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
@@ -336,6 +336,7 @@ usage () {
 	echo '--always-fetch fetch package even if it already exists locally'
 	echo '--local-packagedir=<path> where local packages can be found,'
 	echo '   will fall back to fetching if no local version exists'
+	echo '--packages-local use packages from --local-packagedir only'
 	echo '--delete-packages after installing from a package, delete it'
 	echo ''
 	echo '-l list installed ports by category'
@@ -409,6 +410,8 @@ e2="The --packages-build option and the -P[P] options are mutually exclusive"
 	build)		case "$PM_PACKAGES" in first|only) fail $e2 ;; esac ;;
 	newer)		[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
 				PM_PACKAGES=newer ; export PM_PACKAGES; } ;;
+	local)		[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
+				PM_PACKAGES=local ; export PM_PACKAGES; } ;;
 	esac
 }
 
@@ -439,6 +442,9 @@ for var in "$@" ; do
 	--packages-if-newer)	packages_init newer
 				PM_PACKAGES_NEWER=pmp_newer
 				export PM_PACKAGES_NEWER ;;
+	--packages-local)	packages_init local
+				PM_PACKAGES_LOCAL=pmp_local
+				export PM_PACKAGES_LOCAL ;;
 	--always-fetch)		PM_ALWAYS_FETCH=pm_always_fetch
 				export PM_ALWAYS_FETCH ;;
 	--local-packagedir=*)	LOCAL_PACKAGEDIR=${var#--local-packagedir=}
@@ -3003,7 +3009,7 @@ fetch_package () {
 			$PM_SU_CMD fetch $FETCH_ARGS -o $ppd ${sitepath}${1}.tbz 2>/dev/null; }
 	fi
 }
-	if [ -z "$PACKAGESITE" ]; then
+	if [ -z "$PACKAGESITE" -a -z "$PM_PACKAGES_LOCAL" ]; then
 		release=`uname -r`
 
 		case "$release" in
@@ -3049,7 +3055,7 @@ fetch_package () {
 		fi
 	fi
 
-	if [ -z "$latest_pv" ]; then
+	if [ -z "$latest_pv" -a -z "$PM_PACKAGES_LOCAL" ]; then
 		dirlist=`echo ${TMPDIR}/f-${PM_PARENT_PID}-dl-${portdir%/*}*`
 		if [ ! -r "$dirlist" ]; then
 			pm_unlink $dirlist		# JIC
@@ -3066,7 +3072,7 @@ fetch_package () {
 	fi
 	unset dirlist s
 
-	if [ -z "$latest_pv" ]; then
+	if [ -z "$latest_pv" -a -z "$PM_PACKAGES_LOCAL" ]; then
 		fetch_package $new_port try
 		if [ $? -eq 0 ]; then
 			latest_pv=$new_port
@@ -3077,7 +3083,13 @@ fetch_package () {
 
 	if [ -z "$latest_pv" ]; then
 		echo "===>>> Package and/or archive not found at:"
-		echo "${sitepath}"
+		if [ -n "$LOCAL_PACKAGEDIR" ]; then
+			echo "	$LOCAL_PACKAGEDIR"
+			if [ -z "$PM_PACKAGES_LOCAL" ]; then
+				echo '	or'
+			fi
+		fi
+		[ -z "$PM_PACKAGES_LOCAL" ] && echo "	${sitepath}"
 		echo ''
 		echo "       Check the pkg_add(1) man page for information"
 		echo "       on setting the PACKAGESITE environment variable"
@@ -3170,6 +3182,7 @@ if [ -z "$use_package" ]; then
 		fi
 	fi
 
+	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; echo ''; }
 
