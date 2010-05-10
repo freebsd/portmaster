@@ -1090,8 +1090,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
 	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
 	L)	LIST_PLUS=Lopt ;;
-	P)	packages_init first
-		PM_PACKAGES=first ; export PM_PACKAGES ;;
+	P)	packages_init first ;;
 	R)	RESTART=Ropt ; ARGS="-R $ARGS" ;;
 	a)	UPDATE_ALL=aopt ;;
 	b)	BACKUP=bopt; ARGS="-b $ARGS" ;;
@@ -1107,7 +1106,8 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 		;;
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;;
-	p)	portdir="${OPTARG#$pd/}" ; portdir=${portdir%/} ;;
+	p)	echo "===>>> The -p option has been deprecated" ; echo ''
+		portdir="${OPTARG#$pd/}" ; portdir=${portdir%/} ;;
 	r)	UPDATE_REQ_BYS=ropt
 		if [ -d "$pdb/$OPTARG" ]; then
 			glob_dirs=$OPTARG
