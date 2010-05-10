@@ -486,6 +486,9 @@ unset var
 [ -n "$PM_INDEX" -a -n "$CHECK_PORT_DBDIR" ] &&
 	fail 'The --index* and --check-port-dbdir options are mutually exclusive'
 
+[ -n "$PM_PACKAGES_LOCAL" -a -z "$LOCAL_PACKAGEDIR" ] &&
+	fail 'The --packages-local option requires --local-packagedir to be defined'
+
 # Do this here so it can use the fancy functions above, and default values
 # can be overridden in the rc files
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
