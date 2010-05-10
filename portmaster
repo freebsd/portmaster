@@ -2441,15 +2441,15 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE
 
 	if [ -n "$LOCALBASE" ]; then
-		LOCALBASE_COMPAT="$LOCALBASE/lib/compat"
+		LOCALBASE_COMPAT="$LOCALBASE/lib/compat/pkg"
 	else
 		PLB=`pm_make_b -f/usr/share/mk/bsd.port.mk -V LOCALBASE 2>/dev/null`
 		if [ -n "$PLB" ]; then
-			LOCALBASE_COMPAT="$PLB/lib/compat"
+			LOCALBASE_COMPAT="$PLB/lib/compat/pkg"
 		else
-			PLB=`head -1 $PM_INDEX | cut -f 3 -d\|`
+			PLB=`head -1 $PM_INDEX | cut -f 3 -d\| 2>/dev/null`
 			if [ -d "$PLB" ]; then
-				LOCALBASE_COMPAT="${PLB}/lib/compat"
+				LOCALBASE_COMPAT="${PLB}/lib/compat/pkg"
 			else
 				fail 'The value of LOCALBASE cannot be empty'
 			fi
@@ -3254,13 +3254,13 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 			temp="${temp}$file "
 		done
 		if [ -n "$temp" ]; then
-			if [ ! -d "$LOCALBASE_COMPAT/pkg" ]; then
-				pm_sv Creating $LOCALBASE_COMPAT/pkg for -w
-				pm_mkdir_s $LOCALBASE_COMPAT/pkg
+			if [ ! -d "$LOCALBASE_COMPAT" ]; then
+				pm_sv Creating $LOCALBASE_COMPAT for -w
+				pm_mkdir_s $LOCALBASE_COMPAT
 			fi
 
 			pm_sv Copying old shared libraries for -w
-			$PM_SU_CMD cp -p $temp $LOCALBASE_COMPAT/pkg/
+			$PM_SU_CMD cp -p $temp ${LOCALBASE_COMPAT}/
 		fi
 
 		pm_unlink $ldconfig_out ; unset ldconfig_out temp file
@@ -3335,12 +3335,12 @@ echo ''
 
 # Remove saved libs that match newly installed files
 
-temp=`find $LOCALBASE_COMPAT/pkg -type d -empty 2>/dev/null`
-if [ -z "$temp" -a -d "$LOCALBASE_COMPAT/pkg" ]; then
+temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
+if [ -z "$temp" -a -d "$LOCALBASE_COMPAT" ]; then
 	unset files
 	for file in `pkg_info -q -L $new_port`; do
-		[ -f "$LOCALBASE_COMPAT/pkg/${file##*/}" ] && {
-			files="${files}$LOCALBASE_COMPAT/pkg/${file##*/} "; }
+		[ -f "${LOCALBASE_COMPAT}/${file##*/}" ] && {
+			files="${files}${LOCALBASE_COMPAT}/${file##*/} "; }
 	done
 
 	if [ -n "$files" ]; then
@@ -3351,9 +3351,9 @@ if [ -z "$temp" -a -d "$LOCALBASE_COMPAT/pkg" ]; then
 	unset temp file files
 fi
 
-[ -z "$temp" ] && temp=`find $LOCALBASE_COMPAT/pkg -type d -empty 2>/dev/null`
+[ -z "$temp" ] && temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
 if [ -d "$temp" ]; then
-	pm_sv Deleting the empty $LOCALBASE_COMPAT/pkg
+	pm_sv Deleting the empty $LOCALBASE_COMPAT
 	pm_rmdir_s $temp
 fi
 unset temp
