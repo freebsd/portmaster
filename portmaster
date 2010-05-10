@@ -496,6 +496,11 @@ unset var
 # Do this here so it can use the fancy functions above, and default values
 # can be overridden in the rc files
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
+	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
+		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
+		fail Package installation support requires FreeBSD 6.4 or newer
+	fi
+
 	if [ -z "$pd" ]; then
 		if [ -z "$PORTSDIR" ]; then
 			[ -d /usr/ports ] && pd=/usr/ports
@@ -570,12 +575,13 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			fi
 		fi
 	fi
-	if [ -z "$distdir" -a "$PM_PACKAGES" != only ]; then
-		distdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
-		# In case it is a symlink
-		distdir="${distdir%/}/"
+	export pd pdb
+
+	if [ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
+	    -z "$CHECK_PORT_DBDIR" -a -z "$LIST_ORIGINS" ]; then
+		DISTDIR=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
 	fi
-	export pd pdb distdir
+	[ -n "$DISTDIR" ] && { DISTDIR="${DISTDIR%/}/"; export DISTDIR; }
 
 	[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir=/var/db/ports
 	[ -z "$port_dbdir" ] &&
@@ -585,10 +591,6 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
 		PM_BUILD_ONLY_LIST=pm_bol
 		export PM_BUILD_ONLY_LIST
-	fi
-	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
-		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
-		fail Package installation support requires FreeBSD 6.4 or newer
 	fi
 fi
 
@@ -901,8 +903,8 @@ ports_by_category () {
 delete_empty_dist_subdirs () {
 	# Get back to somewhere safe so we do not
 	# delete our CWD out from under ourselves
-	pm_cd $distdir || fail "Cannot cd into $distdir"
-	find -d $distdir -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
+	pm_cd $DISTDIR || fail "Cannot cd into $DISTDIR"
+	find -d $DISTDIR -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
 }
 
 # Takes a pattern as input
@@ -933,15 +935,15 @@ find_glob_dirs () {
 #=============== Begin code relevant only to --features ===============
 
 if [ -n "$CLEAN_DISTFILES" ]; then
-	[ "$distdir" != '/' ] || fail 'There is no DISTDIR to clean'
+	[ -n "$DISTDIR" ] || fail 'There is no DISTDIR to clean'
 
 	# Set the file name here since we are usually called in a subshell
 	DI_FILES=`pm_mktemp DI-FILES`
 	read_distinfos
 
 	echo "===>>> Checking for stale distfiles"
-	for df in `find $distdir -type f | sort`; do
-		f=${df#$distdir}
+	for df in `find $DISTDIR -type f | sort`; do
+		f=${df#$DISTDIR}
 		if ! grep -ql $f $DI_FILES; then
 			if [ -n "$ALL" ]; then
 				echo "===>>> Deleting $f"
@@ -1181,6 +1183,7 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	[ $# -gt 0 ] && fail 'The -[lL] options are not compatible with updates or installs'
 fi
 unset my_environment
+unset -f test_command_line
 
 #=============== Begin functions for getopts features and main ===============
 
@@ -1484,10 +1487,10 @@ delete_dist_list () {
 }
 
 find_and_delete_distfiles () {
-	# Global: distfiles distfiles_checked delete_all
+	# Global: port_subdir DISTDIR distfiles distfiles_checked delete_all
 	local ps pattern file answer
 
-	ps=${port_subdir#$distdir}
+	ps=${port_subdir#$DISTDIR}
 
 	pattern=${1%[_-]*}
 	for file in ${pattern}*; do
@@ -1532,7 +1535,7 @@ find_and_delete_distfiles () {
 }
 
 set_distfiles_and_subdir () {
-	# Global: dist_list_files distfiles port_subdir distdir
+	# Global: dist_list_files distfiles port_subdir DISTDIR
 
 	[ -z "$dist_list_files" ] && find_dl_distfiles $1
 
@@ -1552,9 +1555,9 @@ set_distfiles_and_subdir () {
 	if [ -z "$port_subdir" ]; then
 		port_subdir=`pm_make -V DIST_SUBDIR`
 		if [ -n "$port_subdir" ]; then
-			port_subdir="${distdir}${port_subdir}/"
+			port_subdir="${DISTDIR}${port_subdir}/"
 		else
-			port_subdir=$distdir
+			port_subdir=$DISTDIR
 		fi
 	fi
 	if [ -d "$port_subdir" ]; then
@@ -1621,7 +1624,7 @@ delete_stale_distfiles () {
 }
 
 delete_all_distfiles () {
-	# Global: delete_all distdir
+	# Global: delete_all DISTDIR
 	local origin rc delete_current
 
 	# In case we are called more than once
@@ -1640,9 +1643,9 @@ delete_all_distfiles () {
 			local answer f ; read answer
 			case "$answer" in
 			[yY])	for f in $dist_list_files; do
-					if [ -f "${distdir}${f}" ]; then
-					echo "       Deleting ${distdir}${f}"
-						pm_unlink ${distdir}${f}
+					if [ -f "${DISTDIR}${f}" ]; then
+					echo "       Deleting ${DISTDIR}${f}"
+						pm_unlink ${DISTDIR}${f}
 					fi
 				done ;;
 			esac
@@ -1822,7 +1825,8 @@ fi
 
 #=============== End code relevant only to getopts features ===============
 
-[ "$distdir" = '/' -a "$PM_PACKAGES" != only ] && fail 'The value of DISTDIR cannot be empty'
+[ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$DONT_SCRUB_DISTFILES" ] &&
+	fail 'The value of DISTDIR cannot be empty'
 
 #=============== Begin functions for main ===============
 
@@ -3371,7 +3375,7 @@ if [ -n "$distfiles" ]; then
 
 	ds=`pm_make -V DIST_SUBDIR`
 	[ -n "$ds" ] && ds="${ds}/"
-	port_subdir="${distdir}${ds}"		# Also for *delete*distfiles()
+	port_subdir="${DISTDIR}${ds}"		# Also for *delete*distfiles()
 
 	if [ -s distinfo ]; then
 		distinfo=distinfo
