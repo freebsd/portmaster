@@ -397,21 +397,26 @@ pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
 #=============== End functions we always want to have ===============
 
 packages_init () {
-	local e1 e2
+	local e1 e2 e3
 
 e1="The -P/--packages and -PP/--packages-only options are mutually exclusive"
 e2="The --packages-build option and the -P[P] options are mutually exclusive"
+e3="The --packages-if-newer and -PP/--packages-only options are mutually exclusive"
 
 	case "$1" in
-	first)		[ "$PM_PACKAGES" = only ] && fail $e1
-			[ -n "$PM_PACKAGES_BUILD" ] && fail $e2 ;;
-	only)		[ "$PM_PACKAGES" = first ] && fail $e1
-			[ -n "$PM_PACKAGES_BUILD" ] && fail $e2 ;;
-	build)		case "$PM_PACKAGES" in first|only) fail $e2 ;; esac ;;
-	newer)		[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
-				PM_PACKAGES=newer ; export PM_PACKAGES; } ;;
-	local)		[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
-				PM_PACKAGES=local ; export PM_PACKAGES; } ;;
+	first)	[ "$PM_PACKAGES" = only ] && fail $e1
+		[ -n "$PM_PACKAGES_BUILD" ] && fail $e2
+		[ -z "$PM_PACKAGES" ] && {
+			PM_PACKAGES=first ; export PM_PACKAGES; } ;;
+	only)	[ "$PM_PACKAGES" = first ] && fail $e1
+		[ "$PM_PACKAGES" = newer ] && fail $e3
+		[ -n "$PM_PACKAGES_BUILD" ] && fail $e2 ;;
+	build)	case "$PM_PACKAGES" in first|only) fail $e2 ;; esac ;;
+	newer)	[ "$PM_PACKAGES" = only ] && fail $e3
+		[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
+			PM_PACKAGES=newer ; export PM_PACKAGES; } ;;
+	local)	[ -z "$PM_PACKAGES" -a -z "$PM_PACKAGES_BUILD" ] && {
+			PM_PACKAGES=local ; export PM_PACKAGES; } ;;
 	esac
 }
 
@@ -431,8 +436,7 @@ for var in "$@" ; do
 	case "$var" in
 	-PP[A-Za-z0-9]*|-*[A-Za-z0-9]PP*)
 				fail "The -PP option must stand alone" ;;
-	--packages)		packages_init first
-				PM_PACKAGES=first ; export PM_PACKAGES ;;
+	--packages)		packages_init first ;;
 	-PP|--packages-only)	packages_init only
 				PM_PACKAGES=only ; export PM_PACKAGES ;;
 	--packages-build)	packages_init build
