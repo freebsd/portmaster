@@ -518,9 +518,17 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			: ${FETCHINDEX:='fetch -am -o'}
 			: ${MASTER_SITE_INDEX:='http://www.FreeBSD.org/ports/'}
 
+			index_fetch="$FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2"
+			do_index_fetch=yes_index_fetch
+
 			index_time=`stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null`
-			pm_sv Updating INDEX file
-			$PM_SU_CMD $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2
+
+			[ -n "$index_time" ] && {
+				$index_fetch 2>/dev/null && do_index_fetch=no_index_fetch; }
+
+			[ "$do_index_fetch" = yes_index_fetch ] && {
+				pm_sv 'Updating INDEX file'; $PM_SU_CMD $index_fetch; }
+
 			if [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
 				temp_index=`pm_mktemp index`
 				bunzip2 < ${PM_INDEX}.bz2 > $temp_index
@@ -528,7 +536,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 				unlink $temp_index
 				unset temp_index
 			fi
-			unset index_time
+			unset index_fetch do_index_fetch index_time
 		else
 			[ -r "$PM_INDEX" ] ||
 				fail "The --no-index-fetch option was used, but $PM_INDEX does not exist"
