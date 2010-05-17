@@ -1060,6 +1060,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 			case "$answer" in
 			[yY])	pm_rm_s -rf $dir ;;
 			esac
+			echo ''
 			;;
 		esac
 	done
