@@ -2811,6 +2811,8 @@ check_state || {
 # Do these things first time through, with or without 'make config'
 if [ -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
 dofetch () {
+	local fetchlog allfiles
+
 	echo "===>>> Launching 'make checksum' for $portdir in background"
 	fetchlog=`pm_mktemp fetchlog-${portdir#*/}`
 	(pm_make -DBATCH checksum >> $fetchlog 2>&1 && {
@@ -2836,8 +2838,8 @@ dofetch () {
 		# Make sure that different ports using the same distfiles
 		# do not clobber each other's fetchs
 		for file in $distfiles; do
-		if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1
-			then
+			case "$file" in */*) file=`echo $file | sed s#/#_#g` ;; esac
+			if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1; then
 				pm_mktemp ${file}-${portdir#*/} >/dev/null
 			else
 				DONT_FETCH=dont_fetch
@@ -2847,7 +2849,7 @@ dofetch () {
 
 		[ -z "$DONT_FETCH" -a -n "$distfiles" ] && dofetch
 	fi
-	unset master_sites
+	unset master_sites distfiles file DONT_FETCH
 
 	if [ -z "$FETCH_ONLY" -a ! "$PM_PACKAGES" = only ]; then
 		TESTINT=`grep -l ^IS_INTERACTIVE Makefile`
@@ -2862,6 +2864,7 @@ dofetch () {
 		echo -n "===>>> Press the [Enter] or [Return] key to continue "
 		read DISCARD
 		echo ''
+		unset TESTINT DISCARD
 	fi
 fi
 fi	# [ -z "$PM_INDEX_ONLY" ]
