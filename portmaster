@@ -3281,6 +3281,8 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 
 			pm_sv Copying old shared libraries for -w
 			$PM_SU_CMD cp -p $temp ${LOCALBASE_COMPAT}/
+			pm_sv Running ldconfig
+			$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
 		fi
 
 		pm_unlink $ldconfig_out ; unset ldconfig_out temp file
