@@ -369,7 +369,7 @@ pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 		 unset -v MASTER_RB_LIST CONFIG_SEEN_LIST;
-		 /usr/bin/make $PM_MAKE_ARGS $*; ); }
+		 nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
 		fail "mktemp for $1 failed"; }
@@ -385,7 +385,7 @@ pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root \
 			-g wheel -m 644 $1 $2; }
 pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 			 unset -v MASTER_RB_LIST CONFIG_SEEN_LIST;
-			 $PM_SU_CMD /usr/bin/make $PM_MAKE_ARGS $*; ); }
+			 $PM_SU_CMD nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
 pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
@@ -532,11 +532,12 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 				$index_fetch 2>/dev/null && do_index_fetch=no_index_fetch; }
 
 			[ "$do_index_fetch" = yes_index_fetch ] && {
-				pm_sv 'Updating INDEX file'; $PM_SU_CMD $index_fetch; }
+				pm_sv 'Fetching new INDEX file'; $PM_SU_CMD $index_fetch; }
 
 			if [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
 				temp_index=`pm_mktemp index`
 				bunzip2 < ${PM_INDEX}.bz2 > $temp_index
+				pm_sv 'Installing new INDEX file'
 				pm_install_s $temp_index $PM_INDEX
 				unlink $temp_index
 				unset temp_index
@@ -724,10 +725,11 @@ IFS='
 		echo -n "	===>>> Delete this dependency data? y/n [n] "
 					read answer
 					case "$answer" in
-					[yY]) unset prev_line line ; continue ;;
+					[yY]) unset prev_line line ; echo '' ; continue ;;
 					esac
 				else
 				echo "	===>>> Try ${0##*/} --check-depends"
+					echo ''
 				fi
 			fi
 
@@ -2531,7 +2533,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 
 	[ -z "$NO_BACKUP" ] && init_packages
 	[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && export NB_DELETE
-	if [ -n "$MAKE_PACKAGE" ]; then
+	if [ -n "$MAKE_PACKAGE" -a -z "$FETCH_ONLY" ]; then
 		init_packages_var
 
 		if [ ! -d "$PACKAGES" ]; then
