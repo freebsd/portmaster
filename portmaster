@@ -278,6 +278,9 @@ usage () {
 	echo "${0##*/} --clean-distfiles"
 	echo "${0##*/} --clean-distfiles-all"
 	echo ''
+	echo "${0##*/} [--index] --clean-packages"
+	echo "${0##*/} [--index] --clean-packages-all"
+	echo ''
 	echo "${0##*/} --check-depends"
 	echo ''
 	echo "${0##*/} --check-port-dbdir [-v]"
@@ -349,6 +352,9 @@ usage () {
 	echo ''
 	echo '--clean-distfiles offer to delete stale distfiles'
 	echo '--clean-distfiles-all delete stale distfiles without prompting'
+	echo ''
+	echo '[--index] --clean-packages offer to delete stale packages'
+	echo '[--index] --clean-distfiles-all delete stale packages without prompting'
 	echo ''
 	echo '--check-depends cross-check and update dependency information for all ports'
 	echo ''
@@ -474,6 +480,8 @@ for var in "$@" ; do
 	--version)		version ; exit 0 ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
 	--clean-distfiles-all)	CLEAN_DISTFILES=clean_distfiles_all ; ALL=cda ;;
+	--clean-packages)	CLEAN_PACKAGES=clean_packages ;;
+	--clean-packages-all)	CLEAN_PACKAGES=clean_packages_all ; ALL=cdp ;;
 	--check-depends)	CHECK_DEPENDS=check_depends ;;
 	--check-port-dbdir)	CHECK_PORT_DBDIR=check_port_dbdir ;;
 	--list-origins)		LIST_ORIGINS=list_origins ;;
@@ -936,6 +944,46 @@ find_glob_dirs () {
 	return 1
 }
 
+init_packages_var () {
+	# Global: PACKAGES
+
+	[ -n "$PACKAGES" ] && return
+
+	PACKAGES=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES 2>/dev/null`
+	if [ -z "$PACKAGES" ]; then
+		if [ -d /usr/ports/packages -a -w /usr/ports/packages ]; then
+			PACKAGES='/usr/ports/packages'
+		else
+			if [ -d /usr/ports/ -a -w /usr/ports/ ]; then
+				PACKAGES='/usr/ports/packages'
+			else
+				fail 'The value of PACKAGES cannot be empty and the directory must be writable'
+			fi
+		fi
+	fi
+	export PACKAGES
+}
+
+parse_index () {
+	local pd line
+
+	[ -z "$pd" -a -n "$PM_INDEX_ONLY" ] && pd=/usr/ports
+
+	line=`grep -m1 .*\|${pd}/${1}\|.* $PM_INDEX` || return 1
+
+	case "$2" in
+	name)		echo ${line%%|*} ;;
+	localbase)	echo $line | cut -f 3 -d\| ;;
+	comment)	echo $line | cut -f 4 -d\| ;;
+	descr)		echo $line | cut -f 5 -d\| ;;
+	maintainer)	echo $line | cut -f 6 -d\| ;;
+	category)	echo $line | cut -f 7 -d\| ;;
+	b-deps)		echo $line | cut -f 8 -d\| ;;
+	r-deps)		echo $line | cut -f 9 -d\| ;;
+	www)		echo $line | cut -f 10 -d\| ;;
+	esac
+}
+
 #=============== End functions relevant to --features and main ===============
 #=============== Begin code relevant only to --features ===============
 
@@ -965,6 +1013,71 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	done
 
 	delete_empty_dist_subdirs
+	safe_exit
+fi
+
+# XXX
+if [ -n "$CLEAN_PACKAGES" ]; then
+	init_packages_var
+
+	echo "===>>> Checking for stale packages"
+	for package in `find $PACKAGES -type f | sort`; do
+		origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` || {
+			fail Empty origin in $package; }
+		origin=${origin#@comment ORIGIN:}
+
+		if [ -z "$PM_INDEX" ]; then
+			if [ -d "$pd/$origin"  ]; then
+				pm_cd $pd/$origin && port_ver=`pm_make -V PKGNAME`
+				[ -n "$port_ver" ] || fail "Is $pd/$origin/Makefile missing?"
+			else
+				echo "===>>> The origin for ${package##*/} ($origin) is missing"
+			fi
+		else
+			port_ver=`parse_index $origin name`
+		fi
+
+		if [ -n "$port_ver" ]; then
+			if [ "${port_ver}.tbz" = "${package##*/}" ]; then
+				echo "===>>> ${package##*/} is up to date"
+				continue
+			fi
+
+			echo "===>>> Package version: ${package##*/} Latest version: $port_ver"
+
+			if [ -d "${pdb}/${package##*/}" ]; then
+				echo "	===>>> ${package##*/} matches the installed version"
+			else
+				echo "	===>>> ${package##*/} is out of date"
+			fi
+		else
+			echo "===>>> ${package#$PACKAGES/}"
+		fi
+
+		if [ -z "$ALL" ]; then
+			echo -n "	===>>> Delete stale package: ${package##*/}? y/n [y] "
+			read answer
+			case "$answer" in
+			[nN]*)	continue ;;
+			esac
+		fi
+
+		echo "	===>>> Deleting $package"
+		pm_unlink_s $package
+	done
+
+	echo "===>>> Deleting stale symlinks"
+	pm_cd $PACKAGES || fail "Cannot cd to $PACKAGES"
+	for link in `find . -type l` ; do
+		if [ ! -e "$link" ]; then
+			echo "	===>>> ${link#./}"
+			$PM_SU_CMD /bin/unlink $link
+		fi
+	done
+
+	echo "===>>> Deleting empty directories (if any)"
+	pm_find_s . -type d -empty -delete
+
 	safe_exit
 fi
 
@@ -1206,26 +1319,6 @@ check_state () {
 	return 0
 }
 
-parse_index () {
-	local pd line
-
-	[ -z "$pd" -a -n "$PM_INDEX_ONLY" ] && pd=/usr/ports
-
-	line=`grep -m1 .*\|${pd}/${1}\|.* $PM_INDEX` || return 1
-
-	case "$2" in
-	name)		echo ${line%%|*} ;;
-	localbase)	echo $line | cut -f 3 -d\| ;;
-	comment)	echo $line | cut -f 4 -d\| ;;
-	descr)		echo $line | cut -f 5 -d\| ;;
-	maintainer)	echo $line | cut -f 6 -d\| ;;
-	category)	echo $line | cut -f 7 -d\| ;;
-	b-deps)		echo $line | cut -f 8 -d\| ;;
-	r-deps)		echo $line | cut -f 9 -d\| ;;
-	www)		echo $line | cut -f 10 -d\| ;;
-	esac
-}
-
 check_pkg_version () {
 	local iport port_ver udf
 
@@ -1351,26 +1444,6 @@ check_for_updates () {
 	check_interactive $iport $port_ver || return 0
 	update_port $iport $port_ver || return 1
 	return 0
-}
-
-init_packages_var () {
-	# Global: PACKAGES
-
-	[ -n "$PACKAGES" ] && return
-
-	PACKAGES=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES 2>/dev/null`
-	if [ -z "$PACKAGES" ]; then
-		if [ -d /usr/ports/packages -a -w /usr/ports/packages ]; then
-			PACKAGES='/usr/ports/packages'
-		else
-			if [ -d /usr/ports/ -a -w /usr/ports/ ]; then
-				PACKAGES='/usr/ports/packages'
-			else
-fail 'The value of PACKAGES cannot be empty and the directory must be writable'
-			fi
-		fi
-	fi
-	export PACKAGES
 }
 
 init_packages () {
