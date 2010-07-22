@@ -213,7 +213,7 @@ safe_exit () {
 		# Save state for the parent process to read back in
 		echo "CUR_DEPS='$CUR_DEPS'" >> $IPC_SAVE
 		echo "dep_of_deps='$dep_of_deps'" >> $IPC_SAVE
-		if [ -z "$CONFIG_ONLY" ]; then
+		if [ -z "$PM_FIRST_PASS" ]; then
 			echo "DISPLAY_LIST='$DISPLAY_LIST'" >> $IPC_SAVE
 			echo "INSTALLED_LIST='$INSTALLED_LIST'" >> $IPC_SAVE
 
@@ -273,7 +273,7 @@ usage () {
 	echo "${0##*/} [-b D|d] -e <name/glob of port directory in $pdb>"
 	echo "${0##*/} [-b D|d] -s"
 	echo ''
-	echo "${0##*/} [--force-config] [-aftv] -F"
+	echo "${0##*/} [--force-config|-G] [-aftv] -F"
 	echo ''
 	echo "${0##*/} --clean-distfiles"
 	echo "${0##*/} --clean-distfiles-all"
@@ -287,15 +287,15 @@ usage () {
 	echo "${0##*/} -h|--help"
 	echo "${0##*/} --version"
 	echo ''
-	echo "--force-config 'make config' for all ports"
+	echo "--force-config 'make config' for all ports (overrides -G)"
 	echo "-C prevents 'make clean' from being run before building"
-	echo "-G prevents recursive 'make config' (overrides --force-config)"
+	echo "-G prevents 'make config'"
 	echo "-H hide details of the port build and install in a log file"
 	echo "-K prevents 'make clean' from being run after building"
 	echo '-B prevents creation of the backup package for the installed port'
 	echo '-b create and keep a backup package of an installed port'
 	echo '-g create a package of the new port'
-	echo '-n run through configure, but do not make or install any ports'
+	echo '-n run through all steps, but do not make or install any ports'
 	echo '-t recurse dependencies thoroughly, using all-depends-list'
 	echo '-v verbose output'
 	echo '-w save old shared libraries before deinstall'
@@ -345,7 +345,7 @@ usage () {
 	echo '-e expunge a port via pkg_delete, and remove its distfiles'
 	echo '-s clean out stale ports that used to be depended on'
 	echo ''
-	echo '[--force-config] [-aftv] -F fetch distfiles only (mutually exclusive of -G)'
+	echo '[--force-config|-G] [-aftv] -F fetch distfiles only'
 	echo ''
 	echo '--clean-distfiles offer to delete stale distfiles'
 	echo '--clean-distfiles-all delete stale distfiles without prompting'
@@ -368,7 +368,7 @@ pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-		 unset -v MASTER_RB_LIST CONFIG_SEEN_LIST;
+		 unset -v MASTER_RB_LIST PM_FP_SEEN_LIST;
 		 nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
@@ -384,7 +384,7 @@ pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
 pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root \
 			-g wheel -m 644 $1 $2; }
 pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-			 unset -v MASTER_RB_LIST CONFIG_SEEN_LIST;
+			 unset -v MASTER_RB_LIST PM_FP_SEEN_LIST;
 			 $PM_SU_CMD nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
@@ -478,7 +478,7 @@ for var in "$@" ; do
 	--check-port-dbdir)	CHECK_PORT_DBDIR=check_port_dbdir ;;
 	--list-origins)		LIST_ORIGINS=list_origins ;;
 	--show-work)		SHOW_WORK=show ; RECURSE_THOROUGH=thorough ;;
-	--force-config)		export FORCE_CONFIG=force_config ;;
+	--force-config)		export PM_FORCE_CONFIG=pm_force_config ;;
 	--*)			echo "Illegal option $var" ; echo ''
 				echo "===>>> Try ${0##*/} --help"; exit 1 ;;
 	*)			newopts="$newopts $var" ;;
@@ -1092,7 +1092,8 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
 	D)	DONT_SCRUB_DISTFILES=Dopt; ARGS="-D $ARGS" ;;
 	F)	FETCH_ONLY=Fopt; ARGS="-F $ARGS" ;;
-	G)	NO_RECURSIVE_CONFIG=Gopt; ARGS="-G $ARGS" ;;
+	G)	[ -z "$PM_FORCE_CONFIG" ] && {
+			PM_NO_MAKE_CONFIG=Gopt; ARGS="-G $ARGS"; } ;;
 	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
 	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
 	L)	LIST_PLUS=Lopt ;;
@@ -1171,15 +1172,9 @@ if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
 	test_command_line ALWAYS_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
 		fail "The -d and -D options are mutually exclusive"
 fi
-if [ -n "$NO_RECURSIVE_CONFIG" ]; then
-	[ -n "$FETCH_ONLY" ] && unset NO_RECURSIVE_CONFIG
-	[ -n "$PM_PACKAGES_BUILD" ] &&
-		fail 'The --packages-build and -G options are mutually exclusive'
-	[ -n "$PM_DEL_BUILD_ONLY" ] &&
-		fail 'The --delete-build-only and -G options are mutually exclusive'
-	[ -n "$FORCE_CONFIG" ] &&
-		fail 'The --force-config and -G options are mutually exclusive'
-fi
+
+[ -n "$PM_NO_MAKE_CONFIG" -a -n "$PM_FORCE_CONFIG" ] && unset PM_NO_MAKE_CONFIG
+
 if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	if [ -n "$FETCH_ONLY" -o -n "$RESTART" -o -n "$UPDATE_ALL" -o \
 	    -n "$EXPUNGE" -o -n "$PM_FORCE" -o -n "$NO_ACTION" -o \
@@ -1985,18 +1980,18 @@ update_port () {
 	[ -n "$2" ] && update_to=" to $2"
 	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
 
-	if [ -z "$NO_RECURSIVE_CONFIG" ]; then
+#
 		local deps
 
 		dep_of_deps=$(( $dep_of_deps + 1 ))
 
-		if [ -n "$CONFIG_ONLY" ]; then
+		if [ -n "$PM_FIRST_PASS" ]; then
 			num_of_deps=$(( $num_of_deps + 1 ))
 			update_build_l $1
 		fi
 
 		deps=" (${dep_of_deps}/${num_of_deps})"
-	fi
+#
 
 	if [ -n "$PM_DEPTH" ]; then
 		echo "	${PM_DEPTH}>> ${1#$pd/}"
@@ -2008,10 +2003,10 @@ update_port () {
 	fi
 
 	[ -n "$doing_dep_check" -o \
-	    \( -n "$UPDATE_ALL" -a -n "$CONFIG_ONLY" \) ] &&
+	    \( -n "$UPDATE_ALL" -a -n "$PM_FIRST_PASS" \) ] &&
 		unset NO_DEP_UPDATES
 
-	if [ -z "$NO_ACTION" -o -n "$CONFIG_ONLY" ]; then
+	if [ -z "$NO_ACTION" -o -n "$PM_FIRST_PASS" ]; then
 		($0 $ARGS $1) || fail "Update for $1 failed"
 		. $IPC_SAVE
 	else
@@ -2025,8 +2020,8 @@ update_port () {
 		echo ''
 	elif [ -n "$UPDATE_REQ_BYS" ]; then
 		return 0
-	elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
-	echo "===>>> Continuing 'make config' dependency check for $portdir"
+	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
+	echo "===>>> Continuing initial dependency check for $portdir"
 	else
 		term_printf " ${PM_DEPTH#* }${deps}"
 		echo "===>>> Returning to dependency check for $portdir"
@@ -2106,9 +2101,9 @@ dependency_check () {
 	else
 		if [ -n "$SHOW_WORK" ]; then
 			echo ''
-		elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
-			echo "===>>> Starting recursive 'make config' check"
-		else
+#
+#
+		elif [ -z "$PM_VERBOSE" ]; then
 			echo "===>>> Starting dependency check"
 		fi
 	fi
@@ -2153,7 +2148,7 @@ dependency_check () {
 	local d_port origin iport udf
 
 	# Do not export, for THIS parent process only
-	[ -n "$CONFIG_ONLY" ] && doing_dep_check=doing_dep_check
+	[ -n "$PM_FIRST_PASS" ] && doing_dep_check=doing_dep_check
 	for d_port in $d_port_list; do
 		origin="${d_port#$pd/}"
 		if [ -n "$SHOW_WORK" ]; then
@@ -2169,8 +2164,8 @@ dependency_check () {
 		    echo "===>>> Checking dependency: $origin"
 
 		# Do this first to catch out of date dependencies
-		if [ -n "$CONFIG_ONLY" ]; then
-		    case "$CONFIG_SEEN_LIST" in *:${origin}:*) continue ;; esac
+		if [ -n "$PM_FIRST_PASS" ]; then
+		    case "$PM_FP_SEEN_LIST" in *:${origin}:*) continue ;; esac
 		fi
 
 		[ -z "$URB_YES" ] &&
@@ -2242,22 +2237,22 @@ dependency_check () {
 			update_port $origin
 		fi
 	done
-	[ -n "$CONFIG_ONLY" ] && unset doing_dep_check
+	[ -n "$PM_FIRST_PASS" ] && unset doing_dep_check
 
 	if [ -n "$SHOW_WORK" ]; then
 		safe_exit
-	elif [ -n "$CONFIG_ONLY" -a -z "$PM_PACKAGES" ]; then
-	echo "===>>> Recursive 'make config' check complete for $portdir"
+	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
+	echo "===>>> Initial dependency check complete for $portdir"
 		case "$PM_DEPTH" in *\>\>*) echo "	$PM_DEPTH" ;; esac
 	else
 		echo "===>>> Dependency check complete for $portdir"
 		case "$PM_DEPTH" in
 		*\>\>*)	echo "	$PM_DEPTH" ;;
 		*)	if [ "$PM_PARENT_PORT" = All ]; then
-				if [ -z "$NO_RECURSIVE_CONFIG" ]; then
+#
 					local deps
 					deps=" (${dep_of_deps}/${num_of_deps})"
-				fi
+#
 				term_printf " >> ${upg_port:-$portdir}${deps}"
 			else
 				term_printf
@@ -2279,7 +2274,7 @@ create_master_rb_list () {
 	[ -n "$MASTER_RB_LIST" ] && export MASTER_RB_LIST=" $MASTER_RB_LIST"
 }
 
-post_config () {
+post_first_pass () {
 	local action
 
 	if [ $num_of_deps -gt 0 ]; then
@@ -2316,7 +2311,7 @@ echo "       all of the above try adding '-i' to the command line."
 	echo "===>>> Starting $action for $* <<<==="
 	echo ''
 
-	unset CONFIG_SEEN_LIST CONFIG_ONLY
+	unset PM_FP_SEEN_LIST PM_FIRST_PASS
 
 	dep_of_deps=0
 
@@ -2408,7 +2403,7 @@ multiport () {
 	echo "===>>> Working on multiple ports:"
 	echo -e $portlist
 
-	if [ -n "$CONFIG_ONLY" ]; then
+	if [ -n "$PM_FIRST_PASS" ]; then
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 			PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 			for port in $worklist; do
@@ -2429,7 +2424,7 @@ multiport () {
 		done
 
 		check_fetch_only
-		post_config multiple ports
+		post_first_pass multiple ports
 	fi
 
 	export PM_BUILDING=pmbuildingmultiport
@@ -2455,8 +2450,10 @@ multiport () {
 }
 
 make_config () {
+	local config_type
+
 	config_type=config-conditional
-	[ -n "$FORCE_CONFIG" ] && config_type=config
+	[ -n "$PM_FORCE_CONFIG" ] && config_type=config
 	pm_sv Running \'make $config_type\'
 	pm_cd_pd $portdir
 	pm_make_s $config_type
@@ -2517,10 +2514,10 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-	if [ -z "$NO_RECURSIVE_CONFIG" ]; then
-		CONFIG_SEEN_LIST=':' ; CONFIG_ONLY=config_only
+#
+		PM_FP_SEEN_LIST=':' ; PM_FIRST_PASS=pm_first_pass
 		NO_DEP_UPDATES=no_dep_updates ; build_l=''
-		export CONFIG_SEEN_LIST CONFIG_ONLY NO_DEP_UPDATES build_l
+		export PM_FP_SEEN_LIST PM_FIRST_PASS NO_DEP_UPDATES build_l
 
 		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 			run_dl_g='' ; build_only_dl_g='' ; rundep_list=''
@@ -2529,7 +2526,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
 			build_deps_il='' ; export build_deps_il
 		fi
-	fi
+#
 
 	[ -z "$NO_BACKUP" ] && init_packages
 	[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && export NB_DELETE
@@ -2558,7 +2555,7 @@ fi
 
 # This has to come after the initialization, it uses all the same stuff
 if [ -n "$UPDATE_ALL" ]; then
-all_config () {
+all_first_pass () {
 	local iport origin
 
 	for iport in $@; do
@@ -2580,7 +2577,7 @@ all_config () {
 			CUR_DEPS="${CUR_DEPS}${iport}:";
 			continue; }
 
-		case "$CONFIG_SEEN_LIST" in *:${origin}:*) continue ;; esac
+		case "$PM_FP_SEEN_LIST" in *:${origin}:*) continue ;; esac
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] &&
 			run_dl_g="$run_dl_g ${pd}/${origin} "
@@ -2590,7 +2587,7 @@ all_config () {
 		PM_DEPTH=
 		check_for_updates $iport $origin || fail 'Update failed'
 
-		CONFIG_SEEN_LIST="${CONFIG_SEEN_LIST}${origin}:"
+		PM_FP_SEEN_LIST="${PM_FP_SEEN_LIST}${origin}:"
 	done
 }
 	[ -n "$DI_FILES" ] && (read_distinfos)&
@@ -2603,23 +2600,21 @@ all_config () {
 	[ -n "$PM_BUILD_ONLY_LIST" ] &&
 		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
-	if [ -n "$CONFIG_ONLY" ]; then
+	if [ -n "$PM_FIRST_PASS" ]; then
 		[ -n "$FETCH_ONLY" ] && export ALL_FETCH=all_fetch
 
-		[ -z "$PM_PACKAGES" ] &&
-			echo "===>>> Checking ports for recursive 'make config'"
 		[ -n "$PM_VERBOSE" ] &&
 		    { echo '' ; echo "===>>> Root ports:"; }
-		all_config $roots
+		all_first_pass $roots
 		[ -n "$PM_VERBOSE" ] &&
 		    { echo '' ; echo "===>>> Trunk ports:"; }
-		all_config $trunks
+		all_first_pass $trunks
 		[ -n "$PM_VERBOSE" ] &&
 		    { echo '' ; echo "===>>> Branch ports:"; }
-		all_config $branches
+		all_first_pass $branches
 		[ -n "$PM_VERBOSE" ] &&
 		    { echo '' ; echo "===>>> Leaf ports:"; }
-		all_config $leaves
+		all_first_pass $leaves
 
 		check_fetch_only
 		if [ -n "$NO_DEP_UPDATES" ]; then
@@ -2627,7 +2622,7 @@ all_config () {
 			safe_exit
 		fi
 
-		post_config for ports that need updating
+		post_first_pass for ports that need updating
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
 	fi
@@ -2654,15 +2649,15 @@ all_config () {
 			continue
 		fi
 
-		if [ -z "$NO_RECURSIVE_CONFIG" ]; then
+#
 			check_interactive $iport || continue
 			# We got here, so we know we have to build it
 			update_port $iport
-		else
-			[ -n "$PM_VERBOSE" ] &&
-				echo "===>>> Checking installed port: $iport"
-			check_for_updates $iport || fail 'Update failed'
-		fi
+#
+#
+#
+#
+#
 	done
 
 	echo "===>>> Update check of installed ports complete" ; echo ''
@@ -2775,7 +2770,7 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 			# Outdent
 			if [ $dep_of_deps -gt 0 ]; then
 				dep_of_deps=$(( $dep_of_deps - 1 ))
-				if [ -n "$CONFIG_ONLY" ]; then
+				if [ -n "$PM_FIRST_PASS" ]; then
 					num_of_deps=$(( $num_of_deps - 1 ))
 					build_l="${build_l%\\t*}"
 				fi
@@ -2792,7 +2787,8 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 			fi
 			;;
 		esac
-	elif [ -n "$NO_RECURSIVE_CONFIG" -o -n "$URB_YES" ]; then
+#
+	elif [ -n "$URB_YES" ]; then
 		echo ''
 		echo "===>>> $upg_port has an +IGNOREME file, ignoring"
 		echo ''
@@ -2803,7 +2799,7 @@ fi
 # START
 
 # Should only be reached for multiport already built as a dependency
-case "$CONFIG_SEEN_LIST" in *:${portdir}:*) safe_exit ;; esac
+case "$PM_FP_SEEN_LIST" in *:${portdir}:*) safe_exit ;; esac
 
 [ -z "$PM_INDEX_ONLY" ] && { pm_cd $pd/$portdir || no_valid_port; }
 
@@ -2814,7 +2810,7 @@ else
 	PM_DEPTH="${PM_DEPTH}>> ${upg_port:-$portdir} "
 fi
 
-if [ -n "$CONFIG_ONLY" -a "$$" -eq "$PM_PARENT_PID" ]; then
+if [ -n "$PM_FIRST_PASS" -a "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -n "$upg_port" ]; then
 		update_build_l $upg_port
 	else
@@ -2838,7 +2834,7 @@ check_state || {
 [ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && {
 	echo ''; (read_distinfos)& }
 
-# Do these things first time through, with or without 'make config'
+# Do these things first time through
 if [ -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
 dofetch () {
 	local fetchlog allfiles
@@ -2859,7 +2855,7 @@ dofetch () {
 	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make_b -V MASTER_SITES`
 
 	if [ -n "$master_sites" ]; then
-		# PATCHFILES may get added post-config, but we want to
+		# PATCHFILES may get added after the first pass, but we want to
 		# do as much of this as we can, as early as we can, and
 		# patch files are usually small anyway.
 		distfiles=`pm_make -V ALLFILES | sed -e 's# *$##g'`
@@ -2899,13 +2895,13 @@ dofetch () {
 fi
 fi	# [ -z "$PM_INDEX_ONLY" ]
 
-if [ -n "$CONFIG_ONLY" ]; then
+if [ -n "$PM_FIRST_PASS" ]; then
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$PM_BUILD_ONLY_LIST" ] &&
 		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
-	[ -z "$PM_PACKAGES" ] && make_config
+	[ -z "$PM_PACKAGES" -a -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
-	CONFIG_SEEN_LIST="${CONFIG_SEEN_LIST}${portdir}:"
+	PM_FP_SEEN_LIST="${PM_FP_SEEN_LIST}${portdir}:"
 
 	dep_check_type='build-depends-list run-depends-list'
 	[ -n "$RECURSE_THOROUGH" ] && dep_check_type=all-depends-list
@@ -2916,7 +2912,7 @@ if [ -n "$CONFIG_ONLY" ]; then
 
 	if [ ! "$$" -eq "$PM_PARENT_PID" ]; then
 		# Save state for the parent process to read back in
-		echo "CONFIG_SEEN_LIST='$CONFIG_SEEN_LIST'" > $IPC_SAVE
+		echo "PM_FP_SEEN_LIST='$PM_FP_SEEN_LIST'" > $IPC_SAVE
 
 		if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
 			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
@@ -2967,7 +2963,7 @@ if [ -n "$CONFIG_ONLY" ]; then
 	fi
 
 	check_fetch_only
-	post_config $portdir
+	post_first_pass $portdir
 fi
 
 [ -z "$PM_BUILDING" ] && export PM_BUILDING=pmbuildingmain
@@ -2995,12 +2991,13 @@ if [ -z "$NO_DEP_UPDATES" ]; then
 		dependency_check all-depends-list
 	fi
 	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
-elif [ -z "$NO_RECURSIVE_CONFIG" -a "$$" -eq "$PM_PARENT_PID" ]; then
+#
+elif [ "$$" -eq "$PM_PARENT_PID" ]; then
 	echo "===>>> All dependencies are up to date"
 	echo ''
 fi
 
-if [ -n "$NO_ACTION" -a -z "$CONFIG_ONLY" ]; then
+if [ -n "$NO_ACTION" -a -z "$PM_FIRST_PASS" ]; then
 	[ -n "$PM_VERBOSE" ] && echo "===>>> Build canceled due to -n flag"
 	safe_exit
 fi
@@ -3227,7 +3224,7 @@ fi
 
 if [ -z "$use_package" ]; then
 	if [ -n "$PM_PACKAGES" ]; then
-		make_config
+		[ -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
 		if [ -z "$RECURSE_THOROUGH" ]; then
 			echo "===>>> Starting check for build dependencies"
@@ -3261,6 +3258,8 @@ if [ -z "$use_package" ]; then
 		port_log_args=">> $port_log 2>&1"
 		echo "===>>> Logging build to $port_log"
 	fi
+
+	[ -n "$PM_NO_MAKE_CONFIG" ] && PM_MAKE_ARGS="$PM_MAKE_ARGS -D_OPTIONS_OK"
 
 	eval pm_make $port_log_args || fail "make failed for $portdir"
 else
