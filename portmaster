@@ -180,16 +180,31 @@ parent_exit () {
 	if [ -n "$INSTALLED_LIST" ]; then
 		if [ -n "$UPDATE_ALL" -o -n "$PM_MULTI_PORTS" ]; then
 			show_list=all
-		else
+		elif [ -z "$show_list" ]; then
 			case "$INSTALLED_LIST" in
 			*\\n\\t*)	show_list=all ;;
 			*\\n)		show_list=one ;;
 			esac
 		fi
+		if [ -n "$PM_LOG" ]; then
+			if [ -f "$PM_LOG" ]; then
+				echo '' >> $PM_LOG
+			elif [ -e "$PM_LOG" -o -L "$PM_LOG" ]; then
+				echo "===>>> Warning: $PM_LOG exists, but is not a regular file"
+			else
+				local new_pm_log
+
+				new_pm_log=`pm_mktemp pm_log` &&
+					mv $new_pm_log $PM_LOG
+			fi
+			date >> $PM_LOG
+		fi
 		case "$show_list" in
 		all)	echo "===>>> The following actions were performed:"
-			echo -e $INSTALLED_LIST ;;
-		one)	echo "===>>> $ilist complete" ; echo '' ;;
+			echo -e $INSTALLED_LIST
+			[ -n "$PM_LOG" ] && echo -e $INSTALLED_LIST >> $PM_LOG ;;
+		one)	echo "===>>> $ilist complete" ; echo ''
+			[ -n "$PM_LOG" ] && echo "	$ilist" >> $PM_LOG ;;
 		esac
 	fi
 
