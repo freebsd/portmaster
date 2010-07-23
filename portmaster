@@ -1046,9 +1046,13 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 				[ -n "$port_ver" ] || fail "Is $pd/$origin/Makefile missing?"
 			else
 				echo "===>>> The origin for ${package##*/} ($origin) is missing"
+				unset port_ver
 			fi
 		else
-			port_ver=`parse_index $origin name`
+			if ! port_ver=`parse_index $origin name`; then
+				echo "===>>> Cannot determine latest version of ${package##*/} from INDEX"
+				unset port_ver
+			fi
 		fi
 
 		if [ -n "$port_ver" ]; then
@@ -1064,9 +1068,9 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 			else
 				echo "	===>>> ${package##*/} is out of date"
 			fi
-		else
-			echo "===>>> ${package#$PACKAGES/}"
 		fi
+
+		echo "	===>>> Path: ${package}"
 
 		if [ -z "$ALL" ]; then
 			echo -n "	===>>> Delete stale package: ${package##*/}? y/n [y] "
@@ -1080,7 +1084,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		pm_unlink_s $package
 	done
 
-	echo "===>>> Deleting stale symlinks"
+	echo '' ; echo "===>>> Deleting stale symlinks"
 	pm_cd $PACKAGES || fail "Cannot cd to $PACKAGES"
 	for link in `find . -type l` ; do
 		if [ ! -e "$link" ]; then
@@ -1089,7 +1093,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		fi
 	done
 
-	echo "===>>> Deleting empty directories (if any)"
+	echo '' ; echo "===>>> Deleting empty directories (if any)"
 	pm_find_s . -type d -empty -delete
 
 	safe_exit
