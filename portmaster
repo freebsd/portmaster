@@ -1031,7 +1031,6 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	safe_exit
 fi
 
-# XXX
 if [ -n "$CLEAN_PACKAGES" ]; then
 	init_packages_var
 
@@ -3175,7 +3174,11 @@ fetch_package () {
 	echo "===>>> Checking package repository for latest available version"
 
 	if [ -n "$LOCAL_PACKAGEDIR" ]; then
-		if [ -z "$PM_INDEX_ONLY" ]; then
+		if [ -r "${LOCAL_PACKAGEDIR}/All/${new_port}.tbz" ]; then
+			local_package=${LOCAL_PACKAGEDIR}/All/${new_port}.tbz
+			latest_pv=${local_package##*/}
+		fi
+		if [ -z "$latest_pv" -a  -z "$PM_INDEX_ONLY" ]; then
 			s=`pm_make -V LATEST_LINK`
 			if [ -r "${LOCAL_PACKAGEDIR}/Latest/${s}.tbz" ]; then
 				local_package=${LOCAL_PACKAGEDIR}/Latest/${s}.tbz
@@ -3184,11 +3187,6 @@ fetch_package () {
 			else
 				[ -n "$PM_VERBOSE" ] &&
 		echo "===>>> No local package for $new_port exists, attempting fetch"
-			fi
-		else
-			if [ -r "${LOCAL_PACKAGEDIR}/All/${new_port}.tbz" ]; then
-				local_package=${LOCAL_PACKAGEDIR}/All/${new_port}.tbz
-				latest_pv=${local_package##*/}
 			fi
 		fi
 	fi
