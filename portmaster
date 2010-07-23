@@ -21,15 +21,16 @@ if [ -z "$PM_PARENT_PID" ]; then
 	fi
 	export PM_PARENT_PID TMPDIR UPGRADE_TOOL PATH
 
-	set -o allexport
-	# Read a global rc file first
 	if [ -r /etc/portmaster.rc ]; then
 		echo '' ; echo "===>>> WARNING"
 		echo '       Your portmaster.rc is in /etc, however support for the file in this'
-		echo '       location is deprecated, and will be removed in a future version.'
+		echo '       location has been removed.'
 		echo '' ; echo '       The proper location for this file is /usr/local/etc'
-		echo '' ; sleep 5 ; . /etc/portmaster.rc
+		exit 1
 	fi
+
+	set -o allexport
+	# Read a global rc file first
 	[ -r /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
 
 	# Read a local one next, and allow the command line to override
@@ -317,7 +318,6 @@ usage () {
 	echo '-t recurse dependencies thoroughly, using all-depends-list'
 	echo '-v verbose output'
 	echo '-w save old shared libraries before deinstall'
-	echo "-u DEPRECATED"
 	echo '[-R] -f always rebuild ports (overrides -i)'
 	echo '-i interactive update -- ask whether to rebuild ports'
 	echo '-D no cleaning of distfiles'
@@ -369,7 +369,7 @@ usage () {
 	echo '--clean-distfiles-all delete stale distfiles without prompting'
 	echo ''
 	echo '[--index] --clean-packages offer to delete stale packages'
-	echo '[--index] --clean-distfiles-all delete stale packages without prompting'
+	echo '[--index] --clean-packages-all delete stale packages without prompting'
 	echo ''
 	echo '--check-depends cross-check and update dependency information for all ports'
 	echo ''
@@ -390,7 +390,7 @@ pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 		 unset -v MASTER_RB_LIST PM_FP_SEEN_LIST;
-		 nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
+		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
 		fail "mktemp for $1 failed"; }
@@ -406,7 +406,7 @@ pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root \
 			-g wheel -m 644 $1 $2; }
 pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 			 unset -v MASTER_RB_LIST PM_FP_SEEN_LIST;
-			 $PM_SU_CMD nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
+			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
 pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
@@ -1240,8 +1240,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 		;;
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;;
-	p)	echo "===>>> The -p option has been deprecated" ; echo ''
-		portdir="${OPTARG#$pd/}" ; portdir=${portdir%/} ;;
+	p)	fail 'The -p option has been deprecated' ;;
 	r)	UPDATE_REQ_BYS=ropt
 		if [ -d "$pdb/$OPTARG" ]; then
 			glob_dirs=$OPTARG
@@ -1255,7 +1254,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 		portdir=`origin_from_pdb ${glob_dirs##*/}` ; unset glob_dirs ;;
 	s)	CLEAN_STALE=sopt ;;
 	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
-	u)	echo "===>>> The -u option has been deprecated" ; echo '' ;;
+	u)	fail 'The -u option has been deprecated' ;;
 	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
 	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
 	x)	case "$OPTARG" in
@@ -1267,6 +1266,8 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 done
 shift $(( $OPTIND - 1 ))
 unset -f packages_init cross_idx
+
+[ -n "$UNATTENDED" ] && fail 'The -u option has been deprecated'
 
 [ -n "$PM_EXCL" ] && export PM_EXCL
 
