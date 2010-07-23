@@ -291,8 +291,8 @@ usage () {
 	echo ''
 	echo "${0##*/} [--force-config|-G] [-aftv] -F"
 	echo ''
-	echo "${0##*/} --clean-distfiles"
-	echo "${0##*/} --clean-distfiles-all"
+	echo "${0##*/} [-t] --clean-distfiles"
+	echo "${0##*/} [-t] --clean-distfiles-all"
 	echo ''
 	echo "${0##*/} [--index] --clean-packages"
 	echo "${0##*/} [--index] --clean-packages-all"
@@ -365,8 +365,9 @@ usage () {
 	echo ''
 	echo '[--force-config|-G] [-aftv] -F fetch distfiles only'
 	echo ''
-	echo '--clean-distfiles offer to delete stale distfiles'
-	echo '--clean-distfiles-all delete stale distfiles without prompting'
+	echo '[-t] --clean-distfiles offer to delete stale distfiles'
+	echo '[-t] --clean-distfiles-all delete stale distfiles without prompting'
+	echo '   with -t distfile is valid from any port, not just those installed'
 	echo ''
 	echo '[--index] --clean-packages offer to delete stale packages'
 	echo '[--index] --clean-packages-all delete stale packages without prompting'
@@ -897,6 +898,40 @@ read_distinfos () {
 	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
 }
 
+read_distinfos_all () {
+	local origin distinfo disc1 f disc2
+
+	echo '############' > $DI_FILES		# Make the file > 0 bytes
+	echo "===>>> Gathering distinfo list for all ports"
+	echo '       (This will take several minutes)'
+	echo ''
+	for origin in ${pd}/*/*; do
+		case "${origin#$pd/}" in
+		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile) continue ;; esac
+
+		[ -d "$origin" ] || continue
+		pm_cd $origin || continue
+
+		if [ -s distinfo ]; then
+			distinfo=distinfo
+		else
+			distinfo=`pm_make -V MD5_FILE`
+		fi
+
+		if [ -s "$distinfo" ]; then
+			grep '^MD5' $distinfo | while read disc1 f disc2; do
+				f=${f#(} ; f=${f%)}
+				echo $f >> $DI_FILES
+			done
+		fi
+	done
+
+	# Tell safe_exit that we are done
+	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
+	sed -i -e 1s/############/%%%%%%%%%%%%/ $DI_FILES
+	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
+}
+
 globstrip () {
 	local in
 
@@ -1007,7 +1042,12 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 
 	# Set the file name here since we are usually called in a subshell
 	DI_FILES=`pm_mktemp DI-FILES`
-	read_distinfos
+
+	if [ "$1" != '-t' ]; then
+		read_distinfos
+	else
+		read_distinfos_all
+	fi
 
 	echo "===>>> Checking for stale distfiles"
 	for df in `find $DISTDIR -type f | sort`; do
