@@ -188,8 +188,10 @@ parent_exit () {
 			esac
 		fi
 		if [ -n "$PM_LOG" ]; then
-			if [ -f "$PM_LOG" ]; then
+			if [ -w "$PM_LOG" ]; then
 				echo '' >> $PM_LOG
+			elif [ -e "$PM_LOG" -a ! -w "$PM_LOG" ]; then
+				echo "===>>> Warning: $PM_LOG exists, but is not writable"
 			elif [ -e "$PM_LOG" -o -L "$PM_LOG" ]; then
 				echo "===>>> Warning: $PM_LOG exists, but is not a regular file"
 			else
@@ -203,7 +205,7 @@ parent_exit () {
 		case "$show_list" in
 		all)	echo "===>>> The following actions were performed:"
 			echo -e $INSTALLED_LIST
-			[ -n "$PM_LOG" ] && echo -e $INSTALLED_LIST >> $PM_LOG ;;
+			[ -n "$PM_LOG" ] && echo -e ${INSTALLED_LIST%\n} >> $PM_LOG ;;
 		one)	echo "===>>> $ilist complete" ; echo ''
 			[ -n "$PM_LOG" ] && echo "	$ilist" >> $PM_LOG ;;
 		esac
@@ -534,6 +536,9 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			pd=$PORTSDIR
 		fi
 	fi
+
+	[ -n "$pd" ] && [ ! -r "${pd}/Mk/bsd.port.mk" ] &&
+		fail "The ports directory ($pd) does not seem to contain a ports tree"
 
 	if [ -n "$PM_INDEX" ]; then
 		if [ -z "$INDEXFILE" ]; then
@@ -876,11 +881,10 @@ read_distinfos () {
 			origin=$moved_npd
 		fi
 
-		pm_cd $pd/$origin || continue
-
-		if [ -s distinfo ]; then
-			distinfo=distinfo
+		if [ -s "${origin}/distinfo" ]; then
+			distinfo="${origin}/distinfo"
 		else
+			pm_cd $origin || continue
 			distinfo=`pm_make -V MD5_FILE`
 		fi
 
@@ -905,16 +909,17 @@ read_distinfos_all () {
 	echo "===>>> Gathering distinfo list for all ports"
 	echo '       (This will take several minutes)'
 	echo ''
+
 	for origin in ${pd}/*/*; do
 		case "${origin#$pd/}" in
-		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile) continue ;; esac
+		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS) continue ;; esac
 
 		[ -d "$origin" ] || continue
-		pm_cd $origin || continue
 
-		if [ -s distinfo ]; then
-			distinfo=distinfo
+		if [ -s "${origin}/distinfo" ]; then
+			distinfo="${origin}/distinfo"
 		else
+			pm_cd $origin || continue
 			distinfo=`pm_make -V MD5_FILE`
 		fi
 
@@ -1001,11 +1006,11 @@ init_packages_var () {
 
 	PACKAGES=`pm_make -f/usr/share/mk/bsd.port.mk -V PACKAGES 2>/dev/null`
 	if [ -z "$PACKAGES" ]; then
-		if [ -d /usr/ports/packages -a -w /usr/ports/packages ]; then
-			PACKAGES='/usr/ports/packages'
+		if [ -d "${pd}/packages" -a -w "${pd}/packages" ]; then
+			PACKAGES="${pd}/packages"
 		else
-			if [ -d /usr/ports/ -a -w /usr/ports/ ]; then
-				PACKAGES='/usr/ports/packages'
+			if [ -d "${pd}/" -a -w "${pd}/" ]; then
+				PACKAGES="${pd}/packages"
 			else
 				fail 'The value of PACKAGES cannot be empty and the directory must be writable'
 			fi
