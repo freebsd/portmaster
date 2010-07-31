@@ -1020,11 +1020,9 @@ init_packages_var () {
 }
 
 parse_index () {
-	local pd line
+	local line
 
-	[ -z "$pd" -a -n "$PM_INDEX_ONLY" ] && pd=/usr/ports
-
-	line=`grep -m1 .*\|${pd}/${1}\|.* $PM_INDEX` || return 1
+	line=`grep -m1 .*\|.*/${1}\|.* $PM_INDEX` || return 1
 
 	case "$2" in
 	name)		echo ${line%%|*} ;;
