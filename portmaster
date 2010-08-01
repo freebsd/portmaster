@@ -881,6 +881,8 @@ read_distinfos () {
 			origin=$moved_npd
 		fi
 
+		origin="${pd}/${origin}"
+
 		if [ -s "${origin}/distinfo" ]; then
 			distinfo="${origin}/distinfo"
 		else
