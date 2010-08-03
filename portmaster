@@ -2120,23 +2120,19 @@ update_build_l () {
 }
 
 update_port () {
-	local update_to
+	local update_to deps
 
 	[ -n "$2" ] && update_to=" to $2"
 	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
 
-#
-		local deps
+	dep_of_deps=$(( $dep_of_deps + 1 ))
 
-		dep_of_deps=$(( $dep_of_deps + 1 ))
+	if [ -n "$PM_FIRST_PASS" ]; then
+		num_of_deps=$(( $num_of_deps + 1 ))
+		update_build_l $1
+	fi
 
-		if [ -n "$PM_FIRST_PASS" ]; then
-			num_of_deps=$(( $num_of_deps + 1 ))
-			update_build_l $1
-		fi
-
-		deps=" (${dep_of_deps}/${num_of_deps})"
-#
+	deps=" (${dep_of_deps}/${num_of_deps})"
 
 	if [ -n "$PM_DEPTH" ]; then
 		echo "	${PM_DEPTH}>> ${1#$pd/}"
@@ -2246,8 +2242,6 @@ dependency_check () {
 	else
 		if [ -n "$SHOW_WORK" ]; then
 			echo ''
-#
-#
 		elif [ -z "$PM_VERBOSE" ]; then
 			echo "===>>> Starting dependency check"
 		fi
@@ -2394,10 +2388,8 @@ dependency_check () {
 		case "$PM_DEPTH" in
 		*\>\>*)	echo "	$PM_DEPTH" ;;
 		*)	if [ "$PM_PARENT_PORT" = All ]; then
-#
-					local deps
-					deps=" (${dep_of_deps}/${num_of_deps})"
-#
+				local deps
+				deps=" (${dep_of_deps}/${num_of_deps})"
 				term_printf " >> ${upg_port:-$portdir}${deps}"
 			else
 				term_printf
@@ -2709,19 +2701,17 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-#
-		PM_FP_SEEN_LIST=':' ; PM_FIRST_PASS=pm_first_pass
-		NO_DEP_UPDATES=no_dep_updates ; build_l=''
-		export PM_FP_SEEN_LIST PM_FIRST_PASS NO_DEP_UPDATES build_l
+	PM_FP_SEEN_LIST=':' ; PM_FIRST_PASS=pm_first_pass
+	NO_DEP_UPDATES=no_dep_updates ; build_l=''
+	export PM_FP_SEEN_LIST PM_FIRST_PASS NO_DEP_UPDATES build_l
 
-		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-			run_dl_g='' ; build_only_dl_g='' ; rundep_list=''
-			export run_dl_g build_only_dl_g rundep_list
-		fi
-		if [ -n "$PM_DEL_BUILD_ONLY" ]; then
-			build_deps_il='' ; export build_deps_il
-		fi
-#
+	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+		run_dl_g='' ; build_only_dl_g='' ; rundep_list=''
+		export run_dl_g build_only_dl_g rundep_list
+	fi
+	if [ -n "$PM_DEL_BUILD_ONLY" ]; then
+		build_deps_il='' ; export build_deps_il
+	fi
 
 	[ -z "$NO_BACKUP" ] && init_packages
 	[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && export NB_DELETE
@@ -2844,15 +2834,10 @@ all_first_pass () {
 			continue
 		fi
 
-#
-			check_interactive $iport || continue
-			# We got here, so we know we have to build it
-			update_port $iport
-#
-#
-#
-#
-#
+		check_interactive $iport || continue
+
+		# We got here, so we know we have to build it
+		update_port $iport
 	done
 
 	echo "===>>> Update check of installed ports complete" ; echo ''
@@ -2982,7 +2967,6 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 			fi
 			;;
 		esac
-#
 	elif [ -n "$URB_YES" ]; then
 		echo ''
 		echo "===>>> $upg_port has an +IGNOREME file, ignoring"
