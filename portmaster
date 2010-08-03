@@ -703,12 +703,11 @@ check_dependency_files () {
 		if [ -s "$pdb/$iport/+REQUIRED_BY" ]; then
 			# No actual dependencies exist, so this file is stale
 			# Zero it out so that -s mode can find it
-# Outdent
-if [ -n "$PM_VERBOSE" -o -n "$CHECK_DEPENDS" ]; then
-	echo "	===>>> No installed ports depend on $iport"
-	echo "	===>>> Emptying +REQUIRED_BY file.  Try ${0##*/} -s"
-fi
-# Outdent
+			if [ -n "$PM_VERBOSE" -o -n "$CHECK_DEPENDS" ]; then
+				echo "	===>>> No installed ports depend on $iport"
+				echo "	===>>> Emptying +REQUIRED_BY file.  Try ${0##*/} -s"
+			fi
+
 			check_regular_file $pdb/$iport/+REQUIRED_BY
 			$PM_SU_CMD truncate -s0 $pdb/$iport/+REQUIRED_BY
 		fi
@@ -1467,15 +1466,13 @@ check_for_updates () {
 				check_restart_and_udf $udf $iport ||
 					do_update=do_update_force
 			elif [ -n "$URB_YES" ]; then
-		# Outdent
-		case "$MASTER_RB_LIST" in *" $iport "*)
-			if ! check_restart_and_udf $udf $iport; then
-				do_update=do_update_urb
-			else
-				URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
-			fi ;;
-		esac
-		# Outdent
+				case "$MASTER_RB_LIST" in *" $iport "*)
+					if ! check_restart_and_udf $udf $iport; then
+						do_update=do_update_urb
+					else
+						URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
+					fi ;;
+				esac
 			elif [ -n "$PM_MULTI_PORTS" ]; then
 				case "$PM_MULTI_PORTS" in
 				*:${iport}:*)	do_update=do_update_mi ;;
@@ -1794,15 +1791,15 @@ delete_all_distfiles () {
 		echo ''
 		if [ -n "$dist_list_files" ]; then
 			local answer f
-	# Outdent
-	if [ -z "$ALWAYS_SCRUB_DISTFILES" ]; then
-		echo "===>>> However, the list of files in $dist_list"
-		echo -n "       should be current.  Delete the files on this list? y/n [n] "
-		read answer
-	else
-		answer=y
-	fi
-	# Outdent
+
+			if [ -z "$ALWAYS_SCRUB_DISTFILES" ]; then
+				echo "===>>> However, the list of files in $dist_list"
+				echo -n "       should be current.  Delete the files on this list? y/n [n] "
+				read answer
+			else
+				answer=y
+			fi
+
 			case "$answer" in
 			[yY])	for f in $dist_list_files; do
 					if [ -f "${DISTDIR}${f}" ]; then
@@ -2681,23 +2678,21 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	[ -n "$UPDATE_REQ_BYS" ] && export URB_DONE_LIST=':'
 	if [ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ]; then
 		if [ -z "$RESTART" ]; then
-	# Outdent
-	files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
-	if [ -n "$files" ]; then
-		echo "===>>> There are 'install complete' flags from a previous"
-		echo -n "       -[rf] run of ${0##*/}, delete them? y/n [n] "
-		read answer
-		case "$answer" in
-		[yY])	pm_sv Deleting \'install complete\' flags
-			pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
-		*)	echo -n "===>>> Enable the -R option? y/n [n] "
-			read answer
-			case "$answer" in
-			[yY]) RESTART=Ropt ; ARGS="-R $ARGS" ;;
-			esac ;;
-		esac
-	fi
-	# Outdent
+			files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
+			if [ -n "$files" ]; then
+				echo "===>>> There are 'install complete' flags from a previous"
+				echo -n "       -[rf] run of ${0##*/}, delete them? y/n [n] "
+				read answer
+				case "$answer" in
+				[yY])	pm_sv Deleting \'install complete\' flags
+					pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
+				*)	echo -n "===>>> Enable the -R option? y/n [n] "
+					read answer
+					case "$answer" in
+					[yY]) RESTART=Ropt ; ARGS="-R $ARGS" ;;
+					esac ;;
+				esac
+			fi
 		fi
 	fi
 
@@ -2947,15 +2942,13 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 				case "$answer" in
 				[yY]) ;;	# Let it build
 				*) CUR_DEPS="${CUR_DEPS}${upg_port}:${portdir}:"
-			# Outdent
-			if [ $dep_of_deps -gt 0 ]; then
-				dep_of_deps=$(( $dep_of_deps - 1 ))
-				if [ -n "$PM_FIRST_PASS" ]; then
-					num_of_deps=$(( $num_of_deps - 1 ))
-					build_l="${build_l%\\t*}"
-				fi
-			fi
-			# Outdent
+					if [ $dep_of_deps -gt 0 ]; then
+						dep_of_deps=$(( $dep_of_deps - 1 ))
+						if [ -n "$PM_FIRST_PASS" ]; then
+							num_of_deps=$(( $num_of_deps - 1 ))
+							build_l="${build_l%\\t*}"
+						fi
+					fi
 					safe_exit ;;
 				esac
 			else
