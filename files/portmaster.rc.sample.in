@@ -1,0 +1,92 @@
+# $FreeBSD$
+#
+# Sample portmaster rc file.
+# Place in $HOME/.portmasterrc or %%PREFIX%%/etc/portmaster.rc
+#
+# Do not create temporary backup packages before pkg_delete (-B)
+# NO_BACKUP=Bopt
+#
+# Always save the backup packages of the old port (-b)
+# BACKUP=bopt
+#
+# Make and save a package of the new port (-g)
+# MAKE_PACKAGE=gopt
+#
+# Do not preclean the port's build directory (-C)
+# DONT_PRE_CLEAN=Copt
+#
+# Do not clean the port's build directory after installation (-K)
+# DONT_POST_CLEAN=Kopt
+#
+# Never search for stale distfiles to delete (-D)
+# DONT_SCRUB_DISTFILES=Dopt
+#
+# Always delete stale distfiles without prompting (-d)
+# ALWAYS_SCRUB_DISTFILES=dopt
+#
+# Do not run 'make config' for ports that need updating (-G)
+# (This unsets --force-config)
+# NO_RECURSIVE_CONFIG=Gopt
+#
+# Hide the build and install processes in a log file (-H)
+# HIDE_BUILD=Hopt
+#
+# Arguments to pass to make (-m)
+# PM_MAKE_ARGS='-DFORCE_PKG_REGISTER'
+# 
+# Recurse through every dependency, and child dependencies (-t)
+# RECURSE_THOROUGH=topt
+# 
+# Be verbose (-v)
+# PM_VERBOSE=vopt
+# 
+# Save copies of old shared libraries (recommended) (-w)
+# SAVE_SHARED=wopt
+# 
+# Install a package if available (-P or --packages)
+# PM_PACKAGES=first
+# 
+# Only install packages (-PP or --packages-only)
+# PM_PACKAGES=only
+# 
+# Install packages for build-only dependencies (--packages-build)
+# PM_PACKAGES_BUILD=pmp_build
+# 
+# Delete build-only dependencies when finished (--delete-build-only)
+# PM_DEL_BUILD_ONLY=pm_dbo
+# 
+# Use packages if they are newer than installed (--packages-newer)
+# PM_PACKAGES=newer
+# PM_PACKAGES_NEWER=pmp_newer
+# 
+# Always fetch new package files (--always-fetch)
+# PM_ALWAYS_FETCH=pm_always_fetch
+# 
+# Specify a local package repository (--local-packagedir)
+# LOCAL_PACKAGEDIR=<path>
+# 
+# Only use packages from --local-packagedir (--packages-local)
+# PM_PACKAGES_LOCAL=pmp_local
+# 
+# Delete packages after they are installed (--delete-packages)
+# PM_DELETE_PACKAGES=pm_delete_packages
+# 
+# Suppress the build confirmation message (--no-confirm)
+# PM_NO_CONFIRM=pm_no_confirm
+# 
+# Do not update the xterm title bar (--no-term-title)
+# PM_NO_TERM_TITLE=pm_no_term_title
+# 
+# Do not fetch the INDEX file (--no-index-fetch)
+# PM_NO_INDEX_FETCH=pm_no_index_fetch
+# 
+# Use only the INDEX file to check if a port is out of date (--index)
+# PM_INDEX=pm_index
+# 
+# Use the INDEX file first, then check /usr/ports (--index-first)
+# PM_INDEX=pm_index
+# PM_INDEX_FIRST=pm_index_first
+# 
+# Use the INDEX file instead of /usr/ports (--index-only)
+# PM_INDEX=pm_index
+# PM_INDEX_ONLY=pm_index_only
