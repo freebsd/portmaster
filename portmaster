@@ -68,8 +68,6 @@ fail () {
 }
 
 trap_exit () {
-	TRAP=trap
-
 	echo ''		# Helps if the previous message was 'echo -n'
 	if [ -n "$portdir" -a -z "$1" ]; then
 		echo "===>>> Build/Install for $portdir exiting due to signal"
@@ -134,7 +132,7 @@ parent_exit () {
 	fi
 	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && kill_bad_children
 
-	if [ -z "$TRAP" ]; then
+	if [ -z "$1" ]; then
 		if [ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ]; then
 			files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 			if [ -n "$files" ]; then
@@ -158,7 +156,7 @@ parent_exit () {
 	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do pm_unlink $f ; done
 
 	case "$DISPLAY_LIST" in
-	*' '*)	if [ -n "$TRAP" ]; then
+	*' '*)	if [ -n "$1" ]; then
 			echo "===>>> There are messages from installed ports to display,"
 			echo "       but first take a moment to review the error messages"
 			echo -n "       above.  Then press Enter when ready to proceed. "
@@ -224,7 +222,7 @@ parent_exit () {
 
 safe_exit () {
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		parent_exit
+		parent_exit $1
 	else
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
 
@@ -2414,7 +2412,7 @@ post_first_pass () {
 			[nN]*)	echo ''
 				echo "===>>> If you would like to upgrade or install some, but not"
 				echo "       all of the above try adding '-i' to the command line."
-				safe_exit ;;
+				safe_exit 1 ;;
 			esac
 			unset build_l
 		fi
@@ -2876,10 +2874,10 @@ if [ -n "$upg_port" -a -z "$portdir" ]; then
 	case "$?" in
 	3)	echo ''
 		echo "===>>> BSDPAN ports cannot be upgraded with portmaster"
-		echo "       (${upg_port})"; echo ''; safe_exit ;;
+		echo "       (${upg_port})"; echo ''; safe_exit 1 ;;
 	2)	[ -z "$PM_VERBOSE" ] && {
 		echo "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present";
-		echo ''; }; safe_exit ;;
+		echo ''; }; safe_exit 1 ;;
 	*)	fail 'Cannot continue' ;;
 	esac ; }
 elif [ -z "$portdir" ]; then
