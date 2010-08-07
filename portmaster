@@ -46,14 +46,14 @@ umask 022
 #=============== Begin functions we always want to have ===============
 
 version () {
-	local cvs
+	local svn
 
-	cvs='$FreeBSD$'
+	svn='$FreeBSD$'
 
-	cvs="${cvs#*,v }" ; cvs="${cvs#*/portmaster }" ; cvs="${cvs%% *}"
+	svn="${svn#*,v }" ; svn="${svn#*/portmaster }" ; svn="${svn%% *}"
 
 	echo ''
-	[ "${cvs#$}" != 'FreeBSD$' ] && { echo "===>>> Version $cvs" ; return 0; }
+	[ "${svn#$}" != 'FreeBSD$' ] && { echo "===>>> Version $svn" ; return 0; }
 	echo "===>>> Version unknown!"
 }
 
