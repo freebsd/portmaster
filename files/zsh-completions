@@ -1,20 +1,21 @@
 #compdef portmaster
-# for portmaster 2.18
+
+# $FreeBSD$
 
 local context state line array ret=1
 typeset -A opt_args
 
 _arguments -A "-*" : \
-  "--force-config['make config' for all ports]" \
+  "--force-config['make config' for all ports (overrides -G)]" \
   "-C[prevents 'make clean' from being run before building]" \
-  "(-F)-G[prevents recursive 'make config' (overrides --force-config)]" \
+  "-G[prevents 'make config']" \
   "-H[hide details of the port build and install in a log file]" \
   "-K[prevents 'make clean' from being run after building]" \
   "(-b)-B[prevents creation of the backup package for the installed port]" \
   "(-B)-b[create and keep a backup package of an installed port]" \
   "-g[create a package of the new port]" \
-  "-n[run through configure, but do not make or install any ports]" \
-  "-t[recurse dependencies thoroughly, using all-depends-array]" \
+  "-n[run through all steps, but do not make or install any ports]" \
+  "-t[recurse dependencies thoroughly, using all-depends-list]" \
   "-v[verbose output]" \
   "-w[save old shared libraries before deinstall]" \
   "(-i)-f[always rebuild ports (overrides -i)]" \
@@ -47,9 +48,11 @@ _arguments -A "-*" : \
   "-L[list all installed ports by category, and search for updates]" \
   "-e[expunge a port via pkg_delete, and remove its distfiles]:full name of port directory in /var/db/pkg:->pkgs" \
   "-s[clean out stale ports that used to be depended on]" \
-  "(-G)-F[fetch distfiles only]" \
+  "-F[fetch distfiles only]" \
   "--clean-distfiles[offer to delete stale distfiles]" \
   "--clean-distfiles-all[delete stale distfiles without prompting]" \
+  "----clean-packages[offer to delete stale packages]" \
+  "----clean-packages-all[delete stale packages without prompting]" \
   "--check-depends[cross-check and update dependency information for all ports]" \
   "--check-port-dbdir[check for stale entries in /var/db/ports]" \
   "--list-origins[list directories from /usr/ports for root and leaf ports]" \
