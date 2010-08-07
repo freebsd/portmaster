@@ -213,7 +213,7 @@ parent_exit () {
 		echo "===>>> Deleting installed build-only dependencies"
 		cd
 		for f in $build_deps_il; do
-			[ -n "$PM_VERBOSE" ] && echo "       $f"
+			pm_v "       $f"
 			pm_pkg_delete_s -f $f
 		done
 		echo ''
@@ -413,6 +413,7 @@ pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
 pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
 pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
 
+pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
 pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
 
 #=============== End functions we always want to have ===============
@@ -941,7 +942,7 @@ globstrip () {
 
 ports_by_category () {
 	local pkg
-	[ -n "$PM_VERBOSE" ] && echo "===>>> Sorting ports by category"
+	pm_v "===>>> Sorting ports by category"
 
 	for pkg in $pdb/*; do
 		if [ -s "$pkg/+REQUIRED_BY" ]; then
@@ -1216,16 +1217,15 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 	[ -n "$PM_VERBOSE" ] && { print='-print'; echo '';
 		echo "===>>> Deleting empty directories (if any)"; }
 	pm_find_s $port_dbdir -type d -empty $print -delete
-	[ -n "$PM_VERBOSE" ] && echo ''
+	pm_v
 
 	for dir in ${port_dbdir}/*; do
 		dbdir=${dir#$port_dbdir/}
 
 		[ -n "$PM_VERBOSE" ] && echo -n "===>>> Checking ${dbdir}: "
 		case "$unique_list" in
-		*:${dbdir}:*)	[ -n "$PM_VERBOSE" ] && echo "Ok" ;;
-		*)	[ -n "$PM_VERBOSE" ] && echo ''
-			echo ''
+		*:${dbdir}:*)	pm_v "Ok" ;;
+		*)	pm_v
 			echo "	===>>> $dbdir does not seem to be installed"
 			echo -n "	===>>> Delete ${dir}? y/n [n] "
 			read answer
@@ -1645,8 +1645,7 @@ find_and_delete_distfiles () {
 		case "$distfiles" in
 		*" ${file} "*)
 			distfiles_checked="${distfiles_checked}${file}:"
-			[ -n "$PM_VERBOSE" ] &&
-				echo "===>>> Keeping current distfile: $file"
+			pm_v "===>>> Keeping current distfile: $file"
 			continue ;;	# Do not delete current version
 		*)	if [ -e "$DI_FILES" ]; then
 				grep -ql ${ps}$file $DI_FILES && continue
@@ -1724,8 +1723,7 @@ delete_stale_distfiles () {
 			case "$distfiles" in
 			*" ${file} "*)
 				distfiles_checked="${distfiles_checked}${file}:"
-				[ -n "$PM_VERBOSE" ] &&
-					echo "===>>> Keeping current distfile: $file"
+				pm_v "===>>> Keeping current distfile: $file"
 				continue ;;	# Do not delete current version
 			esac
 
@@ -1751,8 +1749,7 @@ delete_stale_distfiles () {
 		find_and_delete_distfiles $file
 	done
 
-	[ -n "$PM_VERBOSE" ] && {
-		echo "===>>> Distfile cleaning complete" ; echo ''; }
+	pm_v "===>>> Distfile cleaning complete" ; pm_v
 }
 
 delete_all_distfiles () {
@@ -1824,10 +1821,9 @@ delete_all_distfiles () {
 
 if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	ports_by_category
-	[ -n "$PM_VERBOSE" ] && echo ''
 	num_roots=0; num_trunks=0; num_branches=0; num_leaves=0; num_updates=0
 
-	echo "===>>> Root ports (No dependencies, not depended on)"
+	pm_v ; echo "===>>> Root ports (No dependencies, not depended on)"
 	for iport in $roots; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
@@ -2125,7 +2121,7 @@ update_port () {
 		($0 $ARGS $1) || fail "Update for $1 failed"
 		. $IPC_SAVE
 	else
-		[ -n "$PM_VERBOSE" ] && echo "===>>> Build canceled due to -n flag"
+		pm_v "===>>> Build canceled due to -n flag"
 	fi
 
 	if [ -n "$UPDATE_ALL" ]; then
@@ -2215,8 +2211,8 @@ dependency_check () {
 	else
 		if [ -n "$SHOW_WORK" ]; then
 			echo ''
-		elif [ -z "$PM_VERBOSE" ]; then
-			echo "===>>> Starting dependency check"
+		else
+			pm_v "===>>> Starting dependency check"
 		fi
 	fi
 
@@ -2272,8 +2268,7 @@ dependency_check () {
 			continue
 		fi
 
-		[ -n "$PM_VERBOSE" ] &&
-			echo "===>>> Checking dependency: $origin"
+		pm_v "===>>> Checking dependency: $origin"
 
 		# Do this first to catch out of date dependencies
 		[ -n "$PM_FIRST_PASS" ] &&
@@ -2599,8 +2594,7 @@ urb_final () {
 		# Check here since if "no" it will not prompt
 		check_interactive $req_by || continue
 
-		[ -n "$PM_VERBOSE" ] &&
-			echo "===>>> $new_port is required by $req_by"
+		pm_v "===>>> $new_port is required by $req_by"
 		check_exclude $req_by || continue
 
 		# Shortcut, since check_for will force it
@@ -2710,15 +2704,14 @@ all_first_pass () {
 	local iport origin
 
 	for iport in $@; do
-		[ -n "$PM_VERBOSE" ] && echo "===>>> $iport"
+		pm_v "===>>> $iport"
 
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport` || {
 			case "$?" in
 			3) ;;
-			2) [ -z "$PM_VERBOSE" ] &&
-				echo "	===>>> No ORIGIN for $iport, and +IGNOREME is present"
+			2)	pm_v "	===>>> No ORIGIN for $iport, and +IGNOREME is present"
 				echo "	===>>> Skipping"
 				echo '' ;;
 			*)	fail 'Cannot continue' ;;
@@ -2752,16 +2745,16 @@ all_first_pass () {
 	if [ -n "$PM_FIRST_PASS" ]; then
 		[ -n "$FETCH_ONLY" ] && export ALL_FETCH=all_fetch
 
-		[ -n "$PM_VERBOSE" ] && { echo '' ; echo "===>>> Root ports:"; }
+		pm_v ; pm_v "===>>> Root ports:"
 		all_first_pass $roots
 
-		[ -n "$PM_VERBOSE" ] && { echo '' ; echo "===>>> Trunk ports:"; }
+		pm_v ; pm_v "===>>> Trunk ports:"
 		all_first_pass $trunks
 
-		[ -n "$PM_VERBOSE" ] && { echo '' ; echo "===>>> Branch ports:"; }
+		pm_v ; pm_v "===>>> Branch ports:"
 		all_first_pass $branches
 
-		[ -n "$PM_VERBOSE" ] && { echo '' ; echo "===>>> Leaf ports:"; }
+		pm_v ; pm_v "===>>> Leaf ports:"
 		all_first_pass $leaves
 
 		check_fetch_only
@@ -2875,9 +2868,8 @@ if [ -n "$upg_port" -a -z "$portdir" ]; then
 	3)	echo ''
 		echo "===>>> BSDPAN ports cannot be upgraded with portmaster"
 		echo "       (${upg_port})"; echo ''; safe_exit 1 ;;
-	2)	[ -z "$PM_VERBOSE" ] && {
-		echo "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present";
-		echo ''; }; safe_exit 1 ;;
+	2)	pm_v "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present"; pm_v
+		safe_exit 1 ;;
 	*)	fail 'Cannot continue' ;;
 	esac ; }
 elif [ -z "$portdir" ]; then
@@ -3080,8 +3072,7 @@ if [ -n "$PM_FIRST_PASS" ]; then
 			*:${req_by}:*) already_done $req_by
 			continue ;; esac
 
-			[ -n "$PM_VERBOSE" ] &&
-			echo "===>>> $upg_port is required by $req_by"
+			pm_v "===>>> $upg_port is required by $req_by"
 
 			check_exclude $req_by || continue
 			check_interactive $req_by || continue
@@ -3135,7 +3126,7 @@ elif [ "$$" -eq "$PM_PARENT_PID" ]; then
 fi
 
 if [ -n "$NO_ACTION" -a -z "$PM_FIRST_PASS" ]; then
-	[ -n "$PM_VERBOSE" ] && echo "===>>> Build canceled due to -n flag"
+	pm_v "===>>> Build canceled due to -n flag"
 	safe_exit
 fi
 
@@ -3173,8 +3164,7 @@ fetch_package () {
 
 	if [ -z "$PM_ALWAYS_FETCH" ]; then
 		if [ -r "${ppd}/${1}.tbz" ]; then
-			[ -n "$PM_VERBOSE" ] &&
-				echo "===>>> Package exists, skipping fetch"
+			pm_v "===>>> Package exists, skipping fetch"
 			return 0
 		else
 			do_fetch=1
@@ -3237,8 +3227,7 @@ fetch_package () {
 				latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}.tbz`
 				latest_pv=${latest_pv##*/}
 			else
-				[ -n "$PM_VERBOSE" ] &&
-					echo "===>>> No local package for $new_port exists, attempting fetch"
+				pm_v "===>>> No local package for $new_port exists, attempting fetch"
 			fi
 		fi
 	fi
@@ -3296,15 +3285,13 @@ notnewer () {
 
 	if [ "$latest_pv" = "$new_port" ]; then
 		use_package=up_equal
-		[ -n "$PM_VERBOSE" ] &&
-			echo "===>>> Available package ($latest_pv) matches the current version"
+		pm_v "===>>> Available package ($latest_pv) matches the current version"
 	elif [ -n "$latest_pv" -a -n "$PM_PACKAGES_NEWER" ]; then
 		if [ -n "$upg_port" ]; then
 			case `pkg_version -t $upg_port $latest_pv` in
 			\<)	use_package=up_newer
-				[ -n "$PM_VERBOSE" ] && {
-					echo "===>>> Available package ($latest_pv)";
-					echo "       is newer than installed ($upg_port)"; } ;;
+				pm_v "===>>> Available package ($latest_pv)"
+				pm_v "       is newer than installed ($upg_port)" ;;
 			=)	if [ -n "$PM_FORCE" ]; then
 					use_package=up_force
 				else
@@ -3314,16 +3301,14 @@ notnewer () {
 			esac
 		else
 			use_package=up_no_installed
-			[ -n "$PM_VERBOSE" ] &&
-				echo "===>>> There is a package available ($latest_pv)"
+			pm_v "===>>> There is a package available ($latest_pv)"
 		fi
 	elif [ -n "$latest_pv" ]; then
 		case `pkg_version -t $new_port $latest_pv` in
 		\<)	# Could happen if ports tree is out of date
 			use_package=up_old_tree
-			[ -n "$PM_VERBOSE" ] && {
-			echo "===>>> Available package ($latest_pv)";
-			echo "       is newer than ports tree ($new_port)"; } ;;
+			pm_v "===>>> Available package ($latest_pv)"
+			pm_v "       is newer than ports tree ($new_port)" ;;
 		=)	;;	# Should not be reached
 		*)	# Packages like autoconf-2.1* vs. 2.6* can be false neg.
 			fetch_package $new_port try
@@ -3489,8 +3474,7 @@ else
 	echo "===>>> Installing package"
 	if $PM_SU_CMD pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz; then
 		[ -n "$PM_DELETE_PACKAGES" ] && {
-			[ -n "$PM_VERBOSE" ] &&
-				echo "===>>> Deleting ${latest_pv}.tbz";
+			pm_v "===>>> Deleting ${latest_pv}.tbz"
 			pm_unlink_s ${ppd}/${latest_pv}.tbz; }
 	else
 		install_failed ${latest_pv}.tbz
@@ -3596,9 +3580,9 @@ fi
 check_dependency_files $portdir $new_port
 if [ -s "$grep_deps" ]; then
 	echo "===>>> Updating dependency entry for $new_port in each dependent port"
-	[ -n "$PM_VERBOSE" ] && echo ''
+	pm_v
 	while read d_port; do
-		[ -n "$PM_VERBOSE" ] && echo "===>>> $d_port"
+		pm_v "===>>> $d_port"
 		dp_cont=$pdb/$d_port/+CONTENTS
 		[ -e "$dp_cont" ] || continue
 
@@ -3622,8 +3606,7 @@ if [ -s "$grep_deps" ]; then
 		do_update=do_update2
 	fi
 	if [ -n "$do_update" ]; then
-		[ -n "$PM_VERBOSE" ] && { echo '';
-			echo "	===>>> Updating $new_port/+REQUIRED_BY"; }
+		pm_v ; pm_v "	===>>> Updating $new_port/+REQUIRED_BY"
 		pm_install_s $grep_deps $pdb/$new_port/+REQUIRED_BY
 	fi
 
