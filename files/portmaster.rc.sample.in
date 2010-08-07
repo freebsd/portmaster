@@ -1,7 +1,7 @@
 # $FreeBSD$
 #
 # Sample portmaster rc file.
-# Place in $HOME/.portmasterrc or %%PREFIX%%/etc/portmaster.rc
+# Place in $HOME/.portmasterrc or %%LOCALBASE%%/etc/portmaster.rc
 #
 # Please read the portmaster man page for more information on
 # these options.
