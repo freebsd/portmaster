@@ -98,3 +98,12 @@
 # Use the INDEX file instead of /usr/ports (--index-only)
 # PM_INDEX=pm_index
 # PM_INDEX_ONLY=pm_index_only
+#
+#
+# The following options are available for the rc file only:
+#
+# Log actions taken by portmaster with a date/time stamp
+# PM_LOG=/full/path/to/file
+#
+# Do not prompt the user for failed backup package creation
+# PM_IGNORE_FAILED_BACKUP_PACKAGE=pm_ignore_failed_backup_package

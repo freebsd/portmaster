@@ -592,6 +592,34 @@ file so that the dependencies match.
 If you wish to customize your build environment on a per-port
 basis you might want to take a look at
 .Pa ports/ports-mgmt/portconf
+.Pp
+To log actions taken by
+.Nm
+along with a date/time stamp you can define
+.Ev PM_LOG
+in your rc file with the full path of the file you would
+like to log to.
+If running
+.Nm
+with
+.Xr sudo 8
+(see below) then you should make sure that the file is
+writable by the unprivileged user.
+.Pp
+By default
+.Nm
+creates backup packages of installed ports before it runs
+.Xr pkg_delete 1
+during an update.
+If that package creation fails it is treated as a serious
+error and the user is prompted.
+However for scripted use of
+.Nm
+this can be a problem.
+In situations where the user is ABSOLUTELY SURE
+that lack of a backup package should not be a fatal error
+.Ev PM_IGNORE_FAILED_BACKUP_PACKAGE
+can be defined to any value in the rc file.
 .Sh FILES
 .Bl -tag -width "1234" -compact
 .It Pa /usr/local/etc/portmaster.rc
