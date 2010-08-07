@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 9, 2010
+.Dd August 7, 2010
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -33,7 +33,7 @@
 .Sh SYNOPSIS
 Common Flags:
 .Op Fl -force-config CGHgntvw [B|b] [f|i] [D|d]
-.Op [[--packages|-P]|[--packages-only|-PP]] | [--packages-build]
+.Op Sy [[--packages|-P]|[--packages-only|-PP]] | [--packages-build]
 .Op Fl -packages-if-newer
 .Op Fl -delete-build-only
 .Op Fl -always-fetch
@@ -43,7 +43,7 @@ Common Flags:
 .Op Fl -no-confirm
 .Op Fl -no-term-title
 .Op Fl -no-index-fetch
-.Op --index|--index-first|--index-only
+.Op Sy --index|--index-first|--index-only
 .Op Fl m Ar arguments for make
 .Op Fl x Ar glob pattern to exclude from building
 .Nm
@@ -112,9 +112,21 @@ and/or multiple globs from /var/db/pkg
 .Op Fl b [D|d]
 .Fl s
 .Nm
+.Op Fl -force-config|-G
+.Op Fl aftv
+.Fl F
+.Nm
+.Op Fl t
 .Fl -clean-distfiles
 .Nm
+.Op Fl t
 .Fl -clean-distfiles-all
+.Nm
+.Op Fl -index
+.Fl -clean-packages
+.Nm
+.Op Fl -index
+.Fl -clean-packages-all
 .Nm
 .Fl -check-depends
 .Nm
@@ -325,14 +337,13 @@ Manual intervention is therefore required.
 The options are as follows:
 .Bl -tag -width F1
 .It Fl -force-config
-run 'make config' for all ports
+run 'make config' for all ports (overrides -G)
 .It Fl B
 prevents creation of the backup package for the installed port
 .It Fl C
 prevents 'make clean' from being run before building
 .It Fl G
-prevents the recursive 'make config' (overrides
-.Fl -force-config )
+prevents 'make config'
 .It Fl H
 hide details of the port build and install in a log file
 .It Fl K
@@ -342,21 +353,19 @@ create and keep a backup package of an installed port
 .It Fl g
 create a package of the new port
 .It Fl n
-run through configure, but do not make or install any ports
+run through all steps, but do not make or install any ports
 .It Fl t
-recurse dependencies thoroughly, using all-depends-list
+recurse dependencies thoroughly, using all-depends-list.
+.Sy RECOMMENDED FOR USE ONLY WHEN NEEDED, NOT ROUTINELY.
+When applied to the
+.Fl -clean-distfiles[-all]
+option it allows a distfile to be valid if it matches
+any up to date port,
+not just the ones that are installed.
 .It Fl v
 verbose output
 .It Fl w
 save old shared libraries before deinstall
-.It Fl u
-This option has been deprecated.
-It did very little previously, and not what most users expected.
-Please check the
-.Fl d
-and
-.Fl D
-options to achieve most of the same effect.
 .It [-R] Fl f
 always rebuild ports (overrides
 .Fl i )
@@ -375,8 +384,6 @@ Can be specified more than once.
 If a port is not already installed the exclude pattern will
 be run against the directory name from
 .Pa /usr/ports .
-.It Fl p Ar port directory in /usr/ports
-This option has been deprecated.
 .It Fl -show-work
 show what dependent ports are, and are not installed (implies
 .Fl t ) .
@@ -480,7 +487,7 @@ but may be used with
 .Fl -force-config
 and
 .Fl [aftv] .
-.It Fl -clean-distfiles
+.It [-t] Fl -clean-distfiles
 recurse through the installed ports to get a list
 of distinfo files,
 then recurse through all files in
@@ -488,8 +495,13 @@ then recurse through all files in
 to make sure that they are still associated with
 an installed port.
 If not, offer to delete the stale file.
-.It Fl -clean-distfiles-all
+.It [-t] Fl -clean-distfiles-all
 does the same as above, but deletes all files without prompting.
+.It [--index] Fl -clean-packages
+offer to delete stale packages
+.It [--index] Fl -clean-packages-all
+does the same as above, but deletes all out of date
+files without prompting.
 .It Fl -check-depends
 cross-check and update dependency information for all ports
 .It [-v] Fl -check-port-dbdir
@@ -570,6 +582,16 @@ MASTER_SITE_INDEX	(default http://www.FreeBSD.org/ports/)
 FETCHINDEX		(default fetch -am -o)
 INDEXFILE		(default auto per FreeBSD version)
 .Ed
+.Pp
+If you use non-standard OPTIONS settings for package building
+and wish to use the
+.Fl -index-only
+option without a ports tree you must generate your own INDEX
+file so that the dependencies match.
+.Pp
+If you wish to customize your build environment on a per-port
+basis you might want to take a look at
+.Pa ports/ports-mgmt/portconf
 .Sh FILES
 .Bl -tag -width "1234" -compact
 .It Pa /usr/local/etc/portmaster.rc
@@ -581,17 +603,6 @@ These files will be read by the parent
 .Nm
 process, and all variables
 in them will be exported.
-.Pp
-PLEASE NOTE: In versions before 2.3
-.Pa /etc/portmaster.rc
-was recommended.
-However placing this file in LOCALBASE is the correct
-thing to do.
-In future versions of
-.Nm
-support for
-.Pa /etc/portmaster.rc
-will be removed.
 .Pp
 .It Pa /var/db/pkg/*/+IGNOREME
 If this file exists for a port that is already installed,
