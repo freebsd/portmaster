@@ -3,6 +3,9 @@
 # Sample portmaster rc file.
 # Place in $HOME/.portmasterrc or %%PREFIX%%/etc/portmaster.rc
 #
+# Please read the portmaster man page for more information on
+# these options.
+#
 # Do not create temporary backup packages before pkg_delete (-B)
 # NO_BACKUP=Bopt
 #
@@ -35,6 +38,11 @@
 # PM_MAKE_ARGS='-DFORCE_PKG_REGISTER'
 # 
 # Recurse through every dependency, and child dependencies (-t)
+#
+# NOTE:	USE OF THIS OPTION IN YOUR CONFIG FILE IS NOT RECOMMENDED
+#	IT IS ONLY NEEDED IN SPECIAL CIRCUMSTANCES, AND SHOULD BE
+#	USED FROM THE COMMAND LINE.
+#
 # RECURSE_THOROUGH=topt
 # 
 # Be verbose (-v)
