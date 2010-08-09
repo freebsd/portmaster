@@ -132,7 +132,7 @@ parent_exit () {
 			fi
 		fi
 		if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a -n "$NB_DELETE" ]; then
-			pm_sv Deleting safety packages for successful installs
+			pm_sv 'Deleting safety packages for successful installs'
 			pm_cd $pbu || fail "Cannot cd to $pbu"
 			pm_rm_s $NB_DELETE
 		fi
@@ -140,7 +140,7 @@ parent_exit () {
 
 	[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
 	if [ -d "$pbu" ]; then
-		pm_sv Removing empty backup package directory
+		pm_sv 'Removing empty backup package directory'
 		pm_rmdir_s $pbu
 	fi
 
@@ -2758,7 +2758,7 @@ all_first_pass () {
 			safe_exit
 		fi
 
-		post_first_pass for ports that need updating
+		post_first_pass 'for ports that need updating'
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
 	fi
@@ -3392,11 +3392,11 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 		done
 		if [ -n "$temp" ]; then
 			if [ ! -d "$LOCALBASE_COMPAT" ]; then
-				pm_sv Creating $LOCALBASE_COMPAT for -w
+				pm_sv "Creating $LOCALBASE_COMPAT for -w"
 				pm_mkdir_s $LOCALBASE_COMPAT
 			fi
 
-			pm_sv Copying old shared libraries for -w
+			pm_sv 'Copying old shared libraries for -w'
 			$PM_SU_CMD cp -p $temp ${LOCALBASE_COMPAT}/
 			pm_sv Running ldconfig
 			$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
@@ -3409,13 +3409,13 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 
 	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then
 		# Delete any existing versions of the old port
-		pm_sv Running pkg_delete for $ro_upg_port
+		pm_sv "Running pkg_delete for $ro_upg_port"
 		pm_pkg_delete_s -f $ro_upg_port
 	fi
 
 	# Could be empty if -o
 	if [ -n "$upg_port" ]; then
-		pm_sv Running pkg_delete for $upg_port
+		pm_sv "Running pkg_delete for $upg_port"
 		pm_pkg_delete_s -f $upg_port
 	fi
 
