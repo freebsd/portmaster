@@ -866,7 +866,7 @@ read_distinfos () {
 		fi
 
 		if [ -s "$distinfo" ]; then
-			grep '^MD5' $distinfo | while read disc1 f disc2; do
+			grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
 				f=${f#(} ; f=${f%)}
 				echo $f >> $DI_FILES
 			done
@@ -901,7 +901,7 @@ read_distinfos_all () {
 		fi
 
 		if [ -s "$distinfo" ]; then
-			grep '^MD5' $distinfo | while read disc1 f disc2; do
+			grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
 				f=${f#(} ; f=${f%)}
 				echo $f >> $DI_FILES
 			done
@@ -3526,8 +3526,7 @@ if [ -n "$distfiles" ]; then
 	for file in $distfiles; do
 		size=`grep "^SIZE (${ds}${file})" $distinfo`
 		sha256=`grep "^SHA256 (${ds}${file})" $distinfo`
-		md5=`grep "^MD5 (${ds}${file})" $distinfo`
-		echo "DISTFILE:${ds}${file}:SIZE=${size##* }:SHA256=${sha256##* }:MD5=${md5##* }" \
+		echo "DISTFILE:${ds}${file}:SIZE=${size##* }:SHA256=${sha256##* }" \
 		    >> $dist_list_temp
 		# Make sure any new distfiles get added to the list
 		[ -z "$DONT_SCRUB_DISTFILES" -a ! "$$" -eq "$PM_PARENT_PID" ] &&
