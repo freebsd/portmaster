@@ -219,20 +219,24 @@ safe_exit () {
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
 
 		# Save state for the parent process to read back in
-		echo "CUR_DEPS='$CUR_DEPS'" >> $IPC_SAVE
-		echo "dep_of_deps='$dep_of_deps'" >> $IPC_SAVE
 		if [ -z "$PM_FIRST_PASS" ]; then
+			> $IPC_SAVE
 			echo "DISPLAY_LIST='$DISPLAY_LIST'" >> $IPC_SAVE
 			echo "INSTALLED_LIST='$INSTALLED_LIST'" >> $IPC_SAVE
 
 			[ -n "$PM_DEL_BUILD_ONLY" ] &&
 				echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
+
+			PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE#* }
 		else
 			# Do these here so +IGNOREME can modify them
 			echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
 			echo "build_l='$build_l'" >> $IPC_SAVE
 			[ -z "$NO_DEP_UPDATES" ] && echo 'unset NO_DEP_UPDATES' >> $IPC_SAVE
 		fi
+		echo "CUR_DEPS='$CUR_DEPS'" >> $IPC_SAVE
+		echo "dep_of_deps='$dep_of_deps'" >> $IPC_SAVE
+		echo "PM_NEEDS_UPDATE='$PM_NEEDS_UPDATE'" >> $IPC_SAVE
 		[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && echo "NB_DELETE='$NB_DELETE'" >> $IPC_SAVE
 		[ -n "$PM_MULTI_BUILT" ] && echo "PM_MULTI_BUILT='$PM_MULTI_BUILT'" >> $IPC_SAVE
 		if [ -n "$INTERACTIVE_UPDATE" ]; then
@@ -377,7 +381,7 @@ pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-		 unset -v MASTER_RB_LIST PM_FP_SEEN_LIST;
+		 unset -v MASTER_RB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
@@ -392,7 +396,7 @@ pm_unlink () { /bin/test -e $1 && /bin/unlink $1; }
 pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
 pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root -g wheel -m 644 $1 $2; }
 pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-			 unset -v MASTER_RB_LIST PM_FP_SEEN_LIST;
+			 unset -v MASTER_RB_LIST;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
@@ -2061,13 +2065,19 @@ term_printf () {
 	printf "\033]0;${0##*/}: ${PM_PARENT_PORT}${1}\007"
 }
 
-update_build_l () {
-	[ -n "$PM_NO_CONFIRM" ] && return
+update_pm_nu () {
+	case "$PM_NEEDS_UPDATE" in *\ $1\ *) return ;; esac
 
+	PM_NEEDS_UPDATE="${PM_NEEDS_UPDATE}${1} "
+}
+
+update_build_l () {
 	local origin iport new_port
 
 	case "$1" in
 	*/*)	origin=$1
+		update_pm_nu $origin
+		[ -n "$PM_NO_CONFIRM" ] && return
 		case "$build_l" in *\ $origin\\*) return ;; esac
 		iport=`iport_from_origin $origin`
 		if [ -z "$iport" ]; then
@@ -2075,9 +2085,12 @@ update_build_l () {
 			return
 		fi ;;
 	*)	iport=$1
-		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac
-		origin=`origin_from_pdb $1` ;;
+		origin=`origin_from_pdb $1`
+		update_pm_nu $origin
+		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac ;;
 	esac
+
+	[ -n "$PM_NO_CONFIRM" ] && return
 
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		pm_cd $pd/$origin && new_port=`pm_make -V PKGNAME`
@@ -2274,7 +2287,7 @@ dependency_check () {
 
 		# Do this first to catch out of date dependencies
 		[ -n "$PM_FIRST_PASS" ] &&
-			case "$PM_FP_SEEN_LIST" in *:${origin}:*) continue ;; esac
+			case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
 
 		[ -z "$URB_YES" ] &&
 			case "$CUR_DEPS" in *:${origin}:*) continue ;; esac
@@ -2414,6 +2427,8 @@ post_first_pass () {
 		term_printf
 	fi
 
+	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
+
 	action=build
 	if [ "$PM_PACKAGES" = only ]; then
 		action=install
@@ -2423,7 +2438,7 @@ post_first_pass () {
 
 	echo ''; echo "===>>> Starting $action for $* <<<==="; echo ''
 
-	unset PM_FP_SEEN_LIST PM_FIRST_PASS PM_NO_CONFIRM
+	unset PM_FIRST_PASS PM_NO_CONFIRM
 
 	dep_of_deps=0
 
@@ -2472,7 +2487,7 @@ multiport () {
 	PM_MULTI_PORTS=':' ; PM_MULTI_BUILT=':'
 	export PM_MULTI_PORTS PM_MULTI_BUILT
 
-	local port worklist_temp worklist portlist numports num
+	local port worklist_temp worklist portlist numports origin num
 
 	# Expand globs and check that the directories exist
 	for port in "$@"; do
@@ -2500,7 +2515,6 @@ multiport () {
 		esac
 	done
 
-	numports=0
 	for port in $worklist_temp; do
 		check_exclude $port || continue
 		check_interactive $port || continue
@@ -2508,8 +2522,6 @@ multiport () {
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
 		PM_MULTI_PORTS="${PM_MULTI_PORTS}${port}:"
-		numports=$(( $numports + 1 ))
-		update_build_l $port
 	done
 
 	echo "===>>> Working on multiple ports:"
@@ -2526,12 +2538,20 @@ multiport () {
 			done
 		fi
 
-		num=1
+		numports=0
 		for port in $worklist; do
-			init_term_printf "$port ${num}/${numports}"
+			case "$port" in
+			*/*)	origin=$port ;;
+			*)	origin=`origin_from_pdb $port` ;;
+			esac
+
+			case "$PM_NEEDS_UPDATE" in *\ ${origin}\ *) continue ;; esac
+
+			numports=$(( $numports + 1 ))
+			init_term_printf "$port ${numports}/${numports}"
 			($0 $ARGS $port) || fail "Update for $port failed"
 			. $IPC_SAVE
-			num=$(( $num + 1 ))
+			update_build_l $port
 		done
 
 		check_fetch_only
@@ -2539,7 +2559,7 @@ multiport () {
 	fi
 
 	export PM_BUILDING=pmbuildingmultiport
-	num=1
+	num=0
 	for port in $worklist; do
 		case "$PM_MULTI_BUILT" in *:${port}:*) continue ;; esac
 
@@ -2552,10 +2572,10 @@ multiport () {
 				continue
 			fi ;;
 		esac
+		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || fail "Update for $port failed"
 		. $IPC_SAVE
-		num=$(( $num + 1 ))
 	done
 	safe_exit
 }
@@ -2660,9 +2680,9 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-	PM_FP_SEEN_LIST=':' ; PM_FIRST_PASS=pm_first_pass
+	PM_FIRST_PASS=pm_first_pass ; PM_NEEDS_UPDATE=' '
 	NO_DEP_UPDATES=no_dep_updates ; build_l=''
-	export PM_FP_SEEN_LIST PM_FIRST_PASS NO_DEP_UPDATES build_l
+	export PM_FIRST_PASS PM_NEEDS_UPDATE NO_DEP_UPDATES build_l
 
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		run_dl_g='' ; build_only_dl_g='' ; rundep_list=''
@@ -2688,9 +2708,6 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		export DI_FILES=`pm_mktemp DI-FILES`
 
 	[ $# -gt 1 -a -z "$REPLACE_ORIGIN" ] && multiport "$@"
-elif [ -z "$SHOW_WORK" ]; then
-	# Zero out this file so that we can save our data to it safely
-	> $IPC_SAVE
 fi
 
 # This has to come after the initialization, it uses all the same stuff
@@ -2716,7 +2733,7 @@ all_first_pass () {
 			CUR_DEPS="${CUR_DEPS}${iport}:";
 			continue; }
 
-		case "$PM_FP_SEEN_LIST" in *:${origin}:*) continue ;; esac
+		case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] && run_dl_g="$run_dl_g ${pd}/${origin} "
 
@@ -2724,8 +2741,6 @@ all_first_pass () {
 
 		PM_DEPTH=
 		check_for_updates $iport $origin || fail 'Update failed'
-
-		PM_FP_SEEN_LIST="${PM_FP_SEEN_LIST}${origin}:"
 	done
 }
 	[ -n "$DI_FILES" ] && (read_distinfos)&
@@ -2765,6 +2780,7 @@ all_first_pass () {
 
 	export PM_BUILDING=pmbuildingall
 
+if ! : ; then
 	for iport in $roots $trunks $branches $leaves; do
 		# Probably got updated as a dependency for something else
 		[ -d "$pdb/$iport" ] || continue
@@ -2790,6 +2806,11 @@ all_first_pass () {
 		# We got here, so we know we have to build it
 		update_port $iport
 	done
+fi
+
+	unset roots trunks branches leaves
+
+	for origin in $PM_NEEDS_UPDATE; do update_port $origin; done
 
 	echo "===>>> Update check of installed ports complete" ; echo ''
 	safe_exit
@@ -2924,9 +2945,6 @@ fi
 
 # START
 
-# Should only be reached for multiport already built as a dependency
-case "$PM_FP_SEEN_LIST" in *:${portdir}:*) safe_exit ;; esac
-
 [ -z "$PM_INDEX_ONLY" ] && { pm_cd $pd/$portdir || no_valid_port; }
 
 if [ -z "$PM_DEPTH" ]; then
@@ -3024,8 +3042,6 @@ if [ -n "$PM_FIRST_PASS" ]; then
 
 	[ -z "$PM_PACKAGES" -a -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
-	PM_FP_SEEN_LIST="${PM_FP_SEEN_LIST}${portdir}:"
-
 	dep_check_type='build-depends-list run-depends-list'
 	[ -n "$RECURSE_THOROUGH" ] && dep_check_type=all-depends-list
 	dependency_check "$dep_check_type"
@@ -3035,8 +3051,7 @@ if [ -n "$PM_FIRST_PASS" ]; then
 
 	if [ ! "$$" -eq "$PM_PARENT_PID" ]; then
 		# Save state for the parent process to read back in
-		echo "PM_FP_SEEN_LIST='$PM_FP_SEEN_LIST'" > $IPC_SAVE
-
+		> $IPC_SAVE
 		if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
 			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
 			echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
