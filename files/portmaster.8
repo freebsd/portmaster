@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd August 7, 2010
+.Dd August 8, 2010
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -572,14 +572,13 @@ When using the
 .Fl -index-only
 option the
 .Ev PACKAGES
-and
-.Ev INDEXDIR
-variables must each be set to a dirctory where the
+variable must be set to a dirctory where the
 superuser has write permissions.
 Other useful variables include:
 .Bd -literal
 MASTER_SITE_INDEX	(default http://www.FreeBSD.org/ports/)
 FETCHINDEX		(default fetch -am -o)
+INDEXDIR		(default $PORTSDIR, or $TMPDIR for --index-only)
 INDEXFILE		(default auto per FreeBSD version)
 .Ed
 .Pp
