@@ -535,7 +535,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			unset ver
 		fi
 
-		[ -z "$INDEXDIR" -a -n "$PM_INDEX_ONLY" -z "$pd" ] && INDEXDIR="$TMPDIR"
+		[ -z "$INDEXDIR" -a -n "$PM_INDEX_ONLY" -a -z "$pd" ] && INDEXDIR="$TMPDIR"
 
 		PM_INDEX="${INDEXDIR:-$pd}/${INDEXFILE}"
 
