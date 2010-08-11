@@ -2967,74 +2967,72 @@ echo ''
 [ "$$" -eq "$PM_PARENT_PID" -a -n "$upg_port" ] &&
 	echo "===>>> Currently installed version: $upg_port"
 
-if [ -z "$PM_INDEX_ONLY" ]; then
-	echo "===>>> Port directory: $pd/$portdir"
+echo "===>>> Port directory: $pd/$portdir" ; echo ''
 
-	# Do these things first time through
-	if [ -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
-		if ! check_state; then
-			echo "	===>>> If you are sure you can build it, remove the"
-			echo "	       $state line in the Makefile and try again."
-			safe_exit 1
-		fi
+# Do these things first time through
+if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
+	if ! check_state; then
+		echo "	===>>> If you are sure you can build it, remove the"
+		echo "	       $state line in the Makefile and try again."
+		safe_exit 1
+	fi
 
-		# Do not start this in the background until we are sure we are going to build
-		[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && { echo ''; (read_distinfos)& }
+	# Do not start this in the background until we are sure we are going to build
+	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
 
-		# Handle the problem of manual fetching
-		[ -z "$PM_PACKAGES" ] && master_sites=`pm_make_b -V MASTER_SITES`
+	# Handle the problem of manual fetching
+	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make_b -V MASTER_SITES`
 
-		if [ -n "$master_sites" ]; then
-			# PATCHFILES may get added after the first pass, but we want to
-			# do as much of this as we can, as early as we can, and
-			# patch files are usually small anyway.
-			distfiles=`pm_make -V ALLFILES | sed -e 's# *$##g'`
-			[ -n "$distfiles" ] && distfiles=" ${distfiles} "
+	if [ -n "$master_sites" ]; then
+		# PATCHFILES may get added after the first pass, but we want to
+		# do as much of this as we can, as early as we can, and
+		# patch files are usually small anyway.
+		distfiles=`pm_make -V ALLFILES | sed -e 's# *$##g'`
+		[ -n "$distfiles" ] && distfiles=" ${distfiles} "
 
-			# Make sure that different ports using the same distfiles
-			# do not clobber each other's fetchs
-			for file in $distfiles; do
-				case "$file" in */*) file=`echo $file | sed s#/#_#g` ;; esac
-				if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1; then
-					pm_mktemp ${file}-${portdir#*/} >/dev/null
-				else
-					DONT_FETCH=dont_fetch
-					break
-				fi
-			done
-
-			if [ -z "$DONT_FETCH" -a -n "$distfiles" ]; then
-				echo "===>>> Launching 'make checksum' for $portdir in background"
-				fetchlog=`pm_mktemp fetchlog-${portdir#*/}`
-				(pm_make -DBATCH checksum >> $fetchlog 2>&1 && {
-				    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.*; exit 0; }
-				    allfiles=`pm_make -V ALLFILES`
-				    pm_make delete-distfiles RESTRICTED_FILES="${allfiles}" \
-					>> $fetchlog 2>&1 &&
-					    echo "===>>> RE-STARTING FETCH <<<===" >> $fetchlog
-				    pm_make -DBATCH checksum >> $fetchlog 2>&1
-				    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.* )&
+		# Make sure that different ports using the same distfiles
+		# do not clobber each other's fetchs
+		for file in $distfiles; do
+			case "$file" in */*) file=`echo $file | sed s#/#_#g` ;; esac
+			if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1; then
+				pm_mktemp ${file}-${portdir#*/} >/dev/null
+			else
+				DONT_FETCH=dont_fetch
+				break
 			fi
-			unset master_sites distfiles file DONT_FETCH fetchlog allfiles
-		fi
+		done
 
-		if [ -z "$FETCH_ONLY" -a ! "$PM_PACKAGES" = only ]; then
-			TESTINT=`grep -l ^IS_INTERACTIVE Makefile`
-		else
-			[ -n "$ALL_FETCH" ] && safe_exit
+		if [ -z "$DONT_FETCH" -a -n "$distfiles" ]; then
+			echo "===>>> Launching 'make checksum' for $portdir in background"
+			fetchlog=`pm_mktemp fetchlog-${portdir#*/}`
+			(pm_make -DBATCH checksum >> $fetchlog 2>&1 && {
+			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.*; exit 0; }
+			    allfiles=`pm_make -V ALLFILES`
+			    pm_make delete-distfiles RESTRICTED_FILES="${allfiles}" \
+				>> $fetchlog 2>&1 &&
+				    echo "===>>> RE-STARTING FETCH <<<===" >> $fetchlog
+			    pm_make -DBATCH checksum >> $fetchlog 2>&1
+			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.* )&
 		fi
-		if [ -n "$TESTINT" ]; then
-			echo ''
-			echo "===>>> Warning: $portdir is interactive, and will likely"
-			echo "       require attention during the build"
-			echo ''
-			echo -n "===>>> Press the [Enter] or [Return] key to continue "
-			read DISCARD
-			echo ''
-			unset TESTINT DISCARD
-		fi
-	fi	# [ -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]
-fi	# [ -z "$PM_INDEX_ONLY" ]
+		unset master_sites distfiles file DONT_FETCH fetchlog allfiles
+	fi
+
+	if [ -z "$FETCH_ONLY" -a ! "$PM_PACKAGES" = only ]; then
+		TESTINT=`grep -l ^IS_INTERACTIVE Makefile`
+	else
+		[ -n "$ALL_FETCH" ] && safe_exit
+	fi
+	if [ -n "$TESTINT" ]; then
+		echo ''
+		echo "===>>> Warning: $portdir is interactive, and will likely"
+		echo "       require attention during the build"
+		echo ''
+		echo -n "===>>> Press the [Enter] or [Return] key to continue "
+		read DISCARD
+		echo ''
+		unset TESTINT DISCARD
+	fi
+fi	# [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]
 
 if [ -n "$PM_FIRST_PASS" ]; then
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$PM_BUILD_ONLY_LIST" ] &&
