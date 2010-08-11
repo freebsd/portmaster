@@ -534,6 +534,9 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			INDEXFILE=INDEX-${ver%%\.*}
 			unset ver
 		fi
+
+		[ -z "$INDEXDIR" -a -n "$PM_INDEX_ONLY" -z "$pd" ] && INDEXDIR="$TMPDIR"
+
 		PM_INDEX="${INDEXDIR:-$pd}/${INDEXFILE}"
 
 		if [ -z "$PM_NO_INDEX_FETCH" ]; then
