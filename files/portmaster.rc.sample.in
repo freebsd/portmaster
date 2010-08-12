@@ -28,8 +28,7 @@
 # ALWAYS_SCRUB_DISTFILES=dopt
 #
 # Do not run 'make config' for ports that need updating (-G)
-# (This unsets --force-config)
-# NO_RECURSIVE_CONFIG=Gopt
+# PM_NO_MAKE_CONFIG=Gopt
 #
 # Hide the build and install processes in a log file (-H)
 # HIDE_BUILD=Hopt
