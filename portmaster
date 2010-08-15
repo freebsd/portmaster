@@ -570,16 +570,20 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 		PM_INDEX_PORTS=`pkg_version -Ivl\< $PM_INDEX | cut -f1 -d\<`
 		export PM_INDEX_PORTS
+
+		if [ -z "$pd" -o "$pd" != /usr/ports ]; then
+			PM_IPD=`head -1 $PM_INDEX | cut -f 2 -d\|`
+			PM_IPD=${PM_IPD%/*}
+			PM_IPD=${PM_IPD%/*}
+
+			[ -n "$PM_INDEX_ONLY" ] && pd=$PM_IPD
+		else
+			PM_IPD=$pd
+		fi
+		export PM_IPD
 	fi
 
-	if [ -z "$pd" ]; then
-		if [ -n "$PM_INDEX_ONLY" ]; then
-			pd=`head -1 $PM_INDEX | cut -f 2 -d\|`
-			pd=${pd%/*}
-			pd=${pd%/*}
-		fi
-		[ -z "$pd" ] && fail 'The value of PORTSDIR cannot be empty'
-	fi
+	[ -z "$pd" ] && fail 'The value of PORTSDIR cannot be empty'
 	if [ -z "$pdb" ]; then
 		if [ -z "$PKG_DBDIR" ]; then
 			[ -d /var/db/pkg ] && pdb=/var/db/pkg
@@ -1006,7 +1010,7 @@ init_packages_var () {
 parse_index () {
 	local line
 
-	line=`grep -m1 .*\|.*/${1}\|.* $PM_INDEX` || return 1
+	line=`grep -m1 "|${PM_IPD}/${1}|" $PM_INDEX` || return 1
 
 	case "$2" in
 	name)		echo ${line%%|*} ;;
@@ -2046,6 +2050,7 @@ check_fetch_only () {
 	while `ls ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-* >/dev/null 2>&1`; do
 		nf=`ps -ax | grep [f]etch | wc -l`
 		nf=${nf##* }
+		[ "$nf" -eq 0 ] && break	# Not often, but it happens
 		fetches=fetches ; [ "$nf" -eq 1 ] && fetches=fetch
 		echo "===>>> Waiting for ${nf##* } distfile $fetches to finish"
 		sleep $sleep
