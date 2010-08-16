@@ -625,10 +625,14 @@ unset var newopts
 #=============== Begin functions relevant to --features and main ===============
 
 iport_from_origin () {
-	local dir
+	local sn dir
 
-	if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/*/+CONTENTS 2>/dev/null`; then
-		dir=`pkg_info -q -O $1` || return 1
+	sn=${1#*/} ; sn=${sn%-*} ; sn=${sn%%[0-9]*}
+
+	if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/${sn}*/+CONTENTS 2>/dev/null`; then
+		if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/*/+CONTENTS 2>/dev/null`; then
+			dir=`pkg_info -q -O $1` || return 1
+		fi
 	fi
 
 	# It should not happen that more than one port meets this
