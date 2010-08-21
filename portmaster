@@ -1087,7 +1087,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		origin=${origin#@comment ORIGIN:}
 
 		if [ -z "$PM_INDEX" ]; then
-			if [ -d "$pd/$origin"  ]; then
+			if [ -d "$pd/$origin" ]; then
 				pm_cd $pd/$origin && port_ver=`pm_make -V PKGNAME`
 				[ -n "$port_ver" ] || fail "Is $pd/$origin/Makefile missing?"
 			else
@@ -1391,46 +1391,34 @@ check_state () {
 	return 0
 }
 
-check_pkg_version () {
-	local iport port_ver udf
-
-	iport=$1 ; port_ver=$2 ; udf=$3
-
-	case `pkg_version -t $iport $port_ver` in
-	\<)	return 1 ;;
-	=)	return ;;
-	\>)	if [ -n "$PM_VERBOSE" ]; then
-			echo "	===>>> Port version $port_ver does not"
-			echo "	===>>> seem newer than installed $iport"
-		fi
-		if [ -n "$PM_FORCE" ]; then
-			check_restart_and_udf $udf $iport || return 1
-		elif [ -n "$URB_YES" ]; then
-			case "$MASTER_RB_LIST" in *" $iport "*)
-				if ! check_restart_and_udf $udf $iport; then
-					return 1
-				else
-					URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
-				fi ;;
-			esac
-		fi ;;
-	esac
+# Takes $iport and $origin as arguments
+#
+check_force_multi () {
+	if [ -n "$PM_FORCE" ]; then
+		check_restart_and_udf $1 || return 1
+	elif [ -n "$PM_MULTI_PORTS" ]; then
+		case "$PM_MULTI_PORTS" in
+		*:${1}:*)	return 1 ;;
+		*:${2}:*)	return 1 ;;
+		esac
+	fi
 }
 
 check_for_updates () {
 	# Global: num_updates
-	local list_only nf iport origin port_ver skip udf do_update
+	local nf iport origin port_ver do_update skip
 
-	[ "$1" = 'list' ] && { list_only=list_only; nf=nonfatal; shift; }
+	[ "$1" = 'list' ] && { nf=nonfatal; shift; }
 
-	iport=$1
-
-	origin=${2:-`origin_from_pdb $iport`} || return 0
+	iport=$1 ; origin=${2:-`origin_from_pdb $iport`} || return 0
 
 	if [ -n "$PM_INDEX" ]; then
 		case "$PM_INDEX_PORTS" in
 		*${iport}*) port_ver=`parse_index $origin name` ; do_update=upd_idx ;;
 		esac
+
+		[ -z "$do_update" -a -z "$LIST_PLUS" ] && {
+			check_force_multi $iport $origin || do_update=upd_fm_idx; }
 
 		[ -n "$PM_INDEX_FIRST" ] || skip=index_skip
 	fi
@@ -1440,6 +1428,8 @@ check_for_updates () {
 			if [ -e "$pdb/$iport/+IGNOREME" ]; then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
 				echo "	===>>> Continuing due to $pdb/$iport/+IGNOREME"
+				echo ''
+				CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
 				return 0
 			else
 				fail "Cannot cd to port directory: $pd/$origin"
@@ -1464,42 +1454,43 @@ check_for_updates () {
 	fi
 
 	if [ -z "$do_update" -a -n "$port_ver" ]; then
-		udf="$pdb/$iport/PM_UPGRADE_DONE_FLAG"
 		if [ "$iport" = "$port_ver" ]; then
-			if [ -n "$PM_FORCE" ]; then
-				check_restart_and_udf $udf $iport || do_update=do_update_force
-			elif [ -n "$URB_YES" ]; then
-				case "$MASTER_RB_LIST" in *" $iport "*)
-					if ! check_restart_and_udf $udf $iport; then
-						do_update=do_update_urb
-					else
-						URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
-					fi ;;
-				esac
-			elif [ -n "$PM_MULTI_PORTS" ]; then
-				case "$PM_MULTI_PORTS" in
-				*:${iport}:*)	do_update=do_update_mi ;;
-				*:${origin}:*)	do_update=do_update_mo ;;
-				esac
-			elif [ -n "$LIST_PLUS" ]; then
-				[ -z "$PM_INDEX_ONLY" ] && check_state
+			if [ -n "$LIST_PLUS" ]; then
+				check_state
 				return 0
 			elif [ -n "$LIST" ]; then
 				return 0
+			else
+				check_force_multi $iport $origin || do_update=upd_fm_eq
+				unset port_ver
 			fi
 		else
-			check_pkg_version $iport $port_ver $udf || do_update=do_update_check
+			case `pkg_version -t $iport $port_ver` in
+			\<)	do_update=upd_lt ;;
+			=)	;;	# Can be reached if same version with different options
+			\>)	if [ -n "$PM_VERBOSE" ]; then
+					echo "	===>>> Port version $port_ver does not"
+					echo "	===>>> seem newer than installed $iport"
+				fi ;;
+			*)	fail "pkg_version -t $iport $port_ver gave an unexpected result"
+			esac
+
+			[ -z "$do_update" ] && {
+				check_force_multi $iport $origin || do_update=upd_fm_ne; }
 		fi
 	fi
 
-	[ -z "$do_update" ] && { CUR_DEPS="${CUR_DEPS}${iport}:${origin}:" ; return 0; }
+	if [ -z "$do_update" ]; then
+		[ -z "$LIST_PLUS" ] && CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
+		return 0
+	fi
 
-	if [ -n "$list_only" ]; then
+	if [ -n "$LIST_PLUS" ]; then
 		if [ -z "$moved_npd" ]; then
 			echo "	===>>> New version available: $port_ver"
 			[ -e "$pdb/$iport/+IGNOREME" ] &&
 				echo "	===>>> +IGNOREME file is present for $1"
-			[ -z "$PM_INDEX_ONLY" ] && { pm_cd_pd $origin ;  check_state; }
+			[ -z "$PM_INDEX_ONLY" ] && { pm_cd_pd $origin ; check_state; }
 			num_updates=$(( $num_updates + 1 ))
 		else
 			unset moved_npd
@@ -1990,14 +1981,13 @@ already_done () {
 check_restart_and_udf () {
 	# RESTART will usually be empty, and we don't want
 	# to go out to the disk if we don't have to.
-	if [ -z "$RESTART" ]; then
-		return 1
-	elif [ ! -e "$1" ]; then
+	[ -z "$RESTART" ] && return 1
+
+	if [ ! -e "$pdb/${1}/PM_UPGRADE_DONE_FLAG" ]; then
 		return 1
 	else
-		already_done $2 ; echo ''
+		already_done $1 ; echo ''
 	fi
-	return 0
 }
 
 check_interactive () {
@@ -2120,10 +2110,16 @@ update_build_l () {
 }
 
 update_port () {
-	local update_to deps
+	local deps
 
-	[ -n "$2" ] && update_to=" to $2"
-	echo "===>>> Launching child to update ${1#$pd/}${update_to}"
+	if [ -n "$2" ]; then
+		echo "===>>> Launching child to update $1 to $2"
+	else
+		case "$1" in
+		*/*)	echo "===>>> Launching child to install ${1#$pd/}" ;;
+		*)	echo "===>>> Launching child to reinstall $1" ;;
+		esac
+	fi
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
@@ -2280,7 +2276,7 @@ dependency_check () {
 		clean_build_only_list
 	fi
 
-	local d_port origin iport udf
+	local d_port origin iport
 
 	# Do not export, for THIS parent process only
 	[ -n "$PM_FIRST_PASS" ] && doing_dep_check=doing_dep_check
@@ -2332,9 +2328,8 @@ dependency_check () {
 
 		check_exclude ${iport:-$origin} || continue
 
-		udf="$pdb/$iport/PM_UPGRADE_DONE_FLAG"
 		if [ -n "$PM_FORCE" -a -n "$iport" ]; then
-			if ! check_restart_and_udf $udf $iport; then
+			if ! check_restart_and_udf $iport; then
 				echo "===>>> Forcing update for $pd/$origin"
 				update_port $iport
 			else
@@ -2343,11 +2338,11 @@ dependency_check () {
 			continue
 		elif [ -n "$URB_YES" -a -n "$iport" ]; then
 			case "$URB_DONE_LIST" in
-			*:${iport}:*) already_done ; continue ;; esac
+			*:${iport}:*) already_done $iport ; continue ;; esac
 
 			case "$MASTER_RB_LIST" in *" $iport "*)
 				check_interactive $iport || continue
-				if ! check_restart_and_udf $udf $iport; then
+				if ! check_restart_and_udf $iport; then
 					update_port $iport
 				else
 					CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
@@ -2803,8 +2798,7 @@ if ! : ; then
 
 		PM_DEPTH=
 		if [ -n "$PM_FORCE" ]; then
-			udf="$pdb/$iport/PM_UPGRADE_DONE_FLAG"
-			if ! check_restart_and_udf $udf $iport; then
+			if ! check_restart_and_udf $iport; then
 				echo "===>>> Forcing update for $iport"
 				update_port $iport
 			else
