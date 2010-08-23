@@ -1048,17 +1048,17 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	for df in `find $DISTDIR -type f | sort`; do
 		f=${df#$DISTDIR}
 		if ! grep -ql $f $DI_FILES; then
-			if [ -n "$ALL" ]; then
-				echo "===>>> Deleting $f"
-				pm_unlink $df
-			else
+			if [ -z "$ALL" ]; then
 				echo -n "===>>> Delete stale file: ${f}? y/n [y] "
 				read answer
-				case "$answer" in
-				[yY]|'')	pm_unlink $df ;;
-				*)		continue ;;
-				esac
+			else
+				answer=y
 			fi
+			case "$answer" in
+			[yY]|'')	echo "       Deleting $f" ; echo ''
+					pm_unlink $df ;;
+			*)		continue ;;
+			esac
 		fi
 	done
 
@@ -1069,18 +1069,9 @@ fi
 if [ -n "$CLEAN_PACKAGES" ]; then
 	init_packages_var
 
-	echo "===>>> Checking for stale packages"; echo ''
+	echo "===>>> Checking for stale packages"
 	for package in `find $PACKAGES -type f | sort`; do
-		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.tbz}
-		if [ ! -d "${pdb}/${pkg_dir}" ]; then
-			echo "===>>> ${package##*/} is not currently installed"
-			echo -n "	===>>> Delete? y/n [y] "
-			read answer
-			case "$answer" in
-			[yY]|'')	echo "	===>>> Deleting $package"
-					pm_unlink_s $package ; continue ;;
-			esac
-		fi
+		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.tbz} ; echo ''
 
 		origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
 			fail Empty origin in $package
@@ -1092,27 +1083,40 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 				[ -n "$port_ver" ] || fail "Is $pd/$origin/Makefile missing?"
 			else
 				echo "===>>> The origin for ${package##*/} ($origin) is missing"
-				unset port_ver
 			fi
 		else
 			if ! port_ver=`parse_index $origin name`; then
 				echo "===>>> Cannot determine latest version of ${package##*/} from INDEX"
-				unset port_ver
 			fi
 		fi
 
 		if [ -n "$port_ver" ]; then
 			if [ "${port_ver}.tbz" = "${package##*/}" ]; then
 				echo "===>>> ${package##*/} is up to date"
+				if [ -z "$ALL" ]; then
+					if [ ! -d "${pdb}/${pkg_dir}" ]; then
+						echo "	===>>> $pkg_dir is not installed"
+						echo -n "	===>>> Delete stale package: ${package##*/}? y/n [y] "
+						read answer
+						case "$answer" in
+						[yY]|'')	echo "	===>>> Deleting $package"
+								pm_unlink_s $package ;;
+						esac
+					fi
+				fi
+				unset port_ver
 				continue
 			fi
 
-			echo "===>>> Package version: ${package##*/} Latest version: $port_ver"
+			echo "===>>> Package version: $pkg_dir"
+			echo "       Latest version:  $port_ver"
+
+			unset port_ver
 
 			if [ -d "${pdb}/${pkg_dir}" ]; then
 				echo "	===>>> ${package##*/} matches the installed version"
 			else
-				echo "	===>>> ${package##*/} is out of date"
+				echo "	===>>> ${package##*/} is not installed"
 			fi
 		fi
 
@@ -1121,15 +1125,18 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		if [ -z "$ALL" ]; then
 			echo -n "	===>>> Delete stale package: ${package##*/}? y/n [y] "
 			read answer
-			case "$answer" in
-			[yY]|'')	echo "	===>>> Deleting $package"
-					pm_unlink_s $package ;;
-			esac
+		else
+			answer=y
 		fi
+		case "$answer" in
+		[yY]|'')	echo "	===>>> Deleting $package"
+				pm_unlink_s $package ;;
+		esac
 
 	done
+	echo '' ; echo ''
 
-	echo '' ; echo "===>>> Deleting stale symlinks"
+	echo "===>>> Deleting stale symlinks"
 	pm_cd $PACKAGES || fail "Cannot cd to $PACKAGES"
 	for link in `find . -type l | sort` ; do
 		if [ ! -e "$link" ]; then
@@ -1137,8 +1144,8 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 			$PM_SU_CMD /bin/unlink $link
 		fi
 	done
+	echo '' ; echo ''
 
-	echo ''
 	empty_dirs=`find . -type d -empty -print | sort`
 	if [ -n "$empty_dirs" ]; then
 		echo "===>>> Deleting empty directories"
@@ -1149,6 +1156,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 	else
 		echo "===>>> No empty directories in $PACKAGES"
 	fi
+	echo ''
 
 	safe_exit
 fi	# [ -n "$CLEAN_PACKAGES" ]
