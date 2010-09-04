@@ -1086,7 +1086,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 			fi
 		else
 			if ! port_ver=`parse_index $origin name`; then
-				echo "===>>> Cannot determine latest version of ${package##*/} from INDEX"
+				echo "===>>> Cannot determine latest version of ${package##*/} from $PM_INDEX"
 			fi
 		fi
 
@@ -1422,7 +1422,9 @@ check_for_updates () {
 
 	if [ -n "$PM_INDEX" ]; then
 		case "$PM_INDEX_PORTS" in
-		*${iport}*) port_ver=`parse_index $origin name` ; do_update=upd_idx ;;
+		*${iport}*)	port_ver=`parse_index $origin name` ||
+					fail "No entry for $origin in $PM_INDEX"
+				do_update=upd_idx ;;
 		esac
 
 		[ -z "$do_update" -a -z "$LIST_PLUS" ] && {
@@ -2106,7 +2108,7 @@ update_build_l () {
 		pm_cd $pd/$origin && new_port=`pm_make -V PKGNAME`
 	else
 		new_port=`parse_index $origin name` ||
-			fail "No INDEX entry for $origin"
+			fail "No entry for $origin in $PM_INDEX"
 	fi
 
 	case `pkg_version -t $iport $new_port 2>/dev/null` in
@@ -2232,7 +2234,11 @@ dependency_check () {
 
 	# Print a message here because sometimes list generation takes
 	# a long time to return.
-	echo "===>>> Gathering dependency list for $portdir from ports"
+	if [ -z "$PM_INDEX_ONLY" ]; then
+		echo "===>>> Gathering dependency list for $portdir from ports"
+	else
+		echo "===>>> Gathering dependency list for $portdir from ${PM_INDEX##*/}"
+	fi
 	d_port_list=`gen_dep_list $1`
 
 	if [ -z "$d_port_list" ]; then
@@ -2959,7 +2965,12 @@ fi
 
 # START
 
-[ -z "$PM_INDEX_ONLY" ] && { pm_cd $pd/$portdir || no_valid_port; }
+if [ -z "$PM_INDEX_ONLY" ]; then
+	pm_cd $pd/$portdir || no_valid_port
+else
+	new_port=`parse_index $portdir name` ||
+		fail "No entry for $portdir in $PM_INDEX"
+fi
 
 if [ -z "$PM_DEPTH" ]; then
 	PM_DEPTH="${upg_port:-$portdir} "
@@ -3154,7 +3165,8 @@ if [ -z "$new_port" ]; then
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		new_port=`pm_make -V PKGNAME`
 	else
-		new_port=`parse_index $portdir name` || fail "No INDEX entry for $origin"
+		new_port=`parse_index $portdir name` ||
+			fail "No entry for $origin in $PM_INDEX"
 	fi
 fi
 
@@ -3250,7 +3262,7 @@ fetch_package () {
 	fi
 
 	if [ -z "$latest_pv" -a -z "$PM_PACKAGES_LOCAL" ]; then
-		dirlist=`echo ${TMPDIR}/f-${PM_PARENT_PID}-dl-${portdir%/*}*`
+		dirlist=`echo ${TMPDIR}/f-${PM_PARENT_PID}-dl-${portdir%/*}\.*`
 		if [ ! -r "$dirlist" ]; then
 			pm_unlink $dirlist		# JIC
 			dirlist=`pm_mktemp dl-${portdir%/*}`
