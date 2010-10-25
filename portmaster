@@ -3006,7 +3006,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
 
 	# Handle the problem of manual fetching
-	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make_b -V MASTER_SITES`
+	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make -V MASTER_SITES`
 
 	if [ -n "$master_sites" ]; then
 		# PATCHFILES may get added after the first pass, but we want to
@@ -3225,7 +3225,7 @@ fetch_package () {
 				release=packages-${release%%\.*}-stable ;;
 		[678]\.[0-9]-RELEASE*)
 				release=packages-${release%-RELEASE*}-release ;;
-		9\.0-CURRENT)	release=packages-9-current ;;
+		9\.0-CURRENT*)	release=packages-9-current ;;
 		*RC[0-9]*)	release=${release%-RC[0-9]}
 				release=packages-${release}-release ;;
 		*BETA[0-9]*)	release=${release%-BETA[0-9]}
