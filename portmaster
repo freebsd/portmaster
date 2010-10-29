@@ -227,7 +227,12 @@ safe_exit () {
 			[ -n "$PM_DEL_BUILD_ONLY" ] &&
 				echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
 
-			PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE#* }
+			for i in $PM_NEEDS_UPDATE; do
+				[ "$i" = "$portdir" ] && continue
+				pnu_temp="${pnu_temp}${i} "
+			done
+
+			PM_NEEDS_UPDATE="$pnu_temp"
 		else
 			# Do these here so +IGNOREME can modify them
 			echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
