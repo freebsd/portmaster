@@ -2664,10 +2664,12 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		if [ -n "$PLB" ]; then
 			LOCALBASE_COMPAT="$PLB/lib/compat/pkg"
 		else
-			PLB=`head -1 $PM_INDEX | cut -f 3 -d\| 2>/dev/null`
-			if [ -d "$PLB" ]; then
+			[ -n "$PM_INDEX" ] && PLB=`head -1 $PM_INDEX | cut -f 3 -d\| 2>/dev/null`
+			if [ -n "$PLB" ] && [ -d "$PLB" ]; then
 				LOCALBASE_COMPAT="${PLB}/lib/compat/pkg"
 			else
+				echo "===>>> Unable to determine the value of LOCALBASE"
+				echo "       Try setting it in the environment, or /etc/make.conf"
 				fail 'The value of LOCALBASE cannot be empty'
 			fi
 		fi
