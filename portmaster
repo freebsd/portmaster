@@ -2805,33 +2805,6 @@ all_first_pass () {
 
 	export PM_BUILDING=pmbuildingall
 
-if ! : ; then
-	for iport in $roots $trunks $branches $leaves; do
-		# Probably got updated as a dependency for something else
-		[ -d "$pdb/$iport" ] || continue
-		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
-		check_exclude $iport || continue
-
-		case "$iport" in bsdpan-*) continue ;; esac
-
-		PM_DEPTH=
-		if [ -n "$PM_FORCE" ]; then
-			if ! check_restart_and_udf $iport; then
-				echo "===>>> Forcing update for $iport"
-				update_port $iport
-			else
-				CUR_DEPS="${CUR_DEPS}${iport}:"
-			fi
-			continue
-		fi
-
-		check_interactive $iport || continue
-
-		# We got here, so we know we have to build it
-		update_port $iport
-	done
-fi
-
 	unset roots trunks branches leaves
 
 	for origin in $PM_NEEDS_UPDATE; do update_port $origin; done
