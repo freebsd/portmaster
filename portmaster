@@ -877,7 +877,8 @@ read_distinfos () {
 			distinfo="${origin}/distinfo"
 		else
 			pm_cd $origin || continue
-			distinfo=`pm_make -V MD5_FILE`
+			distinfo=`pm_make -V DISTINFO_FILE`
+			[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
 		fi
 
 		if [ -s "$distinfo" ]; then
@@ -912,7 +913,8 @@ read_distinfos_all () {
 			distinfo="${origin}/distinfo"
 		else
 			pm_cd $origin || continue
-			distinfo=`pm_make -V MD5_FILE`
+			distinfo=`pm_make -V DISTINFO_FILE`
+			[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
 		fi
 
 		if [ -s "$distinfo" ]; then
@@ -3559,7 +3561,8 @@ if [ -n "$distfiles" ]; then
 	if [ -s distinfo ]; then
 		distinfo=distinfo
 	else
-		distinfo=`pm_make -V MD5_FILE`
+		distinfo=`pm_make -V DISTINFO_FILE`
+		[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $portdir"
 	fi
 
 	dist_list_temp=`pm_mktemp dist_list`
