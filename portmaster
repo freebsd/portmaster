@@ -1163,15 +1163,14 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 	echo '' ; echo ''
 
 	empty_dirs=`find . -type d -empty -print | sort`
-	if [ -n "$empty_dirs" ]; then
-		echo "===>>> Deleting empty directories"
+	case "$empty_dirs" in
+	\.|'')	echo "===>>> No empty directories in $PACKAGES" ;;
+	*)	echo "===>>> Deleting empty directories"
 		for dir in $empty_dirs; do
 			echo "	===>>> ${dir#\.\/}"
 		done
-		pm_find_s . -type d -empty -delete
-	else
-		echo "===>>> No empty directories in $PACKAGES"
-	fi
+		pm_find_s . -type d -empty -delete ;;
+	esac
 	echo ''
 
 	safe_exit
