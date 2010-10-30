@@ -210,6 +210,13 @@ parent_exit () {
 		done
 		echo ''
 	fi
+
+	if [ -n "$1" ]; then
+		echo ''
+		echo "===>>> You can restart from the point of failure with this command line:"
+		echo "       ${0##*/} <flags> $PM_NEEDS_UPDATE"
+		echo ''
+	fi
 }
 
 safe_exit () {
@@ -217,6 +224,8 @@ safe_exit () {
 		parent_exit $1
 	else
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
+
+		[ -n "$1" ] && exit $1
 
 		# Save state for the parent process to read back in
 		if [ -z "$PM_FIRST_PASS" ]; then
