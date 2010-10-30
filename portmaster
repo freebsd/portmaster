@@ -2928,7 +2928,7 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 				case "$answer" in
 				[yY]) ;;	# Let it build
 				*)	CUR_DEPS="${CUR_DEPS}${upg_port}:${portdir}:"
-					if [ $dep_of_deps -gt 0 ]; then
+					if [ ${dep_of_deps:-0} -gt 0 ]; then
 						dep_of_deps=$(( $dep_of_deps - 1 ))
 						if [ -n "$PM_FIRST_PASS" ]; then
 							num_of_deps=$(( $num_of_deps - 1 ))
