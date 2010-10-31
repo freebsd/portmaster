@@ -291,7 +291,7 @@ usage () {
 	echo ''
 	echo "${0##*/} -[l|L]"
 	echo ''
-	echo "${0##*/} [-b D|d] -e <name/glob of port directory in $pdb>"
+	echo "${0##*/} [-b D|d] -e <name/glob of a single port directory in $pdb>"
 	echo "${0##*/} [-b D|d] -s"
 	echo ''
 	echo "${0##*/} [--force-config|-G] [-aftv] -F"
@@ -365,7 +365,7 @@ usage () {
 	echo '-l list installed ports by category'
 	echo '-L list installed ports by category, and search for updates'
 	echo ''
-	echo '-e expunge a port via pkg_delete, and remove its distfiles'
+	echo '-e expunge a single port via pkg_delete, and remove its distfiles'
 	echo '-s clean out stale ports that used to be depended on'
 	echo ''
 	echo '[--force-config|-G] [-aftv] -F fetch distfiles only'
@@ -1907,12 +1907,14 @@ fi
 
 if [ -n "$EXPUNGE" ]; then
 	if [ ! -d "$pdb/$EXPUNGE" ]; then
-		if find_glob_dirs $EXPUNGE; then
-			EXPUNGE=${glob_dirs#$pdb/}
-			unset glob_dirs
-		else
-			fail "No such directory/port: $pdb/$EXPUNGE"
-		fi
+		find_glob_dirs $EXPUNGE
+		case $? in
+		1)	fail "No such directory/port: $pdb/$EXPUNGE" ;;
+		2)	echo "===>>> $EXPUNGE matched multiple ports"
+			fail "The -e option works with only one port at a time" ;;
+		0)	EXPUNGE=${glob_dirs#$pdb/}
+			unset glob_dirs ;;
+		esac
 	fi
 
 	origin=`origin_from_pdb $EXPUNGE`

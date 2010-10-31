@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd August 8, 2010
+.Dd October 30, 2010
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -107,7 +107,7 @@ and/or multiple globs from /var/db/pkg
 .Fl [l|L]
 .Nm
 .Op Fl b [D|d]
-.Fl e Ar name/glob of port directory in /var/db/pkg
+.Fl e Ar name/glob of a single port directory in /var/db/pkg
 .Nm
 .Op Fl b [D|d]
 .Fl s
@@ -468,8 +468,8 @@ requirements.
 list all installed ports by category
 .It Fl L
 list all installed ports by category, and search for updates
-.It Fl e Ar name/glob of port directory in /var/db/pkg
-expunge port using
+.It Fl e Ar name/glob of a single port directory in /var/db/pkg
+expunge a port using
 .Xr pkg_delete 1 ,
 and optionally remove all distfiles.
 Calls
