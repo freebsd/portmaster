@@ -2148,10 +2148,7 @@ update_port () {
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
-	if [ -n "$PM_FIRST_PASS" ]; then
-		num_of_deps=$(( $num_of_deps + 1 ))
-		update_build_l $1
-	fi
+	[ -n "$PM_FIRST_PASS" ] && num_of_deps=$(( $num_of_deps + 1 ))
 
 	deps=" (${dep_of_deps}/${num_of_deps})"
 
@@ -2464,6 +2461,7 @@ post_first_pass () {
 	fi
 
 	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
+	[ -z "$PM_NEEDS_UPDATE" ] && return
 
 	action=build
 	if [ "$PM_PACKAGES" = only ]; then
@@ -2587,7 +2585,13 @@ multiport () {
 			init_term_printf "$port ${numports}/${numports}"
 			($0 $ARGS $port) || fail "Update for $port failed"
 			. $IPC_SAVE
-			update_build_l $port
+
+			case "$PM_NEEDS_UPDATE" in
+			*\ ${origin}\ *)	continue ;;
+						# Handle +IGNOREME in child
+			*)			PM_MULTI_BUILT="${PM_MULTI_BUILT}${port}:"
+						numports=$(( $numports - 1 )) ;;
+			esac
 		done
 
 		check_fetch_only
@@ -2807,7 +2811,7 @@ all_first_pass () {
 
 		check_fetch_only
 		if [ -n "$NO_DEP_UPDATES" ]; then
-			echo "===>>> All ports are up to date"
+			echo '' ; echo "===>>> All ports are up to date" ; echo ''
 			safe_exit
 		fi
 
@@ -2969,10 +2973,11 @@ else
 	PM_DEPTH="${PM_DEPTH}>> ${upg_port:-$portdir} "
 fi
 
-if [ -n "$PM_FIRST_PASS" -a "$$" -eq "$PM_PARENT_PID" ]; then
+if [ -n "$PM_FIRST_PASS" ]; then
 	if [ -n "$upg_port" ]; then
 		update_build_l $upg_port
-		[ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" ] && check_for_updates $upg_port
+		[ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" -a "$$" -eq "$PM_PARENT_PID" ] &&
+			check_for_updates $upg_port
 	else
 		update_build_l $portdir
 	fi
