@@ -211,6 +211,7 @@ parent_exit () {
 		echo ''
 	fi
 
+	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
 	if [ -n "$1" -a -n "$PM_NEEDS_UPDATE" ]; then
 		echo ''
 		echo "===>>> You can restart from the point of failure with this command line:"
@@ -2144,7 +2145,11 @@ update_port () {
 	else
 		case "$1" in
 		*/*)	echo "===>>> Launching child to install ${1#$pd/}" ;;
-		*)	echo "===>>> Launching child to reinstall $1" ;;
+		*)	if [ -z "$FETCH_ONLY" ]; then
+				echo "===>>> Launching child to reinstall $1"
+			else
+				echo "===>>> Launching child to check distfiles for $1"
+			fi ;;
 		esac
 	fi
 
@@ -2680,7 +2685,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 
 	if [ -n "$LOCALBASE" ]; then
 		LOCALBASE_COMPAT="$LOCALBASE/lib/compat/pkg"
-	else
+	elif [ -z "$FETCH_ONLY" ]; then
 		PLB=`pm_make_b -f/usr/share/mk/bsd.port.mk -V LOCALBASE 2>/dev/null`
 		if [ -n "$PLB" ]; then
 			LOCALBASE_COMPAT="$PLB/lib/compat/pkg"
@@ -2724,9 +2729,12 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		fi
 	fi
 
-	PM_FIRST_PASS=pm_first_pass ; PM_NEEDS_UPDATE=' '
-	NO_DEP_UPDATES=no_dep_updates ; build_l=''
-	export PM_FIRST_PASS PM_NEEDS_UPDATE NO_DEP_UPDATES build_l
+	PM_FIRST_PASS=pm_first_pass ; export PM_FIRST_PASS
+
+	if [ -z "$FETCH_ONLY" ]; then
+		PM_NEEDS_UPDATE=' ' ; NO_DEP_UPDATES=no_dep_updates ; build_l=''
+		export PM_NEEDS_UPDATE NO_DEP_UPDATES build_l
+	fi
 
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		run_dl_g='' ; build_only_dl_g='' ; rundep_list=''
@@ -2975,7 +2983,7 @@ else
 	PM_DEPTH="${PM_DEPTH}>> ${upg_port:-$portdir} "
 fi
 
-if [ -n "$PM_FIRST_PASS" ]; then
+if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 	if [ -n "$upg_port" ]; then
 		update_build_l $upg_port
 		[ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" -a "$$" -eq "$PM_PARENT_PID" ] &&
