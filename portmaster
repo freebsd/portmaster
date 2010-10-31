@@ -211,7 +211,7 @@ parent_exit () {
 		echo ''
 	fi
 
-	if [ -n "$1" ]; then
+	if [ -n "$1" -a -n "$PM_NEEDS_UPDATE" ]; then
 		echo ''
 		echo "===>>> You can restart from the point of failure with this command line:"
 		echo "       ${0##*/} <flags> $PM_NEEDS_UPDATE"
