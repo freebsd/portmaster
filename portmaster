@@ -242,7 +242,7 @@ safe_exit () {
 				pnu_temp="${pnu_temp}${i} "
 			done
 
-			PM_NEEDS_UPDATE="$pnu_temp"
+			PM_NEEDS_UPDATE=" ${pnu_temp}"
 		else
 			# Do these here so +IGNOREME can modify them
 			echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
@@ -2467,8 +2467,8 @@ post_first_pass () {
 		term_printf
 	fi
 
-	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
-	[ -z "$PM_NEEDS_UPDATE" ] && return
+	# Only when -a or multi and user said no to update +IGNOREME(s)
+	[ "$PM_NEEDS_UPDATE" = ' ' ] && return
 
 	action=build
 	if [ "$PM_PACKAGES" = only ]; then
@@ -2834,7 +2834,12 @@ all_first_pass () {
 
 	unset roots trunks branches leaves
 
-	for origin in $PM_NEEDS_UPDATE; do update_port $origin; done
+	for origin in $PM_NEEDS_UPDATE; do
+		case "$PM_NEEDS_UPDATE" in
+		*\ $origin\ *)	update_port $origin ;;
+		'')		continue ;;	# Already updated as a dependency
+		esac
+	done
 
 	echo "===>>> Update check of installed ports complete" ; echo ''
 	safe_exit
