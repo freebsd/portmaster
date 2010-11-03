@@ -51,8 +51,8 @@ _arguments -A "-*" : \
   "-F[fetch distfiles only]" \
   "--clean-distfiles[offer to delete stale distfiles]" \
   "--clean-distfiles-all[delete stale distfiles without prompting]" \
-  "----clean-packages[offer to delete stale packages]" \
-  "----clean-packages-all[delete stale packages without prompting]" \
+  "--clean-packages[offer to delete stale packages]" \
+  "--clean-packages-all[delete stale packages without prompting]" \
   "--check-depends[cross-check and update dependency information for all ports]" \
   "--check-port-dbdir[check for stale entries in /var/db/ports]" \
   "--list-origins[list directories from /usr/ports for root and leaf ports]" \
