@@ -2947,10 +2947,8 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 				*)	CUR_DEPS="${CUR_DEPS}${upg_port}:${portdir}:"
 					if [ ${dep_of_deps:-0} -gt 0 ]; then
 						dep_of_deps=$(( $dep_of_deps - 1 ))
-						if [ -n "$PM_FIRST_PASS" ]; then
+						[ -n "$PM_FIRST_PASS" ] &&
 							num_of_deps=$(( $num_of_deps - 1 ))
-							build_l="${build_l%\\t*}"
-						fi
 					fi
 					safe_exit ;;
 				esac
@@ -2986,7 +2984,21 @@ else
 	PM_DEPTH="${PM_DEPTH}>> ${upg_port:-$portdir} "
 fi
 
+echo ''
+[ "$$" -eq "$PM_PARENT_PID" -a -n "$upg_port" ] &&
+	echo "===>>> Currently installed version: $upg_port"
+
+echo "===>>> Port directory: $pd/$portdir" ; echo ''
+
 if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
+	if [ -z "$PM_INDEX_ONLY" ]; then
+		if ! check_state; then
+			echo "	===>>> If you are sure you can build it, remove the"
+			echo "	       $state line in the Makefile and try again."
+			safe_exit 1
+		fi
+	fi
+
 	if [ -n "$upg_port" ]; then
 		update_build_l $upg_port
 		[ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" -a "$$" -eq "$PM_PARENT_PID" ] &&
@@ -2996,20 +3008,8 @@ if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 	fi
 fi
 
-echo ''
-[ "$$" -eq "$PM_PARENT_PID" -a -n "$upg_port" ] &&
-	echo "===>>> Currently installed version: $upg_port"
-
-echo "===>>> Port directory: $pd/$portdir" ; echo ''
-
 # Do these things first time through
 if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
-	if ! check_state; then
-		echo "	===>>> If you are sure you can build it, remove the"
-		echo "	       $state line in the Makefile and try again."
-		safe_exit 1
-	fi
-
 	# Do not start this in the background until we are sure we are going to build
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
 
