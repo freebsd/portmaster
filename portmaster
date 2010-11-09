@@ -932,7 +932,8 @@ read_distinfos_all () {
 		else
 			pm_cd $origin || continue
 			distinfo=`pm_make -V DISTINFO_FILE`
-			[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
+			[ -n "$distinfo" ] ||
+				{ echo ''; echo "===>>> No DISTINFO_FILE in $origin"; echo ''; }
 		fi
 
 		if [ -s "$distinfo" ]; then
@@ -1064,7 +1065,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 		read_distinfos_all
 	fi
 
-	echo "===>>> Checking for stale distfiles"
+	echo "===>>> Checking for stale distfiles" ; echo ''
 	for df in `find $DISTDIR -type f | sort`; do
 		f=${df#$DISTDIR}
 		if ! grep -ql $f $DI_FILES; then
