@@ -264,6 +264,10 @@ safe_exit () {
 }
 
 usage () {
+	local pd
+
+	[ -z "$pd" ] && pd=/usr/ports
+
 	version
 	echo ''
 	echo 'Usage:'
@@ -2900,6 +2904,9 @@ else
 			echo ''
 			echo "===>>> The second argument to -o can be a port in $pdb,"
 			echo "       or a port directory from $pd"
+			echo ''
+			echo "       $ro_opd does not seem to be installed,"
+			echo '       or listed as a dependency'
 			echo '' ; no_valid_port
 		fi
 	fi
