@@ -2611,17 +2611,21 @@ multiport () {
 	num=0
 	for port in $worklist; do
 		case "$port" in
-		*/*)	case "$PM_NEEDS_UPDATE" in
-			*\ $port\ *)	;;		# Ok to proceed
-			*)		continue ;;	# Already updated as a dependency
-			esac ;;
+		*/*)	origin=$port ;;
 		*)	# If an installed version does not exist at this
 			# point it probably got updated as a dependency
 			if [ ! -d "$pdb/$port" ]; then
 				numports=$(( $numports - 1 ))
 				continue
-			fi ;;
+			fi
+			origin=`origin_from_pdb $port` ;;
 		esac
+
+		case "$PM_NEEDS_UPDATE" in
+		*\ $origin\ *)	;;		# Ok to proceed
+		*)		continue ;;	# Already updated as a dependency
+		esac
+
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || fail "Update for $port failed"
