@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd October 30, 2010
+.Dd December 7, 2010
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -796,15 +796,17 @@ Using
 to do a complete reinstallation of all your ports:
 .Dl "1. portmaster --list-origins > ~/installed-port-list"
 .Dl "2. Update your ports tree"
-.Dl "3. portmaster --clean-distfiles-all"
+.Dl "3. portmaster -t --clean-distfiles-all"
 .Dl "4. portmaster --check-port-dbdir"
 .Dl "5. portmaster -Faf"
 .Dl "6. pkg_delete '*'"
 .Dl "7. rm -rf /usr/local/lib/compat/pkg"
-.Dl "8. Manually check /usr/local and /var/db/pkg"
+.Dl "8. Back up any files in /usr/local you wish to save,"
+.Dl "   such as configuration files in /usr/local/etc"
+.Dl "9. Manually check /usr/local and /var/db/pkg"
 .Dl "   to make sure that they are really empty"
-.Dl "9. Re-install portmaster"
-.Dl "10. portmaster `cat ~/installed-port-list`"
+.Dl "10. Re-install portmaster"
+.Dl "11. portmaster `cat ~/installed-port-list`"
 .Pp
 You probably want to use the -D option for the installation
 and then run --clean-distfiles[-all] again when you are done.
