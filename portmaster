@@ -528,7 +528,7 @@ set -- $newopts
 unset var newopts
 
 # Save switches for potential child processes
-while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
@@ -576,6 +576,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
 		-*)	fail 'The -x option requires an argument' ;;
 		esac
 		PM_EXCL="${PM_EXCL}`globstrip ${OPTARG}` " ;;
+	y)	PM_YES=yopt; ARGS="-y $ARGS" ;;
 	*)	echo '' ; echo "===>>> Try ${0##*/} --help"; exit 1 ;;
 	esac
 done
@@ -870,10 +871,19 @@ IFS='
 				echo "	===>>> but there is no installed version"
 				echo ''
 				if [ -n "$CHECK_DEPENDS" ]; then
-					echo -n "	===>>> Delete this dependency data? y/n [n] "
-					read answer
+					if [ -z "$PM_YES" -a -z "$NO_ACTION" ]; then
+						echo -n "	===>>> Delete this dependency data? y/n [n] "
+						read answer
+						echo ''
+					else
+						if [ -n "$PM_YES" ]; then
+							answer=y
+						elif [ -n "$NO_ACTION" ]; then
+							answer=n
+						fi
+					fi
 					case "$answer" in
-					[yY]) unset prev_line line ; echo '' ; continue ;;
+					[yY]) unset prev_line line ; continue ;;
 					esac
 				else
 					echo "	===>>> Try ${0##*/} --check-depends"
