@@ -426,6 +426,7 @@ pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
 pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
 
 #=============== End functions we always want to have ===============
+#=============== Begin Command Line Option Processing ===============
 
 packages_init () {
 	local e1 e2 e3
@@ -517,13 +518,118 @@ for var in "$@" ; do
 	esac
 done
 
-unset var
-
 [ -n "$PM_INDEX" -a -n "$CHECK_PORT_DBDIR" ] &&
 	fail 'The --index* and --check-port-dbdir options are mutually exclusive'
 
 [ -n "$PM_PACKAGES_LOCAL" -a -z "$LOCAL_PACKAGEDIR" ] &&
 	fail 'The --packages-local option requires --local-packagedir to be defined'
+
+set -- $newopts
+unset var newopts
+
+# Save switches for potential child processes
+while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
+	case "${COMMAND_LINE_ARGUMENT}" in
+	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
+	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
+	D)	DONT_SCRUB_DISTFILES=Dopt; ARGS="-D $ARGS" ;;
+	F)	FETCH_ONLY=Fopt; ARGS="-F $ARGS" ;;
+	G)	[ -z "$PM_FORCE_CONFIG" ] && {
+			PM_NO_MAKE_CONFIG=Gopt; ARGS="-G $ARGS"; } ;;
+	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
+	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
+	L)	LIST_PLUS=Lopt ;;
+	P)	packages_init first ;;
+	R)	RESTART=Ropt ; ARGS="-R $ARGS" ;;
+	a)	UPDATE_ALL=aopt ;;
+	b)	BACKUP=bopt; ARGS="-b $ARGS" ;;
+	d)	ALWAYS_SCRUB_DISTFILES=dopt; ARGS="-d $ARGS" ;;
+	e)	EXPUNGE=$OPTARG ;;
+	f)	export PM_FORCE=fopt ;;
+	g)	MAKE_PACKAGE=gopt; ARGS="-g $ARGS" ;;
+	h)	usage 0 ;;
+	i)	INTERACTIVE_UPDATE=iopt; ARGS="-i $ARGS" ;;
+	l)	LIST=lopt ;;
+	m)	export PM_MAKE_ARGS=$OPTARG	# For 'make checksum'
+		ARGS="-m $PM_MAKE_ARGS $ARGS" ;;
+	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
+	o)	REPLACE_ORIGIN=oopt ;;
+	p)	fail 'The -p option has been deprecated' ;;
+	r)	UPDATE_REQ_BYS=ropt
+		if [ -d "$pdb/$OPTARG" ]; then
+			glob_dirs=$OPTARG
+		else
+			find_glob_dirs $OPTARG
+			case $? in
+			1)	fail "$pdb/$OPTARG does not exist" ;;
+			2)	fail 'The argument to -r must match only one port' ;;
+			esac
+		fi
+		PM_RBP=${glob_dirs##*/} ; unset glob_dirs
+		portdir=`origin_from_pdb $PM_RBP` ;;
+	s)	CLEAN_STALE=sopt ;;
+	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
+	u)	fail 'The -u option has been deprecated' ;;
+	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
+	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
+	x)	case "$OPTARG" in
+		-*)	fail 'The -x option requires an argument' ;;
+		esac
+		PM_EXCL="${PM_EXCL}`globstrip ${OPTARG}` " ;;
+	*)	echo '' ; echo "===>>> Try ${0##*/} --help"; exit 1 ;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+[ -n "$UNATTENDED" ] && fail 'The -u option has been deprecated'
+
+[ -n "$PM_EXCL" ] && export PM_EXCL
+
+test_command_line () {
+	local var envar
+
+	for var in $my_environment; do
+		case "$var" in
+		${1}=*)	envar=$1 ;;
+		${2}=*)	envar=$2 ;;
+		esac
+	done
+
+	if [ -n "$envar" ]; then
+		unset $envar
+		return 0
+	fi
+
+	return 1
+}
+
+# Error checking for getopts
+[ -n "$PM_FORCE" -a "$INTERACTIVE_UPDATE" ] &&
+	fail "The -f and -i options are mutually exclusive"
+if [ -n "$BACKUP" -a -n "$NO_BACKUP" ]; then
+	test_command_line NO_BACKUP BACKUP ||
+		fail "The -b and -B options are mutually exclusive"
+fi
+if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
+	test_command_line ALWAYS_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
+		fail "The -d and -D options are mutually exclusive"
+fi
+
+[ -n "$PM_NO_MAKE_CONFIG" -a -n "$PM_FORCE_CONFIG" ] && unset PM_NO_MAKE_CONFIG
+
+if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
+	if [ -n "$FETCH_ONLY" -o -n "$RESTART" -o -n "$UPDATE_ALL" -o \
+	    -n "$EXPUNGE" -o -n "$PM_FORCE" -o -n "$NO_ACTION" -o \
+	    -n "$REPLACE_ORIGIN" -o -n "$UPDATE_REQ_BYS" -o -n "$CLEAN_STALE" ]; then
+		fail 'The -[lL] options are not compatible with -FRaefnors'
+	fi
+	[ $# -gt 0 ] && fail 'The -[lL] options are not compatible with updates or installs'
+fi
+
+unset my_environment COMMAND_LINE_ARGUMENT
+unset -f packages_init cross_idx test_command_line
+
+#=============== End Command Line Option Processing ===============
 
 # Do this here so it can use the fancy functions above, and default values
 # can be overridden in the rc files
@@ -636,9 +742,6 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		export PM_BUILD_ONLY_LIST
 	fi
 fi
-
-set -- $newopts
-unset var newopts
 
 #=============== Begin functions relevant to --features and main ===============
 
@@ -1059,7 +1162,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	# Set the file name here since we are usually called in a subshell
 	DI_FILES=`pm_mktemp DI-FILES`
 
-	if [ "$1" != '-t' ]; then
+	if [ -z "$RECURSE_THOROUGH" ]; then
 		read_distinfos
 	else
 		read_distinfos_all
@@ -1231,8 +1334,6 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 	[ -d "$port_dbdir" ] ||
 		fail 'PORT_DBIR is empty, or the directory $port_dbdir does not exist'
 
-	if [ "$1" = "-v" ]; then PM_VERBOSE=vopt; fi
-
 	unique_list=':'
 
 	echo "===>>> Building list of installed port names"; echo ''
@@ -1296,109 +1397,6 @@ if [ -n "$LIST_ORIGINS" ]; then
 fi
 
 #=============== End code relevant only to --features ===============
-
-# Save switches for potential child processes
-while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:' COMMAND_LINE_ARGUMENT ; do
-	case "${COMMAND_LINE_ARGUMENT}" in
-	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
-	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
-	D)	DONT_SCRUB_DISTFILES=Dopt; ARGS="-D $ARGS" ;;
-	F)	FETCH_ONLY=Fopt; ARGS="-F $ARGS" ;;
-	G)	[ -z "$PM_FORCE_CONFIG" ] && {
-			PM_NO_MAKE_CONFIG=Gopt; ARGS="-G $ARGS"; } ;;
-	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
-	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
-	L)	LIST_PLUS=Lopt ;;
-	P)	packages_init first ;;
-	R)	RESTART=Ropt ; ARGS="-R $ARGS" ;;
-	a)	UPDATE_ALL=aopt ;;
-	b)	BACKUP=bopt; ARGS="-b $ARGS" ;;
-	d)	ALWAYS_SCRUB_DISTFILES=dopt; ARGS="-d $ARGS" ;;
-	e)	EXPUNGE=$OPTARG ;;
-	f)	export PM_FORCE=fopt ;;
-	g)	MAKE_PACKAGE=gopt; ARGS="-g $ARGS" ;;
-	h)	usage 0 ;;
-	i)	INTERACTIVE_UPDATE=iopt; ARGS="-i $ARGS" ;;
-	l)	LIST=lopt ;;
-	m)	export PM_MAKE_ARGS=$OPTARG	# For 'make checksum'
-		ARGS="-m $PM_MAKE_ARGS $ARGS" ;;
-	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
-	o)	REPLACE_ORIGIN=oopt ;;
-	p)	fail 'The -p option has been deprecated' ;;
-	r)	UPDATE_REQ_BYS=ropt
-		if [ -d "$pdb/$OPTARG" ]; then
-			glob_dirs=$OPTARG
-		else
-			find_glob_dirs $OPTARG
-			case $? in
-			1)	fail "$pdb/$OPTARG does not exist" ;;
-			2)	fail 'The argument to -r must match only one port' ;;
-			esac
-		fi
-		PM_RBP=${glob_dirs##*/} ; unset glob_dirs
-		portdir=`origin_from_pdb $PM_RBP` ;;
-	s)	CLEAN_STALE=sopt ;;
-	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
-	u)	fail 'The -u option has been deprecated' ;;
-	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
-	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
-	x)	case "$OPTARG" in
-		-*)	fail 'The -x option requires an argument' ;;
-		esac
-		PM_EXCL="${PM_EXCL}`globstrip ${OPTARG}` " ;;
-	*)	echo '' ; echo "===>>> Try ${0##*/} --help"; exit 1 ;;
-	esac
-done
-shift $(( $OPTIND - 1 ))
-unset -f packages_init cross_idx
-
-[ -n "$UNATTENDED" ] && fail 'The -u option has been deprecated'
-
-[ -n "$PM_EXCL" ] && export PM_EXCL
-
-test_command_line () {
-	local var envar
-
-	for var in $my_environment; do
-		case "$var" in
-		${1}=*)	envar=$1 ;;
-		${2}=*)	envar=$2 ;;
-		esac
-	done
-
-	if [ -n "$envar" ]; then
-		unset $envar
-		return 0
-	fi
-
-	return 1
-}
-
-# Error checking for getopts
-[ -n "$PM_FORCE" -a "$INTERACTIVE_UPDATE" ] &&
-	fail "The -f and -i options are mutually exclusive"
-if [ -n "$BACKUP" -a -n "$NO_BACKUP" ]; then
-	test_command_line NO_BACKUP BACKUP ||
-		fail "The -b and -B options are mutually exclusive"
-fi
-if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
-	test_command_line ALWAYS_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
-		fail "The -d and -D options are mutually exclusive"
-fi
-
-[ -n "$PM_NO_MAKE_CONFIG" -a -n "$PM_FORCE_CONFIG" ] && unset PM_NO_MAKE_CONFIG
-
-if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
-	if [ -n "$FETCH_ONLY" -o -n "$RESTART" -o -n "$UPDATE_ALL" -o \
-	    -n "$EXPUNGE" -o -n "$PM_FORCE" -o -n "$NO_ACTION" -o \
-	    -n "$REPLACE_ORIGIN" -o -n "$UPDATE_REQ_BYS" -o -n "$CLEAN_STALE" ]; then
-		fail 'The -[lL] options are not compatible with -FRaefnors'
-	fi
-	[ $# -gt 0 ] && fail 'The -[lL] options are not compatible with updates or installs'
-fi
-unset my_environment
-unset -f test_command_line
-
 #=============== Begin functions for getopts features and main ===============
 
 check_state () {
