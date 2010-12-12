@@ -264,9 +264,11 @@ safe_exit () {
 }
 
 usage () {
-	local pd
+	local pd pdb port_dbdir
 
 	[ -z "$pd" ] && pd=/usr/ports
+	[ -z "$pdb" ] && pdb=/var/db/pkg
+	[ -z "$port_dbdir" ] && port_dbdir=/var/db/ports
 
 	version
 	echo ''
@@ -304,7 +306,7 @@ usage () {
 	echo ''
 	echo "${0##*/} [-n|y] [-t] --clean-distfiles"
 	echo ''
-	echo "${0##*/} [-n|y] [--index] --clean-packages"
+	echo "${0##*/} [-n|y] [--index|--index-only] --clean-packages"
 	echo ''
 	echo "${0##*/} [-n|y] --check-depends"
 	echo ''
@@ -367,23 +369,24 @@ usage () {
 	echo '-l list installed ports by category'
 	echo '-L list installed ports by category, and search for updates'
 	echo ''
-	echo '-e expunge a single port via pkg_delete, and remove its distfiles'
-	echo '-s clean out stale ports that used to be depended on'
+	echo "--list-origins list directories from $pd for root and leaf ports"
 	echo ''
 	echo '[--force-config|-G] [-aftv] -F fetch distfiles only'
+	echo ''
+	echo '-e expunge a single port via pkg_delete, and remove its distfiles'
+	echo '-s clean out stale ports that used to be depended on'
 	echo ''
 	echo '[-t] --clean-distfiles offer to delete stale distfiles'
 	echo '[-t] -y --clean-distfiles delete stale distfiles without prompting'
 	echo '   with -t distfile is valid from any port, not just those installed'
 	echo ''
-	echo '[--index] --clean-packages offer to delete stale packages'
-	echo '[--index] -y --clean-packages delete stale packages without prompting'
+	echo '[--index|--index-only] --clean-packages offer to delete stale packages'
+	echo '[--index|--index-only] -y --clean-packages delete without prompting'
+	echo '   --index-only is required if no ports tree is available'
 	echo ''
 	echo '--check-depends cross-check and update dependency information for all ports'
 	echo ''
 	echo "--check-port-dbdir [-v] check for stale entries in $port_dbdir"
-	echo ''
-	echo "--list-origins list directories from $pd for root and leaf ports"
 	echo ''
 	echo '-h|--help display this help message'
 	echo '--version display the version number'
@@ -708,7 +711,19 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		export PM_IPD
 	fi
 
-	[ -z "$pd" ] && fail 'The value of PORTSDIR cannot be empty'
+	if [ -n "$pd" ]; then
+		export pd
+	else
+		if [ -n "$EXPUNGE" -o -n "$CLEAN_STALE" ]; then
+			if [ -z "$DONT_SCRUB_DISTFILES" ]; then
+				pm_v "===>>> There is no ports tree, so using -D option"
+				unset ALWAYS_SCRUB_DISTFILES
+				DONT_SCRUB_DISTFILES=Dopt_es; ARGS="-D $ARGS"
+			fi
+		elif [ -z "$LIST" -a -z "$LIST_PLUS" -a -z "$LIST_ORIGINS" -a -z "$CHECK_DEPENDS" ]; then
+			fail 'The value of PORTSDIR cannot be empty'
+		fi
+	fi
 	if [ -z "$pdb" ]; then
 		if [ -z "$PKG_DBDIR" ]; then
 			[ -d /var/db/pkg ] && pdb=/var/db/pkg
@@ -725,7 +740,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			fi
 		fi
 	fi
-	export pd pdb
+	export pdb
 
 	[ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
 	    -z "$CHECK_PORT_DBDIR" -a -z "$LIST_ORIGINS" ] &&
@@ -1320,7 +1335,7 @@ IFS='
 
 		origin=`origin_from_pdb $iport` || continue
 
-		if [ ! -d "$pd/$origin" ]; then
+		if [ -n "$pd" ] && [ ! -d "$pd/$origin" ]; then
 			echo "	===>>> $pd/$origin does not exist"
 			echo "	===>>> This port should probably be updated"
 			continue
@@ -1953,9 +1968,8 @@ if [ -n "$EXPUNGE" ]; then
 	fi
 
 	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $EXPUNGE; }
-	[ -z "$DONT_SCRUB_DISTFILES" ] && delete_all_distfiles $origin
+	[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
 
-	delete_dist_list
 	echo "===>>> Running pkg_delete -f $EXPUNGE"
 	pm_pkg_delete_s -f $EXPUNGE || fail 'pkg_delete failed'
 
@@ -1991,9 +2005,8 @@ if [ -n "$CLEAN_STALE" ]; then
 		get_answer n ${iport} is no longer depended on, delete
 		case "$?" in
 		0)	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
-			[ -z "$DONT_SCRUB_DISTFILES" ] && delete_all_distfiles $origin
+			[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
 
-			delete_dist_list
 			echo "===>>> Running pkg_delete -f $iport"
 			pm_pkg_delete_s -f $iport || fail 'pkg_delete failed'
 
