@@ -263,6 +263,76 @@ safe_exit () {
 	exit ${1:-0}
 }
 
+pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
+pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
+		fail "Cannot cd to port directory: $pd/$1"; }
+pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
+pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
+		 unset -v MASTER_RB_LIST;
+		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
+pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
+pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
+		fail "mktemp for $1 failed"; }
+pm_unlink () { /bin/test -e $1 && /bin/unlink $1; }
+
+# Superuser versions for commands that need root privileges
+
+pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
+pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root -g wheel -m 644 $1 $2; }
+pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
+			 unset -v MASTER_RB_LIST;
+			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
+pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
+pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
+pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
+pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
+pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
+
+pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
+pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
+
+# Do this here so we can have a reasonably good guess.
+# May be modified below.
+if [ "$$" -eq "$PM_PARENT_PID" ]; then
+	if [ -z "$pd" ]; then
+		if [ -z "$PORTSDIR" ]; then
+			[ -d /usr/ports ] && pd=/usr/ports
+			[ -z "$pd" ] &&
+				pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
+		else
+			pd=$PORTSDIR
+		fi
+	fi
+	if [ -n "$pd" ]; then
+		[ ! -r "${pd}/Mk/bsd.port.mk" ] &&
+			fail "The ports directory ($pd) does not seem to contain a ports tree"
+		export pd
+	fi
+
+	if [ -z "$pdb" ]; then
+		if [ -z "$PKG_DBDIR" ]; then
+			[ -d /var/db/pkg ] && pdb=/var/db/pkg
+			[ -z "$pdb" ] &&
+				pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR 2>/dev/null`
+		else
+			pdb=$PKG_DBDIR
+		fi
+		if [ -z "$pdb" ]; then
+			if [ -d /var/db/pkg ]; then
+				pdb='/var/db/pkg'
+			else
+				fail 'The value of PKG_DBDIR cannot be empty'
+			fi
+		fi
+	fi
+	export pdb
+
+	[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir=/var/db/ports
+	[ -z "$port_dbdir" ] &&
+		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
+	[ -n "$port_dbdir" ] && export port_dbdir
+fi
+
 usage () {
 	local pd pdb port_dbdir
 
@@ -395,36 +465,53 @@ usage () {
 	safe_exit ${1:-1}
 }
 
-pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
-pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
-		fail "Cannot cd to port directory: $pd/$1"; }
-pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
-pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-		 unset -v MASTER_RB_LIST;
-		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
-pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
-pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
-		fail "mktemp for $1 failed"; }
-pm_unlink () { /bin/test -e $1 && /bin/unlink $1; }
+globstrip () { local in ; in=${1%[*]} ; in=${in%\\} ; echo $in ; }
 
-# Superuser versions for commands that need root privileges
+# Takes a pattern as input
+# Return values:
+# 0 - Matched one and only one directory in $pdb
+# 1 - No match
+# 2 - Matched multiple directories
 #
-# The following are used once, so they have $PM_SU_CMD in line:
-# truncate, pkg_create, cp, /etc/rc.d/ldconfig, touch
+find_glob_dirs () {
+	# Global: glob_dirs
+	local pattern
 
-pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
-pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root -g wheel -m 644 $1 $2; }
-pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-			 unset -v MASTER_RB_LIST;
-			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
-pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
-pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
-pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
-pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
-pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
+	pattern=`globstrip $1`
 
-pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
-pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
+	glob_dirs=`find $pdb -maxdepth 1 -type d -name ${pattern}\*`
+	case "$glob_dirs" in
+	# Match a newline in multiple responses from find
+	*'
+'*)		return 2 ;;
+	$pdb/*)	return ;;
+	esac
+
+	unset glob_dirs
+	return 1
+}
+
+origin_from_pdb () {
+	local o
+
+	o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
+		echo ${o#@comment ORIGIN:}; return 0; }
+
+	case "$1" in bsdpan-*) return 3 ;; esac
+
+	if [ -e "$pdb/$1/+IGNOREME" ]; then
+		if [ -n "$PM_VERBOSE" -o -n "$LIST_ORIGINS" ]; then
+			echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+			echo "	===>>> $pdb/$1/+IGNOREME exists" >&2
+			echo '' >&2
+		fi
+		return 2
+	else
+		echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+		echo '' >&2
+	fi
+	return 1
+}
 
 #=============== End functions we always want to have ===============
 #=============== Begin Command Line Option Processing ===============
@@ -635,26 +722,12 @@ unset -f packages_init cross_idx test_command_line
 
 #=============== End Command Line Option Processing ===============
 
-# Do this here so it can use the fancy functions above, and default values
-# can be overridden in the rc files
+# Update based on options chosen above
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
 		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
 			fail Package installation support requires FreeBSD 6.4 or newer
 	fi
-
-	if [ -z "$pd" ]; then
-		if [ -z "$PORTSDIR" ]; then
-			[ -d /usr/ports ] && pd=/usr/ports
-			[ -z "$pd" ] &&
-				pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
-		else
-			pd=$PORTSDIR
-		fi
-	fi
-
-	[ -n "$pd" ] && [ ! -r "${pd}/Mk/bsd.port.mk" ] &&
-		fail "The ports directory ($pd) does not seem to contain a ports tree"
 
 	if [ -n "$PM_INDEX" ]; then
 		if [ -z "$INDEXFILE" ]; then
@@ -724,34 +797,12 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			fail 'The value of PORTSDIR cannot be empty'
 		fi
 	fi
-	if [ -z "$pdb" ]; then
-		if [ -z "$PKG_DBDIR" ]; then
-			[ -d /var/db/pkg ] && pdb=/var/db/pkg
-			[ -z "$pdb" ] &&
-				pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR 2>/dev/null`
-		else
-			pdb=$PKG_DBDIR
-		fi
-		if [ -z "$pdb" ]; then
-			if [ -d /var/db/pkg ]; then
-				pdb='/var/db/pkg'
-			else
-				fail 'The value of PKG_DBDIR cannot be empty'
-			fi
-		fi
-	fi
-	export pdb
 
 	[ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
 	    -z "$CHECK_PORT_DBDIR" -a -z "$LIST_ORIGINS" ] &&
 		DISTDIR=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
 
 	[ -n "$DISTDIR" ] && { DISTDIR="${DISTDIR%/}/"; export DISTDIR; }
-
-	[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir=/var/db/ports
-	[ -z "$port_dbdir" ] &&
-		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
-	[ -n "$port_dbdir" ] && export port_dbdir
 
 	if [ -n "$PM_PACKAGES_BUILD" -o -n "$PM_DEL_BUILD_ONLY" ]; then
 		PM_BUILD_ONLY_LIST=pm_bol
@@ -776,28 +827,6 @@ iport_from_origin () {
 	# requirement, but it can if the pkg data is corrupted.
 	dir="${dir%%/+CONTENTS*}"
 	echo ${dir#$pdb/}
-}
-
-origin_from_pdb () {
-	local o
-
-	o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
-		echo ${o#@comment ORIGIN:}; return 0; }
-
-	case "$1" in bsdpan-*) return 3 ;; esac
-
-	if [ -e "$pdb/$1/+IGNOREME" ]; then
-		if [ -n "$PM_VERBOSE" -o -n "$LIST_ORIGINS" ]; then
-			echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
-			echo "	===>>> $pdb/$1/+IGNOREME exists" >&2
-			echo '' >&2
-		fi
-		return 2
-	else
-		echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
-		echo '' >&2
-	fi
-	return 1
 }
 
 check_regular_file () {
@@ -1098,15 +1127,6 @@ read_distinfos_all () {
 	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
 }
 
-globstrip () {
-	local in
-
-	in=${1%[*]}
-	in=${in%\\}
-
-	echo $in
-}
-
 ports_by_category () {
 	local pkg
 	pm_v "===>>> Sorting ports by category"
@@ -1134,30 +1154,6 @@ delete_empty_dist_subdirs () {
 	# delete our CWD out from under ourselves
 	pm_cd $DISTDIR || fail "Cannot cd into $DISTDIR"
 	find -d $DISTDIR -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
-}
-
-# Takes a pattern as input
-# Return values:
-# 0 - Matched one and only one directory in $pdb
-# 1 - No match
-# 2 - Matched multiple directories
-#
-find_glob_dirs () {
-	# Global: glob_dirs
-	local pattern
-
-	pattern=`globstrip $1`
-
-	glob_dirs=`find $pdb -maxdepth 1 -type d -name ${pattern}\*`
-	case "$glob_dirs" in
-	# Match a newline in multiple responses from find
-	*'
-'*)		return 2 ;;
-	$pdb/*)	return ;;
-	esac
-
-	unset glob_dirs
-	return 1
 }
 
 init_packages_var () {
