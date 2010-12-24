@@ -755,8 +755,10 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			[ -n "$index_time" ] && {
 				$index_fetch 2>/dev/null && do_index_fetch=no_index_fetch; }
 
-			[ "$do_index_fetch" = yes_index_fetch ] && {
-				pm_sv 'Fetching new INDEX file'; $PM_SU_CMD $index_fetch; }
+			if [ "$do_index_fetch" = yes_index_fetch ]; then
+				pm_sv 'Fetching new INDEX file'
+				$PM_SU_CMD $index_fetch || fail Could not perform $index_fetch
+			fi
 
 			if [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
 				temp_index=`pm_mktemp index`
