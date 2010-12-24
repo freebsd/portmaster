@@ -146,6 +146,9 @@ parent_exit () {
 
 	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do pm_unlink $f ; done
 
+	[ -n "$PM_WRKDIRPREFIX" ] &&
+		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
+
 	case "$DISPLAY_LIST" in
 	*' '*)	if [ -n "$1" ]; then
 			echo "===>>> There are messages from installed ports to display,"
@@ -3042,7 +3045,11 @@ fi
 # Do these things first time through
 if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
 	# Do not start this in the background until we are sure we are going to build
-	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
+	if [ "$$" -eq "$PM_PARENT_PID" ]; then
+		[ -n "$DI_FILES" ] && (read_distinfos)&
+		
+		PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX`
+	fi
 
 	# Handle the problem of manual fetching
 	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make -V MASTER_SITES`
