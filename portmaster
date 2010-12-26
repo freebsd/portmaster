@@ -1453,6 +1453,10 @@ check_state () {
 check_force_multi () {
 	if [ -n "$PM_FORCE" ]; then
 		check_restart_and_udf $1 || return 1
+	elif [ -n "$URB_YES" ]; then
+		case "$MASTER_RB_LIST" in
+		*" $1 "*) check_restart_and_udf $1 || return 1 ;;
+		esac
 	elif [ -n "$PM_MULTI_PORTS" ]; then
 		case "$PM_MULTI_PORTS" in
 		*:${1}:*)	return 1 ;;
@@ -2461,7 +2465,7 @@ post_first_pass () {
 	local action
 
 	if [ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" ]; then
-		if [ -z "$NO_DEP_UPDATES" -o -n "$PM_RBP_NEEDS_UPGRADE" ]; then
+		if [ -n "$PM_RBP_NEEDS_UPGRADE" ]; then
 			echo "===>>> $PM_RBP and/or dependencies are out of date, forcing rebuild"
 		else
 			echo "===>>> $PM_RBP is up to date, skipping rebuild due to -R flag"
@@ -3136,6 +3140,7 @@ if [ -n "$PM_FIRST_PASS" ]; then
 
 		safe_exit
 	elif [ -n "$UPDATE_REQ_BYS" ]; then
+		[ -z "$NO_DEP_UPDATES" ] && PM_RBP_NEEDS_UPGRADE=pm_rbp_needs_upgrade
 		export URB_YES=urb_yes
 		echo ''
 		echo "===>>> Checking ports that depend on $upg_port"
