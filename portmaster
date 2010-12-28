@@ -790,6 +790,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 
 	if [ -n "$pd" ]; then
+		pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX`
 		export pd
 	else
 		if [ -n "$EXPUNGE" -o -n "$CLEAN_STALE" ]; then
@@ -3051,11 +3052,7 @@ fi
 # Do these things first time through
 if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
 	# Do not start this in the background until we are sure we are going to build
-	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		[ -n "$DI_FILES" ] && (read_distinfos)&
-		
-		PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX`
-	fi
+	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
 
 	# Handle the problem of manual fetching
 	[ -z "$PM_PACKAGES" ] && master_sites=`pm_make -V MASTER_SITES`
