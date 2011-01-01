@@ -267,7 +267,8 @@ safe_exit () {
 }
 
 pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
-pm_cd_pd  () { builtin cd $pd/$1 2>/dev/null ||
+pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
+		builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
@@ -1554,7 +1555,7 @@ check_for_updates () {
 			echo "	===>>> New version available: $port_ver"
 			[ -e "$pdb/$iport/+IGNOREME" ] &&
 				echo "	===>>> +IGNOREME file is present for $1"
-			[ -z "$PM_INDEX_ONLY" ] && { pm_cd_pd $origin ; check_state; }
+			pm_cd_pd $origin && check_state
 			num_updates=$(( $num_updates + 1 ))
 		else
 			unset moved_npd
@@ -3178,7 +3179,7 @@ fi	# [ -n "$PM_FIRST_PASS" ]
 
 [ -z "$PM_BUILDING" ] && export PM_BUILDING=pmbuildingmain
 
-[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
+pm_cd_pd $portdir
 
 if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 	case "$build_only_dl_g" in
@@ -3200,7 +3201,7 @@ if [ -z "$NO_DEP_UPDATES" ]; then
 		echo "===>>> Starting check for all dependencies"
 		dependency_check all-depends-list
 	fi
-	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
+	pm_cd_pd $portdir
 elif [ "$$" -eq "$PM_PARENT_PID" ]; then
 	echo "===>>> All dependencies are up to date"
 	echo ''
@@ -3426,7 +3427,7 @@ if [ -z "$use_package" ]; then
 		fi
 	fi
 
-	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
+	pm_cd_pd $portdir
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; echo ''; }
 
@@ -3508,13 +3509,13 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 		pm_pkg_delete_s -f $upg_port
 	fi
 
-	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
+	pm_cd_pd $portdir
 fi
 
 if [ -z "$RECURSE_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 	echo '' ; echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
-	[ -z "$PM_INDEX_ONLY" ] && pm_cd_pd $portdir
+	pm_cd_pd $portdir
 fi
 
 install_failed () {
