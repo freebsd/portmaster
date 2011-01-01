@@ -1723,7 +1723,7 @@ find_and_delete_distfiles () {
 			distfiles_checked="${distfiles_checked}${file}:"
 			pm_v "===>>> Keeping current distfile: $file"
 			continue ;;	# Do not delete current version
-		*)	if [ -e "$DI_FILES" ]; then
+		*)	if [ -s "$DI_FILES" ]; then
 				grep -ql ${ps}$file $DI_FILES && continue
 			fi
 
@@ -3630,7 +3630,7 @@ if [ -n "$distfiles" ]; then
 		echo "DISTFILE:${ds}${file}:SIZE=${size##* }:SHA256=${sha256##* }" \
 		    >> $dist_list_temp
 		# Make sure any new distfiles get added to the list
-		[ -z "$DONT_SCRUB_DISTFILES" -a ! "$$" -eq "$PM_PARENT_PID" ] &&
+		[ -n "$DI_FILES" -a ! "$$" -eq "$PM_PARENT_PID" ] &&
 			echo "${ds}$file" >> $DI_FILES
 	done
 
