@@ -3113,10 +3113,15 @@ if [ -n "$PM_FIRST_PASS" ]; then
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$PM_BUILD_ONLY_LIST" ] &&
 		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
-	[ -z "$PM_PACKAGES" -a -z "$PM_NO_MAKE_CONFIG" ] && make_config
+	if [ -z "$PM_PACKAGES" ]; then
+		[ -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
-	dep_check_type='build-depends-list run-depends-list'
-	[ -n "$RECURSE_THOROUGH" ] && dep_check_type=all-depends-list
+		dep_check_type='build-depends-list run-depends-list'
+		[ -n "$RECURSE_THOROUGH" ] && dep_check_type=all-depends-list
+	else
+		dep_check_type=run-depends-list
+	fi
+
 	dependency_check "$dep_check_type"
 
 	[ -n "$UPDATE_REQ_BYS" -o -n "$URB_YES" ] &&
@@ -3199,7 +3204,12 @@ if [ -z "$NO_DEP_UPDATES" ]; then
 		fi
 	else
 		echo "===>>> Starting check for all dependencies"
-		dependency_check all-depends-list
+
+		if [ -z "$PM_PACKAGES" ]; then
+			dependency_check all-depends-list
+		else
+			dependency_check run-depends-list
+		fi
 	fi
 	pm_cd_pd $portdir
 elif [ "$$" -eq "$PM_PARENT_PID" ]; then
