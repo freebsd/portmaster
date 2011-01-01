@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (c) 2005-2010 Douglas Barton, All rights reserved
+# Copyright (c) 2005-2011 Douglas Barton, All rights reserved
 # Please see detailed copyright below
 
 trap trap_exit INT
@@ -791,7 +791,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 
 	if [ -n "$pd" ]; then
-		pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX`
+		pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
 		export pd
 	else
 		if [ -n "$EXPUNGE" -o -n "$CLEAN_STALE" ]; then
@@ -3736,7 +3736,7 @@ safe_exit
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#  Copyright (c) 2005-2010 Douglas Barton
+#  Copyright (c) 2005-2011 Douglas Barton
 #  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
