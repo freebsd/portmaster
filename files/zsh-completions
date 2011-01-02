@@ -30,11 +30,6 @@ _arguments -A "-*" : \
   "--index[use INDEX exclusively to check if a port is up to date]" \
   "--index-first[use the INDEX for status, but double-check with the port]" \
   "--index-only[do not try to use /usr/ports]" \
-  "--show-work[list what ports are and would be installed]" \
-  "-o[replace the installed port with a port from a different origin]:new port dir in /usr/ports:->ports" \
-  "-r[rebuild port, and all ports that depend on it]:name/glob of port in /var/db/pkg:->pkgs" \
-  "-R[used with -\[rf\] to skip ports updated on a previous run]" \
-  "-a[check all ports, update as necessary]" \
   "--delete-build-only[delete ports that are build-only dependencies after a successful run]" \
   {-P,--packages}"[use packages, but build port if not available]" \
   {-PP,--packages-only}"[fail if no package is available]" \
@@ -44,18 +39,21 @@ _arguments -A "-*" : \
   "--local-packagedir=-[where local packages can be found]:path:_files -/" \
   "--packages-local[use packages from --local-packagedir only]" \
   "--delete-packages[after installing from a package, delete it]" \
+  "-a[check all ports, update as necessary]" \
+  "--show-work[list what ports are and would be installed]" \
+  "-o[replace the installed port with a port from a different origin]:new port dir in /usr/ports:->ports" \
+  "-r[rebuild port, and all ports that depend on it]:name/glob of port in /var/db/pkg:->pkgs" \
+  "-R[used with -\[rf\] to skip ports updated on a previous run]" \
   "-l[list all installed ports by category]" \
   "-L[list all installed ports by category, and search for updates]" \
+  "--list-origins[list directories from /usr/ports for root and leaf ports]" \
+  "-F[fetch distfiles only]" \
   "-e[expunge a port via pkg_delete, and remove its distfiles]:full name of port directory in /var/db/pkg:->pkgs" \
   "-s[clean out stale ports that used to be depended on]" \
-  "-F[fetch distfiles only]" \
   "--clean-distfiles[offer to delete stale distfiles]" \
-  "--clean-distfiles-all[delete stale distfiles without prompting]" \
   "--clean-packages[offer to delete stale packages]" \
-  "--clean-packages-all[delete stale packages without prompting]" \
   "--check-depends[cross-check and update dependency information for all ports]" \
   "--check-port-dbdir[check for stale entries in /var/db/ports]" \
-  "--list-origins[list directories from /usr/ports for root and leaf ports]" \
   "(-h --help)"{-h,--help}"[display help message]" \
   "--version[display the version number]" \
   '*:Packages and Ports:->pkgs_ports'
