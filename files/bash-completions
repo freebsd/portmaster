@@ -15,8 +15,7 @@ _portmaster () {
 		--local-packagedir= --packages-local \
 		--no-confirm --no-term-title --no-index-fetch \
 		--index --index-first --index-only \
-		--clean-distfiles --clean-distfiles-all	\
-		--clean-packages --clean-packages-all \
+		--clean-distfiles --clean-packages \
 		--check-depends --check-port-dbdir --list-origins \
 		--help --version' -- $cur ) )
 		;;
