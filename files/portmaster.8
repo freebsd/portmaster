@@ -1,4 +1,4 @@
-.\" Copyright (c) 2006-2010 Doug Barton dougb@FreeBSD.org
+.\" Copyright (c) 2006-2011 Doug Barton dougb@FreeBSD.org
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 7, 2010
+.Dd January 1, 2011
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -32,7 +32,7 @@
 .Nd manage your ports without external databases or languages
 .Sh SYNOPSIS
 Common Flags:
-.Op Fl -force-config CGHgntvw [B|b] [f|i] [D|d]
+.Op Fl -force-config CGHKgntvw [B|b] [f|i] [D|d]
 .Op Sy [[--packages|-P]|[--packages-only|-PP]] | [--packages-build]
 .Op Fl -packages-if-newer
 .Op Fl -delete-build-only
@@ -68,7 +68,8 @@ and/or multiple globs from /var/db/pkg
  . (Use in /usr/ports/foo/bar to build that port)
 .Nm
 .Fl -show-work
-.Op Fl Gv m Ar args
+.Op Fl Gv
+.Op Fl m Ar args
 <single port, as above>
 .Nm
 .Op Common Flags
@@ -106,34 +107,37 @@ and/or multiple globs from /var/db/pkg
 .Nm
 .Fl [l|L]
 .Nm
-.Op Fl b [D|d]
-.Fl e Ar name/glob of a single port directory in /var/db/pkg
-.Nm
-.Op Fl b [D|d]
-.Fl s
+.Fl -list-origins
 .Nm
 .Op Fl -force-config|-G
 .Op Fl aftv
 .Fl F
 .Nm
+.Op Fl n|y
+.Op Fl b
+.Op Fl D|d
+.Fl e Ar name/glob of a single port directory in /var/db/pkg
+.Nm
+.Op Fl n|y
+.Op Fl b
+.Op Fl D|d
+.Fl s
+.Nm
+.Op Fl n|y
 .Op Fl t
 .Fl -clean-distfiles
 .Nm
-.Op Fl t
-.Fl -clean-distfiles-all
-.Nm
-.Op Fl -index
+.Op Fl n|y
+.Op Fl -index|-index-only
 .Fl -clean-packages
 .Nm
-.Op Fl -index
-.Fl -clean-packages-all
-.Nm
+.Op Fl n|y
+.Op Fl v
 .Fl -check-depends
 .Nm
-.Fl -check-port-dbdir
+.Op Fl n|y
 .Op Fl v
-.Nm
-.Fl -list-origins
+.Fl -check-port-dbdir
 .Nm
 .Fl h|--help
 .Nm
@@ -335,11 +339,11 @@ user would like to have for this problem.
 Manual intervention is therefore required.
 .Sh OPTIONS
 The options are as follows:
+.Pp
+Common Flags:
 .Bl -tag -width F1
 .It Fl -force-config
 run 'make config' for all ports (overrides -G)
-.It Fl B
-prevents creation of the backup package for the installed port
 .It Fl C
 prevents 'make clean' from being run before building
 .It Fl G
@@ -348,6 +352,8 @@ prevents 'make config'
 hide details of the port build and install in a log file
 .It Fl K
 prevents 'make clean' from being run after building
+.It Fl B
+prevents creation of the backup package for the installed port
 .It Fl b
 create and keep a backup package of an installed port
 .It Fl g
@@ -358,7 +364,7 @@ run through all steps, but do not make or install any ports
 recurse dependencies thoroughly, using all-depends-list.
 .Sy RECOMMENDED FOR USE ONLY WHEN NEEDED, NOT ROUTINELY.
 When applied to the
-.Fl -clean-distfiles[-all]
+.Fl -clean-distfiles
 option it allows a distfile to be valid if it matches
 any up to date port,
 not just the ones that are installed.
@@ -384,6 +390,33 @@ Can be specified more than once.
 If a port is not already installed the exclude pattern will
 be run against the directory name from
 .Pa /usr/ports .
+.It Fl -no-confirm
+do not ask the user to confirm the list of ports to
+be installed and/or updated before proceeding
+.It Fl -no-term-title
+do not update the xterm title bar
+.It Fl -no-index-fetch
+skip fetching the INDEX file
+.It Fl -index
+use INDEX-[7-9] exclusively to check if a port is up to date
+.It Fl -index-first
+use the INDEX for status, but double-check with the port
+.It Fl -index-only
+do not try to use
+.Pa /usr/ports .
+For updating ports when no
+.Pa /usr/ports
+directory is present the
+.Fl PP|--packages-only
+option is required.
+See the ENVIRONMENT section below for additional
+requirements.
+.El
+.Pp
+Features:
+.Bl -tag -width F1
+.It Fl a
+check all ports, update as necessary
 .It Fl -show-work
 show what dependent ports are, and are not installed (implies
 .Fl t ) .
@@ -397,8 +430,10 @@ used with the
 or
 .Fl f
 options to skip ports updated on a previous run.
-.It Fl a
-check all ports, update as necessary
+When used with
+.Fl r
+it will also prevent the rebuild of the parent port if it,
+and all of its dependencies are up to date.
 .It Fl -delete-build-only
 delete ports that are build-only dependencies after a successful run,
 only if installed this run
@@ -443,32 +478,23 @@ use packages from
 only
 .It Fl -delete-packages
 after installing from a package, delete it
-.It Fl -no-confirm
-do not ask the user to confirm the list of ports to
-be installed and/or updated before proceeding
-.It Fl -no-term-title
-do not update the xterm title bar
-.It Fl -no-index-fetch
-skip fetching the INDEX file
-.It Fl -index
-use INDEX-[6-9] exclusively to check if a port is up to date
-.It Fl -index-first
-use the INDEX for status, but double-check with the port
-.It Fl -index-only
-do not try to use
-.Pa /usr/ports .
-For updating ports when no
-.Pa /usr/ports
-directory is present the
-.Fl PP|--packages-only
-option is required.
-See the ENVIRONMENT section below for additional
-requirements.
 .It Fl l
 list all installed ports by category
 .It Fl L
 list all installed ports by category, and search for updates
-.It Fl e Ar name/glob of a single port directory in /var/db/pkg
+.It Fl -list-origins
+list directories from /usr/ports for root and leaf ports.
+This list is suitable for feeding to
+.Nm
+either on another machine or for reinstalling all ports.
+See EXAMPLES below.
+.It [--force-config|-G] [-aftv] Fl F
+fetch distfiles only
+.It Fl n
+answer no to all user prompts for the features below
+.It Fl y
+answer yes to all user prompts for the features below
+.It [-n|y] [-b] [-D|d] Fl e Ar name/glob of a single port directory in /var/db/pkg
 expunge a port using
 .Xr pkg_delete 1 ,
 and optionally remove all distfiles.
@@ -477,17 +503,9 @@ Calls
 after it is done expunging in case removing
 the port causes a dependency to no longer be
 necessary.
-.It Fl s
+.It [-n|y] [-b] [-D|d] Fl s
 clean out stale ports that used to be depended on
-.It Fl F
-fetch distfiles only.
-Cannot be used with
-.Fl G ,
-but may be used with
-.Fl -force-config
-and
-.Fl [aftv] .
-.It [-t] Fl -clean-distfiles
+.It [-t] [-n] Fl -clean-distfiles
 recurse through the installed ports to get a list
 of distinfo files,
 then recurse through all files in
@@ -495,28 +513,32 @@ then recurse through all files in
 to make sure that they are still associated with
 an installed port.
 If not, offer to delete the stale file.
-.It [-t] Fl -clean-distfiles-all
+With
+.Fl t
+distfile is valid from any port, not just those installed.
+.It [-t]
+.Fl y
+.Fl -clean-distfiles
 does the same as above, but deletes all files without prompting.
-.It [--index] Fl -clean-packages
-offer to delete stale packages
-.It [--index] Fl -clean-packages-all
+.It [--index|--index-only] [-n] Fl -clean-packages
+offer to delete stale packages.
+The
+.Fl -index-only
+option is required if no ports tree is available.
+.It [--index|--index-only]
+.Fl y
+.Fl -clean-packages
 does the same as above, but deletes all out of date
 files without prompting.
-.It Fl -check-depends
+.It [-n|y] [-v] Fl -check-depends
 cross-check and update dependency information for all ports
-.It [-v] Fl -check-port-dbdir
+.It [-n|y] [-v] Fl -check-port-dbdir
 check for stale entries in
 .Pa /var/db/ports
-.It Fl -list-origins
-list directories from /usr/ports for root and leaf ports.
-This list is suitable for feeding to
-.Nm
-either on another machine or for reinstalling all ports.
-See EXAMPLES below.
 .It Fl h|--help
 display help message
 .It Fl -version
-display the version only.
+display the version number
 .El
 .Sh ENVIRONMENT
 The directory pointed to by the
@@ -527,7 +549,7 @@ will be used to store new and backup packages.
 When using 'make package' for the
 .Fl g
 option, the ports infrastructure will store packages in
-.Pa /usr/ports/packages/All ,
+.Pa ${PACKAGES}/All ,
 aka
 .Ev PKGREPOSITORY .
 When using the
@@ -535,7 +557,7 @@ When using the
 option,
 .Nm
 stores its backup packages in
-.Pa /usr/ports/packages/portmaster-backup
+.Pa ${PACKAGES}/portmaster-backup
 so that you can create both a backup package and
 a package of the newly installed port even if they
 have the same version.
@@ -796,7 +818,7 @@ Using
 to do a complete reinstallation of all your ports:
 .Dl "1. portmaster --list-origins > ~/installed-port-list"
 .Dl "2. Update your ports tree"
-.Dl "3. portmaster -t --clean-distfiles-all"
+.Dl "3. portmaster -ty --clean-distfiles"
 .Dl "4. portmaster --check-port-dbdir"
 .Dl "5. portmaster -Faf"
 .Dl "6. pkg_delete '*'"
@@ -809,7 +831,7 @@ to do a complete reinstallation of all your ports:
 .Dl "11. portmaster `cat ~/installed-port-list`"
 .Pp
 You probably want to use the -D option for the installation
-and then run --clean-distfiles[-all] again when you are done.
+and then run --clean-distfiles [-y] again when you are done.
 You might also want to consider using the --force-config option
 when installing the new ports.
 .Pp
