@@ -67,6 +67,9 @@ and/or multiple globs from /var/db/pkg
 .Op Common Flags
  . (Use in /usr/ports/foo/bar to build that port)
 .Nm
+.Op Common Flags
+.Fl a
+.Nm
 .Fl -show-work
 .Op Fl Gv
 .Op Fl m Ar args
@@ -78,32 +81,6 @@ and/or multiple globs from /var/db/pkg
 .Op Common Flags
 .Op Fl R
 .Fl r Ar name/glob of port in /var/db/pkg
-.Nm
-.Op Common Flags
-.Fl a
-.Nm
-.Fl -delete-build-only
-.Nm
-.Op Fl -packages-if-newer
-.Op Fl -always-fetch
-.Op Fl -local-packagedir=<path>
-.Op Fl -packages-local
-.Op Fl -delete-packages
-.Fl P|--packages
-.Nm
-.Op Fl -packages-if-newer
-.Op Fl -always-fetch
-.Op Fl -local-packagedir=<path>
-.Op Fl -packages-local
-.Op Fl -delete-packages
-.Fl PP|--packages-only
-.Nm
-.Op Fl -packages-if-newer
-.Op Fl -always-fetch
-.Op Fl -local-packagedir=<path>
-.Op Fl -packages-local
-.Op Fl -delete-packages
-.Fl -packages-build
 .Nm
 .Fl [l|L]
 .Nm
@@ -411,29 +388,6 @@ directory is present the
 option is required.
 See the ENVIRONMENT section below for additional
 requirements.
-.El
-.Pp
-Features:
-.Bl -tag -width F1
-.It Fl a
-check all ports, update as necessary
-.It Fl -show-work
-show what dependent ports are, and are not installed (implies
-.Fl t ) .
-.It Fl o Ar <new port dir in /usr/ports> <installed port>
-replace the installed port with a port from a different origin
-.It [-R] Fl r Ar name/glob of port directory in /var/db/pkg
-rebuild the specified port, and all ports that depend on it
-.It Fl R
-used with the
-.Fl r
-or
-.Fl f
-options to skip ports updated on a previous run.
-When used with
-.Fl r
-it will also prevent the rebuild of the parent port if it,
-and all of its dependencies are up to date.
 .It Fl -delete-build-only
 delete ports that are build-only dependencies after a successful run,
 only if installed this run
@@ -478,6 +432,29 @@ use packages from
 only
 .It Fl -delete-packages
 after installing from a package, delete it
+.El
+.Pp
+Features:
+.Bl -tag -width F1
+.It Fl a
+check all ports, update as necessary
+.It Fl -show-work
+show what dependent ports are, and are not installed (implies
+.Fl t ) .
+.It Fl o Ar <new port dir in /usr/ports> <installed port>
+replace the installed port with a port from a different origin
+.It [-R] Fl r Ar name/glob of port directory in /var/db/pkg
+rebuild the specified port, and all ports that depend on it
+.It Fl R
+used with the
+.Fl r
+or
+.Fl f
+options to skip ports updated on a previous run.
+When used with
+.Fl r
+it will also prevent the rebuild of the parent port if it,
+and all of its dependencies are up to date.
 .It Fl l
 list all installed ports by category
 .It Fl L

@@ -347,13 +347,13 @@ usage () {
 	version
 	echo ''
 	echo 'Usage:'
-	echo "Common flags: [--force-config] [-CGHKgntvw B|b f|i D|d]"
+	echo "Common flags: [--force-config -CGHKgntvw -[B|b] -[f|i] -[D|d]]"
 	echo "    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
 	echo "    [--local-packagedir=<path>] [--packages-local] [--delete-packages]"
 	echo "    [--no-confirm] [--no-term-title] [--no-index-fetch]"
-	echo "    [--index|--index-first|--index-only]"
-	echo "    [-m <arguments for make>] [-x <glob pattern to exclude from building>]"
+	echo "    [--index|--index-first|--index-only] [-m <arguments for make>]"
+	echo "    [-x <glob pattern to exclude from building>]"
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
 	echo "${0##*/} [Common flags] <glob pattern of directories in $pdb>"
@@ -362,12 +362,12 @@ usage () {
 	echo ''
 	echo "${0##*/} [Common flags] . [Use in $pd/foo/bar to build that port]"
 	echo ''
+	echo "${0##*/} [Common flags] -a"
+	echo ''
 	echo "${0##*/} --show-work [-Gv] [-m <args>] <single port, as above>"
 	echo ''
 	echo "${0##*/} [Common flags] -o <new port dir in $pd> <installed port>"
 	echo "${0##*/} [Common flags] [-R] -r <name/glob of port directory in $pdb>"
-	echo ''
-	echo "${0##*/} [Common flags] -a"
 	echo ''
 	echo "${0##*/} -[l|L]"
 	echo ''
@@ -375,21 +375,21 @@ usage () {
 	echo ''
 	echo "${0##*/} [--force-config|-G] [-aftv] -F"
 	echo ''
-	echo "${0##*/} [-n|y] [-b D|d] -e <name/glob of a single port directory in $pdb>"
-	echo "${0##*/} [-n|y] [-b D|d] -s"
+	echo "${0##*/} [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
+	echo "${0##*/} [-n|y] [-b] [-D|d] -s"
 	echo ''
 	echo "${0##*/} [-n|y] [-t] --clean-distfiles"
 	echo ''
 	echo "${0##*/} [-n|y] [--index|--index-only] --clean-packages"
 	echo ''
-	echo "${0##*/} [-n|y] --check-depends"
+	echo "${0##*/} [-n|y] [-v] --check-depends"
 	echo ''
 	echo "${0##*/} [-n|y] [-v] --check-port-dbdir"
 	echo ''
 	echo "${0##*/} -h|--help"
 	echo "${0##*/} --version"
 	echo ''
-	echo "--force-config 'make config' for all ports (overrides -G)"
+	echo "--force-config run 'make config' for all ports (overrides -G)"
 	echo "-C prevents 'make clean' from being run before building"
 	echo "-G prevents 'make config'"
 	echo "-H hide details of the port build and install in a log file"
@@ -402,7 +402,7 @@ usage () {
 	echo '-v verbose output'
 	echo '-w save old shared libraries before deinstall'
 	echo '[-R] -f always rebuild ports (overrides -i)'
-	echo '-i interactive update -- ask whether to rebuild ports'
+	echo '-i interactive update mode -- ask whether to rebuild ports'
 	echo '-D no cleaning of distfiles'
 	echo '-d always clean distfiles'
 	echo "-m <arguments for the 'make' command line>"
@@ -414,17 +414,9 @@ usage () {
 	echo '--no-term-title do not update the xterm title bar'
 	echo ''
 	echo '--no-index-fetch skip fetching the INDEX file'
-	echo '--index use INDEX-[6-9] exclusively to check if a port is up to date'
+	echo '--index use INDEX-[7-9] exclusively to check if a port is up to date'
 	echo '--index-first use the INDEX for status, but double-check with the port'
 	echo '--index-only do not try to use /usr/ports'
-	echo ''
-	echo '--show-work list what ports are and would be installed'
-	echo ''
-	echo '-o replace the installed port with a port from a different origin'
-	echo '[-R] -r rebuild port, and all ports that depend on it'
-	echo '-R used with -[rf] to skip ports updated on a previous run'
-	echo ''
-	echo '-a check all ports, update as necessary'
 	echo ''
 	echo '--delete-build-only delete ports that are build-only dependencies'
 	echo '   after a successful run, only if installed this run'
@@ -440,27 +432,38 @@ usage () {
 	echo '--packages-local use packages from --local-packagedir only'
 	echo '--delete-packages after installing from a package, delete it'
 	echo ''
-	echo '-l list installed ports by category'
-	echo '-L list installed ports by category, and search for updates'
+	echo '-a check all ports, update as necessary'
+	echo ''
+	echo '--show-work list what ports are and would be installed'
+	echo ''
+	echo '-o replace the installed port with a port from a different origin'
+	echo '[-R] -r rebuild port, and all ports that depend on it'
+	echo '-R used with -[rf] to skip ports updated on a previous run'
+	echo ''
+	echo '-l list all installed ports by category'
+	echo '-L list all installed ports by category, and search for updates'
 	echo ''
 	echo "--list-origins list directories from $pd for root and leaf ports"
 	echo ''
 	echo '[--force-config|-G] [-aftv] -F fetch distfiles only'
 	echo ''
-	echo '-e expunge a single port via pkg_delete, and remove its distfiles'
-	echo '-s clean out stale ports that used to be depended on'
+	echo '-n answer no to all user prompts for the features below'
+	echo '-y answer yes to all user prompts for the features below'
 	echo ''
-	echo '[-t] --clean-distfiles offer to delete stale distfiles'
+	echo '[-n|y] [-b] [-D|d] -e expunge one port via pkg_delete, and remove its distfiles'
+	echo '[-n|y] [-b] [-D|d] -s clean out stale ports that used to be depended on'
+	echo ''
+	echo '[-t] [-n] --clean-distfiles offer to delete stale distfiles'
 	echo '[-t] -y --clean-distfiles delete stale distfiles without prompting'
 	echo '   with -t distfile is valid from any port, not just those installed'
 	echo ''
-	echo '[--index|--index-only] --clean-packages offer to delete stale packages'
+	echo '[--index|--index-only] [-n] --clean-packages offer to delete stale packages'
 	echo '[--index|--index-only] -y --clean-packages delete without prompting'
 	echo '   --index-only is required if no ports tree is available'
 	echo ''
-	echo '--check-depends cross-check and update dependency information for all ports'
+	echo '[-n|y] [-v] --check-depends cross-check and update dependency info for all ports'
 	echo ''
-	echo "--check-port-dbdir [-v] check for stale entries in $port_dbdir"
+	echo "[-n|y] [-v] --check-port-dbdir check for stale entries in $port_dbdir"
 	echo ''
 	echo '-h|--help display this help message'
 	echo '--version display the version number'
