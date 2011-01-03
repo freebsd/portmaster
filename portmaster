@@ -680,6 +680,7 @@ done
 shift $(( $OPTIND - 1 ))
 
 [ -n "$UNATTENDED" ] && fail 'The -u option has been deprecated'
+[ -n "$PM_YES" -a -n "$NO_ACTION" ] && fail 'The -y and -n options are mutually exclusive'
 
 [ -n "$PM_EXCL" ] && export PM_EXCL
 
@@ -886,36 +887,55 @@ check_dependency_files () {
 	return 0
 }
 
+# Takes default value, optional value, and message as input
+# Return values:
+# 0 - Default value chosen
+# 1 - Optional value chosen
+#
+get_answer_g () {
+	local default option answer
+
+	default=$1 ; option=$2 ; shift 2
+
+	while : ; do
+		echo -n "${*} [${default}] "
+		read answer
+		echo ''
+
+		case "$answer" in
+		[A-Z])	answer=`echo $answer | tr [:upper:] [:lower:]` ;;
+		esac
+
+		case "$answer" in
+		${default}|'')	return 0 ;;
+		${option})	return 1 ;;
+		*)	echo "	===>>> $answer is not a valid response" ; echo '' ;;
+		esac
+	done
+}
+
 # Takes a default value and message as input
 # Return values:
 # 0 - Answer is "Yes"
 # 1 - Answer is "No"
 #
-get_answer () {
-	local default answer
+get_answer_yn () {
+	local default option
 
 	default=$1 ; shift
 
-	while : ; do
-		if [ -z "$PM_YES" -a -z "$NO_ACTION" ]; then
-			echo -n "	===>>> ${*}? y/n [${default}] "
-			read answer
-			echo ''
-		else
-			if [ -n "$PM_YES" ]; then
-				answer=y
-			elif [ -n "$NO_ACTION" ]; then
-				answer=n
-			fi
-		fi
+	[ "$default" = 'y' ] && option=n || option=y
 
-		case "$answer" in
-		[yY])	return 0 ;;
-		[nN])	return 1 ;;
-		'')	[ "$default" = y ] && return 0 || return 1 ;;
-		*)	echo "	===>>> $answer is not a valid response" ; echo '' ;;
+	if [ -z "$PM_YES" -a -z "$NO_ACTION" ]; then
+		get_answer_g $default $option "${*}? y/n"
+		case "${?}${default}" in
+		0y|1n)	return 0 ;;
+		0n|1y)	return 1 ;;
 		esac
-	done
+	else
+		[ -n "$PM_YES" ] && return 0
+		return 1
+	fi
 }
 
 update_contents () {
@@ -957,7 +977,7 @@ IFS='
 				echo "	===>>> but there is no installed version"
 				echo ''
 				if [ -n "$CHECK_DEPENDS" ]; then
-					get_answer n Delete this dependency data
+					get_answer_yn n Delete this dependency data
 					case "$?" in 0) unset prev_line line ; continue ;; esac
 				else
 					echo "	===>>> Try ${0##*/} --check-depends"
@@ -1223,7 +1243,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	for df in `find $DISTDIR -type f | sort`; do
 		f=${df#$DISTDIR}
 		if ! grep -ql $f $DI_FILES; then
-			get_answer n Delete stale file: ${f}
+			get_answer_yn n Delete stale file: ${f}
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
 				pm_unlink $df ;;
@@ -1266,7 +1286,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 				if [ -z "$PM_YES" ]; then
 					if [ ! -d "${pdb}/${pkg_dir}" ]; then
 						echo "	===>>> $pkg_dir is not installed"
-						get_answer y Delete stale package: ${package##*/}
+						get_answer_yn y Delete stale package: ${package##*/}
 						case "$?" in
 						0)	echo "	===>>> Deleting $package"
 							pm_unlink_s $package ;;
@@ -1291,7 +1311,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 
 		echo "	===>>> Path: ${package}"
 
-		get_answer n Delete stale package: ${package##*/}
+		get_answer_yn n Delete stale package: ${package##*/}
 		case "$?" in
 		0)	echo "	===>>> Deleting $package"
 			pm_unlink_s $package ;;
@@ -1413,7 +1433,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 		*:${dbdir}:*)	pm_v "Ok" ;;
 		*)	pm_v
 			echo "	===>>> $dbdir does not seem to be installed"
-			get_answer n Delete ${dir}
+			get_answer_yn n Delete ${dir}
 			case "$?" in 0) pm_rm_s -rf $dir ;; esac
 			echo '' ;;
 		esac
@@ -1647,11 +1667,8 @@ pm_pkg_create () {
 		echo "===>>> Ignore this error  [i]"
 		echo "===>>> Abort              [a]"
 		echo ''
-		echo -n "===>>> How would you like to proceed? [i] "
-		local answer ; read answer
-		case "$answer" in
-		[aA])	fail "Package creation failed for $2" ;;
-		esac
+		get_answer_g i a "===>>> How would you like to proceed?"
+		case "$?" in 1)	fail "Package creation failed for $2" ;; esac
 	fi
 }
 
@@ -1736,11 +1753,10 @@ find_and_delete_distfiles () {
 				continue
 			fi
 
-			echo -n "===>>> Delete $file? y/n [n] "
-			read answer
-			case "$answer" in
-			[yY])	pm_unlink $file ;;
-			*) distfiles_checked="${distfiles_checked}${file}:" ;;
+			get_answer_g n y "===>>> Delete $file? y/n"
+			case "$?" in
+			1)	pm_unlink $file ;;
+			0)	distfiles_checked="${distfiles_checked}${file}:" ;;
 			esac ;;
 		esac
 	done
@@ -1812,11 +1828,10 @@ delete_stale_distfiles () {
 				continue
 			fi
 
-			echo -n "===>>> Delete $file? y/n [n] "
-			read answer
-			case "$answer" in
-			[yY])	pm_unlink $file ;;
-			*) distfiles_checked="${distfiles_checked}${file}:" ;;
+			get_answer_g n y "===>>> Delete $file? y/n"
+			case "$?" in
+			1)	pm_unlink $file ;;
+			0)	distfiles_checked="${distfiles_checked}${file}:" ;;
 			esac
 		done
 	fi
@@ -1848,12 +1863,11 @@ delete_all_distfiles () {
 		if [ -n "$dist_list_files" ]; then
 			local answer f
 
+			answer=y
 			if [ -z "$ALWAYS_SCRUB_DISTFILES" ]; then
 				echo "===>>> However, the list of files in $dist_list"
-				echo -n "       should be current.  Delete the files on this list? y/n [n] "
-				read answer
-			else
-				answer=y
+				get_answer_g n y "       should be current.  Delete the files on this list? y/n"
+				case "$?" in 0)	answer=n ;; esac
 			fi
 
 			case "$answer" in
@@ -1875,15 +1889,11 @@ delete_all_distfiles () {
 		delete_all=delete_all
 	else
 		echo "===>>> Delete old and new distfiles for $origin"
-		echo -n "       without prompting? y/n [n] "
-		local answer ; read answer
-		case "$answer" in
-		[yY])	delete_all=delete_all2 ;;
-		*)	echo -n "===>>> Delete the current distfiles? y/n [n] "
-			read answer
-			case "$answer" in
-			[yY])	delete_current=delete_current ;;
-			esac ;;
+		get_answer_g n y "       without prompting? y/n"
+		case "$?" in
+		1)	delete_all=delete_all2 ;;
+		0)	get_answer_g n y "===>>> Delete the current distfiles? y/n"
+			case "$?" in 1)	delete_current=delete_current ;; esac ;;
 		esac
 	fi
 
@@ -1968,7 +1978,7 @@ if [ -n "$EXPUNGE" ]; then
 			dep=${dep%/+CON*} ; echo "	${dep##*/}"
 		done
 		echo ''
-		get_answer n Delete this dependency data
+		get_answer_yn n Delete this dependency data
 		case "$?" in
 		0)	for f in $deplist; do
 				update_contents delete $f $origin
@@ -2012,7 +2022,7 @@ if [ -n "$CLEAN_STALE" ]; then
 
 		pkg_info $iport
 
-		get_answer n ${iport} is no longer depended on, delete
+		get_answer_yn n ${iport} is no longer depended on, delete
 		case "$?" in
 		0)	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
 			[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
@@ -2021,7 +2031,7 @@ if [ -n "$CLEAN_STALE" ]; then
 			pm_pkg_delete_s -f $iport || fail 'pkg_delete failed'
 
 			exec $0 -s $ARGS ;;
-		*)	get_answer y Delete this dependency data
+		*)	get_answer_yn y Delete this dependency data
 			case "$?" in
 			0)	pm_unlink_s $file ;;
 			*)	no_del_list="${no_del_list}${iport}:" ;;
@@ -2069,12 +2079,11 @@ check_interactive () {
 		echo ''
 		echo "===>>> +IGNOREME file is present for $1"
 	fi
-
-	echo '' ; echo -n "===>>> Update ${1}${update_to}? y/n [y] "
-	local answer ; read answer
-	case "$answer" in
-	[yY]|'')	INTERACTIVE_YES="${INTERACTIVE_YES}${1}:" ;;
-	*)		INTERACTIVE_NO="${INTERACTIVE_NO}${1}:" ; return 1 ;;
+	echo ''
+	get_answer_g y n "===>>> Update ${1}${update_to}? y/n"
+	case "$?" in
+	0)	INTERACTIVE_YES="${INTERACTIVE_YES}${1}:" ;;
+	1)	INTERACTIVE_NO="${INTERACTIVE_NO}${1}:" ; return 1 ;;
 	esac
 	return 0
 }
@@ -2489,11 +2498,9 @@ post_first_pass () {
 			echo ''
 			echo "===>>> The following actions will be taken if you choose to proceed:"
 			echo -e "$build_l"
-			echo -n "===>>> Proceed? y/n [y] "
-			read answer
-			case "$answer" in
-			[yY]|'')	;;
-			*)	echo ''
+			get_answer_g y n "===>>> Proceed? y/n"
+			case "$?" in
+			1)	echo ''
 				echo "===>>> If you would like to upgrade or install some, but not"
 				echo "       all of the above try adding '-i' to the command line."
 				safe_exit 1 ;;
@@ -2754,16 +2761,12 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 			files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 			if [ -n "$files" ]; then
 				echo "===>>> There are 'install complete' flags from a previous"
-				echo -n "       -[rf] run of ${0##*/}, delete them? y/n [n] "
-				read answer
-				case "$answer" in
-				[yY])	pm_sv Deleting \'install complete\' flags
+				get_answer_g n y "       -[rf] run of ${0##*/}, delete them? y/n"
+				case "$?" in
+				1)	pm_sv Deleting \'install complete\' flags
 					pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
-				*)	echo -n "===>>> Enable the -R option? y/n [n] "
-					read answer
-					case "$answer" in
-					[yY]) RESTART=Ropt ; ARGS="-R $ARGS" ;;
-					esac ;;
+				0)	get_answer_g n y "===>>> Enable the -R option? y/n"
+					case "$?" in 1) RESTART=Ropt ; ARGS="-R $ARGS" ;; esac ;;
 				esac
 			fi
 		fi
@@ -2985,11 +2988,10 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 				echo ''
 				echo "===>>> $upg_port has an +IGNOREME file"
 				echo ''
-				echo -n "===>>> Update anyway? y/n [n] "
-				read answer
-				case "$answer" in
-				[yY]) ;;	# Let it build
-				*)	CUR_DEPS="${CUR_DEPS}${upg_port}:${portdir}:"
+				get_answer_g n y "===>>> Update anyway? y/n"
+				case "$?" in
+				1)	;;	# Let it build
+				0)	CUR_DEPS="${CUR_DEPS}${upg_port}:${portdir}:"
 					if [ ${dep_of_deps:-0} -gt 0 ]; then
 						dep_of_deps=$(( $dep_of_deps - 1 ))
 						[ -n "$PM_FIRST_PASS" ] &&
