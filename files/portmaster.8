@@ -589,7 +589,7 @@ file so that the dependencies match.
 .Pp
 If you wish to customize your build environment on a per-port
 basis you might want to take a look at
-.Pa ports/ports-mgmt/portconf
+.Pa /usr/ports/ports-mgmt/portconf
 .Pp
 To log actions taken by
 .Nm
@@ -618,6 +618,21 @@ In situations where the user is ABSOLUTELY SURE
 that lack of a backup package should not be a fatal error
 .Ev PM_IGNORE_FAILED_BACKUP_PACKAGE
 can be defined to any value in the rc file.
+.Pp
+For those who wish to be sure that specific ports are always
+compiled instead of being installed from packages the
+.Ev PT_NO_INSTALL_PACKAGE
+variable can be defined in the
+.Xr make 1
+environment, perhaps in
+.Pa /usr/local/etc/ports.conf
+if using
+.Pa /usr/ports/ports-mgmt/portconf ,
+or in
+.Pa /etc/make.conf .
+This setting is not compatible with the
+.Fl PP/--packages-only
+option.
 .Sh FILES
 .Bl -tag -width "1234" -compact
 .It Pa /usr/local/etc/portmaster.rc

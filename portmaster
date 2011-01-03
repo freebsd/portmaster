@@ -3239,6 +3239,21 @@ fi
 [ -n "$PM_REQ_BY_SKIP_PARENT" ] && urb_final
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
+	case `pm_make_b -V PT_NO_INSTALL_PACKAGE` in
+	'')	pm_package_time=yes ;;
+	*)	if [ "$PM_PACKAGES" = 'only' ]; then
+			echo "===>>> The -PP/--packages-only option was specified, but"
+			echo "       PT_NO_INSTALL_PACKAGE is defined for $portdir"
+			fail These 2 options are mutually exclusive
+		fi
+		echo "===>>> PT_NO_INSTALL_PACKAGE is set, building port"
+		echo '' ;;
+	esac
+fi
+
+if [ -n "$pm_package_time" ]; then
+	unset pm_package_time
+
 fetch_package () {
 	local do_fetch
 
@@ -3430,7 +3445,7 @@ notnewer () {
 			echo ''
 		fi
 	fi
-fi	# [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]
+fi	# [ -n "$pm_package_time" ]
 
 if [ -z "$use_package" ]; then
 	if [ -n "$PM_PACKAGES" ]; then
