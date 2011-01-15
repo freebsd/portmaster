@@ -977,7 +977,7 @@ IFS='
 				echo "	===>>> but there is no installed version"
 				echo ''
 				if [ -n "$CHECK_DEPENDS" ]; then
-					get_answer_yn n Delete this dependency data
+					get_answer_yn n "	===>>> Delete this dependency data"
 					case "$?" in 0) unset prev_line line ; continue ;; esac
 				else
 					echo "	===>>> Try ${0##*/} --check-depends"
@@ -1243,7 +1243,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	for df in `find $DISTDIR -type f | sort`; do
 		f=${df#$DISTDIR}
 		if ! grep -ql $f $DI_FILES; then
-			get_answer_yn n Delete stale file: ${f}
+			get_answer_yn n "	===>>> Delete stale file: ${f}"
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
 				pm_unlink $df ;;
@@ -1286,7 +1286,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 				if [ -z "$PM_YES" ]; then
 					if [ ! -d "${pdb}/${pkg_dir}" ]; then
 						echo "	===>>> $pkg_dir is not installed"
-						get_answer_yn y Delete stale package: ${package##*/}
+						get_answer_yn y "	===>>> Delete stale package: ${package##*/}"
 						case "$?" in
 						0)	echo "	===>>> Deleting $package"
 							pm_unlink_s $package ;;
@@ -1311,7 +1311,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 
 		echo "	===>>> Path: ${package}"
 
-		get_answer_yn n Delete stale package: ${package##*/}
+		get_answer_yn n "	===>>> Delete stale package: ${package##*/}"
 		case "$?" in
 		0)	echo "	===>>> Deleting $package"
 			pm_unlink_s $package ;;
@@ -1433,7 +1433,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 		*:${dbdir}:*)	pm_v "Ok" ;;
 		*)	pm_v
 			echo "	===>>> $dbdir does not seem to be installed"
-			get_answer_yn n Delete ${dir}
+			get_answer_yn n "	===>>> Delete ${dir}"
 			case "$?" in 0) pm_rm_s -rf $dir ;; esac
 			echo '' ;;
 		esac
@@ -1978,7 +1978,7 @@ if [ -n "$EXPUNGE" ]; then
 			dep=${dep%/+CON*} ; echo "	${dep##*/}"
 		done
 		echo ''
-		get_answer_yn n Delete this dependency data
+		get_answer_yn n "	===>>> Delete this dependency data"
 		case "$?" in
 		0)	for f in $deplist; do
 				update_contents delete $f $origin
@@ -2022,7 +2022,7 @@ if [ -n "$CLEAN_STALE" ]; then
 
 		pkg_info $iport
 
-		get_answer_yn n ${iport} is no longer depended on, delete
+		get_answer_yn n "	===>>> ${iport} is no longer depended on, delete"
 		case "$?" in
 		0)	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
 			[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
@@ -2031,7 +2031,7 @@ if [ -n "$CLEAN_STALE" ]; then
 			pm_pkg_delete_s -f $iport || fail 'pkg_delete failed'
 
 			exec $0 -s $ARGS ;;
-		*)	get_answer_yn y Delete this dependency data
+		*)	get_answer_yn n "	===>>> Delete this dependency data"
 			case "$?" in
 			0)	pm_unlink_s $file ;;
 			*)	no_del_list="${no_del_list}${iport}:" ;;
