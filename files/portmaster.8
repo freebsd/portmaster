@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd January 1, 2011
+.Dd January 16, 2011
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -813,7 +813,7 @@ to do a complete reinstallation of all your ports:
 .Dl "3. portmaster -ty --clean-distfiles"
 .Dl "4. portmaster --check-port-dbdir"
 .Dl "5. portmaster -Faf"
-.Dl "6. pkg_delete '*'"
+.Dl "6. pkg_delete -a"
 .Dl "7. rm -rf /usr/local/lib/compat/pkg"
 .Dl "8. Back up any files in /usr/local you wish to save,"
 .Dl "   such as configuration files in /usr/local/etc"
