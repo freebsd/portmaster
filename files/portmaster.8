@@ -444,7 +444,19 @@ show what dependent ports are, and are not installed (implies
 .It Fl o Ar <new port dir in /usr/ports> <installed port>
 replace the installed port with a port from a different origin
 .It [-R] Fl r Ar name/glob of port directory in /var/db/pkg
-rebuild the specified port, and all ports that depend on it
+rebuild the specified port, and all ports that depend on it.
+The list of dependent ports is built according to origin (i.e.,
+.Pa category/portname )
+not by the version number of the installed port.
+So if you do
+.Nm
+.Fl r Ar fooport-1.23
+and it is necessary to restart using
+.Fl R
+but the newly installed port is now fooport-1.24 you can do
+.Nm
+.Fl R Fl r Ar fooport-1.24
+and it should pick up where you left off.
 .It Fl R
 used with the
 .Fl r
