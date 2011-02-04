@@ -27,10 +27,13 @@ if [ -z "$PM_PARENT_PID" ]; then
 
 	set -o allexport
 	# Read a global rc file first
-	[ -r /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
+	[ -s /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
+
+	# Allow the config file to be stored with the script
+	[ -s "${0%/*}/portmaster.rc" ] && . ${0%/*}/portmaster.rc
 
 	# Read a local one next, and allow the command line to override
-	[ -r "$HOME/.portmasterrc" ] && . $HOME/.portmasterrc
+	[ -s "$HOME/.portmasterrc" ] && . $HOME/.portmasterrc
 	set +o allexport
 
 	my_environment=`set`
