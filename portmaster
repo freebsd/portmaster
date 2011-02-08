@@ -285,7 +285,7 @@ pm_unlink () { /bin/test -e $1 && /bin/unlink $1; }
 # Superuser versions for commands that need root privileges
 
 pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
-pm_install_s      () { $PM_SU_CMD /usr/bin/install -o root -g wheel -m 644 $1 $2; }
+pm_install_s      () { $PM_SU_CMD /usr/bin/install -p -o root -g wheel -m 644 $1 $2; }
 pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 			 unset -v MASTER_RB_LIST;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
@@ -749,38 +749,56 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 		[ -z "$INDEXDIR" -a -n "$PM_INDEX_ONLY" -a -z "$pd" ] && INDEXDIR="$TMPDIR"
 
-		PM_INDEX="${INDEXDIR:-$pd}/${INDEXFILE}"
+		PM_INDEX="${INDEXDIR:=$pd}/${INDEXFILE}"
 
 		if [ -z "$PM_NO_INDEX_FETCH" ]; then
 			: ${FETCHINDEX:='fetch -am -o'}
 			: ${MASTER_SITE_INDEX:='http://www.FreeBSD.org/ports/'}
 
-			index_fetch="$FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2"
 			do_index_fetch=yes_index_fetch
 
 			index_time=`stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null`
 
-			[ -n "$index_time" ] && {
-				$index_fetch 2>/dev/null && do_index_fetch=no_index_fetch; }
-
-			if [ "$do_index_fetch" = yes_index_fetch ]; then
-				pm_sv 'Fetching new INDEX file'
-				$PM_SU_CMD $index_fetch || fail Could not perform $index_fetch
+			if [ -n "$index_time" ]; then
+				# If root, this will succeed either way
+				if $FETCHINDEX ${PM_INDEX}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2 2>/dev/null; then
+					unset do_index_fetch
+					newindex="${PM_INDEX}.bz2"
+				fi
 			fi
 
-			if [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
-				temp_index=`pm_mktemp index`
-				bunzip2 < ${PM_INDEX}.bz2 > $temp_index
-				pm_sv 'Installing new INDEX file'
-				pm_install_s $temp_index $PM_INDEX
-				unlink $temp_index
-				unset temp_index
+			if [ -n "$do_index_fetch" ] ||
+			    [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
+				dli=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-index`
+				if [ -n "$do_index_fetch" ]; then
+					ift="$FETCHINDEX ${dli}/${INDEXFILE}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2"
+					$ift || fail Could not perform $ift
+					unset ift
+					newindex="${dli}/${INDEXFILE}.bz2"
+				fi
+
+				bunzip2 --keep < $newindex > ${dli}/$INDEXFILE
+				if [ -w "${INDEXDIR}/" ]; then
+					pm_unlink $PM_INDEX
+					mv ${dli}/$INDEXFILE $PM_INDEX
+					if [ -n "$do_index_fetch" ]; then
+						pm_unlink ${PM_INDEX}.bz2
+						mv ${dli}/${INDEXFILE}.bz2 ${PM_INDEX}.bz2
+					fi
+				else
+					pm_sv 'Installing new INDEX file'
+					pm_install_s ${dli}/$INDEXFILE $PM_INDEX
+					[ -n "$do_index_fetch" ] &&
+						pm_install_s ${dli}/${INDEXFILE}.bz2 ${PM_INDEX}.bz2
+				fi
+				rm -rf $dli ; unset dli
 			fi
-			unset index_fetch do_index_fetch index_time
+			unset FETCHINDEX MASTER_SITE_INDEX do_index_fetch index_time newindex
 		else
 			[ -r "$PM_INDEX" ] ||
 				fail "The --no-index-fetch option was used, but $PM_INDEX does not exist"
 		fi
+		unset INDEXFILE INDEXDIR
 
 		PM_INDEX_PORTS=`pkg_version -Ivl\< $PM_INDEX | cut -f1 -d\<`
 		export PM_INDEX_PORTS
@@ -798,7 +816,6 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 
 	if [ -n "$pd" ]; then
-		pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
 		export pd
 	else
 		if [ -n "$EXPUNGE" -o -n "$CLEAN_STALE" ]; then
@@ -2780,6 +2797,9 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	if [ -z "$FETCH_ONLY" ]; then
 		PM_NEEDS_UPDATE=' ' ; NO_DEP_UPDATES=no_dep_updates ; build_l=''
 		export PM_NEEDS_UPDATE NO_DEP_UPDATES build_l
+
+		[ -z "$PM_INDEX_ONLY" ] &&
+			pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
 	fi
 
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
