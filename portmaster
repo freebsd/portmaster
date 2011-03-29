@@ -360,8 +360,8 @@ usage () {
 	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
 	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
 	echo "${0##*/} [Common flags] <glob pattern of directories in $pdb>"
-	echo "${0##*/} [Common flags] Multiple full names/paths from $pdb|$pd"
-	echo "                          and/or multiple globs from $pdb"
+	echo "${0##*/} [Common flags] [--update-if-newer] Multiple full names/paths"
+	echo "         from $pdb|$pd and/or multiple globs from $pdb"
 	echo ''
 	echo "${0##*/} [Common flags] . [Use in $pd/foo/bar to build that port]"
 	echo ''
@@ -423,6 +423,9 @@ usage () {
 	echo ''
 	echo '--delete-build-only delete ports that are build-only dependencies'
 	echo '   after a successful run, only if installed this run'
+	echo ''
+	echo '--update-if-newer (only for multiple ports listed on command line)'
+	echo '   do not rebuild/reinstall if the installed version is up to date'
 	echo ''
 	echo '-P|--packages use packages, but build port if not available'
 	echo '-PP|--packages-only fail if no package is available'
@@ -585,6 +588,8 @@ for var in "$@" ; do
 	--delete-packages)	PM_DELETE_PACKAGES=pm_delete_packages
 				export PM_DELETE_PACKAGES ;;
 	-[A-Za-z0-9]*)		newopts="$newopts $var" ;;
+	--update-if-newer)	PM_UPDATE_IF_NEWER=pm_update_if_newer
+				export PM_UPDATE_IF_NEWER ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
 				export PM_DEL_BUILD_ONLY ;;
 	--no-confirm)		PM_NO_CONFIRM=pm_no_confirm
@@ -1512,9 +1517,10 @@ check_force_multi () {
 
 check_for_updates () {
 	# Global: num_updates
-	local nf iport origin port_ver do_update skip
+	local multi nf iport origin port_ver do_update skip
 
 	[ "$1" = 'list' ] && { nf=nonfatal; shift; }
+	[ "$1" = 'multi' ] && { multi=multi; nf=nonfatal; shift; }
 
 	iport=$1 ; origin=${2:-`origin_from_pdb $iport`} || return 0
 
@@ -1604,6 +1610,8 @@ check_for_updates () {
 			unset moved_npd
 		fi
 		return 0
+	elif [ -n "$multi" ]; then
+		return 1
 	elif [ "$PM_RBP" = "$iport" ]; then
 		PM_RBP_NEEDS_UPGRADE=pm_rbp_needs_upgrade
 		return 0
@@ -2622,6 +2630,16 @@ multiport () {
 	for port in $worklist_temp; do
 		check_exclude $port || continue
 		check_interactive $port || continue
+
+		if [ -n "$PM_UPDATE_IF_NEWER" ]; then
+			if check_for_updates multi $port; then
+				if [ -n "$PM_VERBOSE" ]; then
+					echo ''
+					echo "===>>> $port is up to date, skipping"
+				fi
+				continue
+			fi
+		fi
 
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
