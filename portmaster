@@ -2599,7 +2599,7 @@ multiport () {
 	# Global
 	PM_MULTI_PORTS=':' ; export PM_MULTI_PORTS
 
-	local port worklist_temp worklist portlist numports origin num
+	local port worklist_temp iport worklist portlist numports origin num
 
 	# Expand globs and check that the directories exist
 	for port in "$@"; do
@@ -2632,12 +2632,19 @@ multiport () {
 		check_interactive $port || continue
 
 		if [ -n "$PM_UPDATE_IF_NEWER" ]; then
-			if check_for_updates multi $port; then
-				if [ -n "$PM_VERBOSE" ]; then
-					echo ''
-					echo "===>>> $port is up to date, skipping"
+			case "$port" in
+			*/*)	iport=`iport_from_origin $port` ;;
+			*)	iport=$port ;;
+			esac
+
+			if [ -n "$iport" ]; then
+				if check_for_updates multi $port; then
+					if [ -n "$PM_VERBOSE" ]; then
+						echo ''
+						echo "===>>> $port is up to date, skipping"
+					fi
+					continue
 				fi
-				continue
 			fi
 		fi
 
