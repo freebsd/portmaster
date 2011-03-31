@@ -2653,6 +2653,7 @@ multiport () {
 		PM_MULTI_PORTS="${PM_MULTI_PORTS}${port}:"
 	done
 
+	echo ''
 	echo "===>>> Working on multiple ports:"
 	echo -e $portlist
 
