@@ -1537,7 +1537,7 @@ check_for_updates () {
 		[ -n "$PM_INDEX_FIRST" ] || skip=index_skip
 	fi
 
-	if [ -d "$pd/$origin" -a -z "$do_update" -a -z "$skip" ]; then
+	if [ -z "$do_update" -a -z "$skip" ] && [ -d "$pd/$origin" ]; then
 		if ! pm_cd $pd/$origin; then
 			if [ -e "$pdb/$iport/+IGNOREME" ]; then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
@@ -2606,7 +2606,7 @@ multiport () {
 		port=${port#$pdb/}
 		case "$port" in
 		*/*)	port=${port#$pd/}
-			if [ -d "$pd/${port}" ]; then
+			if [ -n "$PM_INDEX_ONLY" ] || [ -d "$pd/${port}" ]; then
 				worklist_temp="$worklist_temp $port"
 			else
 				fail "$pd/${port} does not exist"
