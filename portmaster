@@ -1386,9 +1386,17 @@ IFS='
 
 		origin=`origin_from_pdb $iport` || continue
 
-		if [ -n "$pd" ] && [ ! -d "$pd/$origin" ]; then
+		if [ -z "$PM_INDEX_ONLY" ]; then
+			if [ -n "$pd" ] && [ ! -d "$pd/$origin" ]; then
+				missing=yes
+			fi
+		else
+			parse_index $origin name >/dev/null || missing=yes
+		fi
+		if [ -n "$missing" ]; then
 			echo "	===>>> $pd/$origin does not exist"
 			echo "	===>>> This port should probably be updated"
+			unset missing
 			continue
 		fi
 
