@@ -385,7 +385,7 @@ usage () {
 	echo ''
 	echo "${0##*/} [-n|y] [--index|--index-only] --clean-packages"
 	echo ''
-	echo "${0##*/} [-n|y] [-v] --check-depends"
+	echo "${0##*/} [-n|y] [--index|--index-only] [-v] --check-depends"
 	echo ''
 	echo "${0##*/} [-n|y] [-v] --check-port-dbdir"
 	echo ''
@@ -745,7 +745,8 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			fail Package installation support requires FreeBSD 6.4 or newer
 	fi
 
-	if [ -n "$PM_INDEX" ]; then
+	if [ -n "$PM_INDEX" ] &&
+	    [ -z "$LIST" -a -z "$LIST_ORIGINS" -a -z "$EXPUNGE" -a -z "$CLEAN_STALE" ]; then
 		if [ -z "$INDEXFILE" ]; then
 			ver=`uname -r`
 			INDEXFILE=INDEX-${ver%%\.*}
@@ -818,19 +819,23 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			PM_IPD=$pd
 		fi
 		export PM_IPD
-	fi
+	fi	# [ -n "$PM_INDEX" ]
 
-	if [ -n "$pd" ]; then
-		export pd
+	if [ -z "$EXPUNGE" -a -z "$CLEAN_STALE" ]; then
+		if [ -n "$pd" ]; then
+			export pd
+		elif [ -z "$LIST" -a -z "$LIST_ORIGINS" ]; then
+			fail 'The value of PORTSDIR cannot be empty'
+		fi
 	else
-		if [ -n "$EXPUNGE" -o -n "$CLEAN_STALE" ]; then
+		if [ -n "$pd" ] && [ -d "$pd" ]; then
+			export pd
+		else
 			if [ -z "$DONT_SCRUB_DISTFILES" ]; then
 				pm_v "===>>> There is no ports tree, so using -D option"
 				unset ALWAYS_SCRUB_DISTFILES
 				DONT_SCRUB_DISTFILES=Dopt_es; ARGS="-D $ARGS"
 			fi
-		elif [ -z "$LIST" -a -z "$LIST_PLUS" -a -z "$LIST_ORIGINS" -a -z "$CHECK_DEPENDS" ]; then
-			fail 'The value of PORTSDIR cannot be empty'
 		fi
 	fi
 
@@ -844,7 +849,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		PM_BUILD_ONLY_LIST=pm_bol
 		export PM_BUILD_ONLY_LIST
 	fi
-fi
+fi	# [ "$$" -eq "$PM_PARENT_PID" ]
 
 #=============== Begin functions relevant to --features and main ===============
 
@@ -1045,7 +1050,7 @@ IFS='
 
 	check_regular_file $contents
 	[ -n "$PM_VERBOSE" -o -n "$CHECK_DEPENDS" ] &&
-		echo "	===>>> Installing the new +CONTENTS file"
+		{ echo "	===>>> Installing the new +CONTENTS file" ; echo ''; }
 	pm_install_s $new_cont $contents
 	pm_unlink $new_cont
 }
@@ -1311,6 +1316,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 				if [ -z "$PM_YES" ]; then
 					if [ ! -d "${pdb}/${pkg_dir}" ]; then
 						echo "	===>>> $pkg_dir is not installed"
+						echo "	===>>> Path: ${package}"
 						get_answer_yn y "	===>>> Delete stale package: ${package##*/}"
 						case "$?" in
 						0)	echo "	===>>> Deleting $package"
@@ -1388,10 +1394,10 @@ IFS='
 
 		if [ -z "$PM_INDEX_ONLY" ]; then
 			if [ -n "$pd" ] && [ ! -d "$pd/$origin" ]; then
-				missing=yes
+				missing=missing
 			fi
 		else
-			parse_index $origin name >/dev/null || missing=yes
+			parse_index $origin name >/dev/null || missing=missing
 		fi
 		if [ -n "$missing" ]; then
 			echo "	===>>> $pd/$origin does not exist"
@@ -1432,8 +1438,6 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 	for pkg in $pdb/*; do
 		[ -d $pkg ] || continue
 
-		unset unique_name
-
 		iport=${pkg#$pdb/}
 		origin=`origin_from_pdb $iport` || continue
 
@@ -1447,8 +1451,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 			echo "	===>>> $pd/$origin does not exist for $pkg"
 			continue
 		fi
-		unique_name=`make -V UNIQUENAME`
-		unique_list="${unique_list}${unique_name}:"
+		unique_list="${unique_list}`make -V UNIQUENAME`:"
 	done
 
 	echo "===>>> Checking $port_dbdir"
@@ -2975,7 +2978,13 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	fi
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
-	if [ ! -d "$pd/$portdir" ]; then
+	if [ -z "$PM_INDEX_ONLY" ]; then
+		[ -d "$pd/$portdir" ] || missing=missing
+	else
+		parse_index $portdir name >/dev/null || missing=missing
+	fi
+
+	if [ -n "$missing" ]; then
 		echo ''
 		echo "===>>> The first argument to -o must be a directory in $pd"
 		echo '' ; no_valid_port
