@@ -2666,6 +2666,10 @@ multiport () {
 	done
 
 	echo ''
+	if [ -z "$worklist" ]; then
+		echo "===>>> All listed ports are up to date, exiting" ; echo ''
+		safe_exit
+	fi
 	echo "===>>> Working on multiple ports:"
 	echo -e $portlist
 
