@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd January 16, 2011
+.Dd April 10, 2011
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -61,6 +61,7 @@ This is a change from pre-version-2.3 behavior.
 .Pp
 .Nm
 .Op Common Flags
+.Op Fl -update-if-newer
 .Ar Multiple full names or paths from /usr/ports or /var/db/pkg,
 and/or multiple globs from /var/db/pkg
 .Nm
@@ -109,6 +110,7 @@ and/or multiple globs from /var/db/pkg
 .Fl -clean-packages
 .Nm
 .Op Fl n|y
+.Op Fl -index|-index-only
 .Op Fl v
 .Fl -check-depends
 .Nm
@@ -391,6 +393,9 @@ requirements.
 .It Fl -delete-build-only
 delete ports that are build-only dependencies after a successful run,
 only if installed this run
+.It Fl -update-if-newer
+(only for multiple ports listed on the command line)
+do not rebuild/reinstall if the installed version is up to date
 .It Fl P|--packages
 use packages, but build port if not available
 .It Fl PP|--packages-only
@@ -656,6 +661,11 @@ These files will be read by the parent
 .Nm
 process, and all variables
 in them will be exported.
+If a
+.Pa portmaster.rc
+file is placed in the same directory as the
+.Nm
+script itself, it will be read as described above.
 .Pp
 .It Pa /var/db/pkg/*/+IGNOREME
 If this file exists for a port that is already installed,

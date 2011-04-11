@@ -13,6 +13,7 @@ _portmaster () {
 		--packages-build --packages-if-newer --delete-build-only \
 		--always-fetch --delete-packages \
 		--local-packagedir= --packages-local \
+		--update-if-newer \
 		--no-confirm --no-term-title --no-index-fetch \
 		--index --index-first --index-only \
 		--clean-distfiles --clean-packages \

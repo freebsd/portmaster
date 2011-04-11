@@ -31,6 +31,7 @@ _arguments -A "-*" : \
   "--index-first[use the INDEX for status, but double-check with the port]" \
   "--index-only[do not try to use /usr/ports]" \
   "--delete-build-only[delete ports that are build-only dependencies after a successful run]" \
+  "--update-if-newer[(only for multiple ports) do not rebuild if installed version is up to date]" \
   {-P,--packages}"[use packages, but build port if not available]" \
   {-PP,--packages-only}"[fail if no package is available]" \
   "--packages-build[use packages for all build dependencies]" \
