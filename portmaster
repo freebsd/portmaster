@@ -557,10 +557,11 @@ cross_idx () {
 
 	e1='The --index, --index-first, and --index-only options are mutually exclusive'
 
-	case "$1" in
-	index)		[ -n "$PM_INDEX_FIRST" -o -n "$PM_INDEX_ONLY" ] && fail $e1 ;;
-	first)		[ -n "$PM_INDEX" -o -n "$PM_INDEX_ONLY" ] && fail $e1 ;;
-	only)		[ -n "$PM_INDEX" -o -n "$PM_INDEX_FIRST" ] && fail $e1 ;;
+	case "$*" in
+	*--index*--index*)	fail $e1 ;;
+	index\ *)		[ -n "$PM_INDEX_FIRST" -o -n "$PM_INDEX_ONLY" ] && fail $e1 ;;
+	first\ *)		[ -n "$PM_INDEX_ONLY" ] && fail $e1 ;;
+	only\ *)		[ -n "$PM_INDEX_FIRST" ] && fail $e1 ;;
 	esac
 }
 
@@ -597,11 +598,11 @@ for var in "$@" ; do
 	--no-term-title)	PM_NO_TERM_TITLE=pm_no_term_title
 				export PM_NO_TERM_TITLE ;;
 	--no-index-fetch)	PM_NO_INDEX_FETCH=pm_no_index_fetch ;;
-	--index)		cross_idx index ; PM_INDEX=pm_index ; export PM_INDEX ;;
-	--index-first)		cross_idx first ; PM_INDEX=pm_index
+	--index)		cross_idx "index $*" ; PM_INDEX=pm_index ; export PM_INDEX ;;
+	--index-first)		cross_idx "first $*" ; PM_INDEX=pm_index
 				PM_INDEX_FIRST=pm_index_first
 				export PM_INDEX PM_INDEX_FIRST ;;
-	--index-only)		cross_idx only ; PM_INDEX=pm_index
+	--index-only)		cross_idx "only $*" ; PM_INDEX=pm_index
 				PM_INDEX_ONLY=pm_index_only
 				export PM_INDEX PM_INDEX_ONLY ;;
 	--help)			usage 0 ;;
