@@ -101,7 +101,7 @@ trap_exit () {
 kill_bad_children () {
 	local mypgid pid ppid pgid command ; IFS=' '
 
-	mypgid=`ps -o pgid -p $PM_PARENT_PID` ; mypgid=${mypgid##*PGID[^0-9]}
+	mypgid=`ps -o pgid= -p $PM_PARENT_PID`
 
 	ps -axo pid,ppid,pgid,command | sed '1d' | while read pid ppid pgid command; do
 		[ "$pid" -gt 25 ] || continue
