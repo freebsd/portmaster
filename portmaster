@@ -39,8 +39,8 @@ if [ -z "$PM_PARENT_PID" ]; then
 	my_environment=`set`
 
 	# If we are already root, unset this to avoid potential conflict
-	euid=`ps -o uid $$` ; euid=${euid##* }
-	[ "$euid" -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
+	euid=`ps -o uid= $$`
+	[ $euid -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
 	unset euid
 fi
 
