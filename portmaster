@@ -53,11 +53,9 @@ version () {
 
 	svn='$FreeBSD$'
 
-	svn="${svn#*,v }" ; svn="${svn#*/portmaster }" ; svn="${svn%% *}"
+	svn="${svn#*/portmaster }" ; svn="${svn%% *}"
 
-	echo ''
-	[ "${svn#$}" != 'FreeBSD$' ] && { echo "===>>> Version $svn" ; return 0; }
-	echo "===>>> Version unknown!"
+	echo '' ; echo "===>>> Version $svn" ; return 0
 }
 
 fail () {
@@ -372,7 +370,8 @@ usage () {
 	echo "${0##*/} [Common flags] -o <new port dir in $pd> <installed port>"
 	echo "${0##*/} [Common flags] [-R] -r <name/glob of port directory in $pdb>"
 	echo ''
-	echo "${0##*/} -[l|L]"
+	echo "${0##*/} -l"
+	echo "${0##*/} [--index-only [-t]] -L"
 	echo ''
 	echo "${0##*/} --list-origins"
 	echo ''
@@ -616,7 +615,7 @@ for var in "$@" ; do
 	--check-depends)	CHECK_DEPENDS=check_depends ;;
 	--check-port-dbdir)	CHECK_PORT_DBDIR=check_port_dbdir ;;
 	--list-origins)		LIST_ORIGINS=list_origins ;;
-	--show-work)		SHOW_WORK=show ; RECURSE_THOROUGH=thorough ;;
+	--show-work)		SHOW_WORK=show ; PM_THOROUGH=thorough ;;
 	--force-config)		export PM_FORCE_CONFIG=pm_force_config ;;
 	--*)			echo "Illegal option $var" ; echo ''
 				echo "===>>> Try ${0##*/} --help"; exit 1 ;;
@@ -674,7 +673,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 		PM_RBP=${glob_dirs##*/} ; unset glob_dirs
 		portdir=`origin_from_pdb $PM_RBP` ;;
 	s)	CLEAN_STALE=sopt ;;
-	t)	RECURSE_THOROUGH=topt; ARGS="-t $ARGS" ;;
+	t)	PM_THOROUGH=topt; ARGS="-t $ARGS" ;;
 	u)	fail 'The -u option has been deprecated' ;;
 	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
 	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
@@ -1264,7 +1263,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	# Set the file name here since we are usually called in a subshell
 	DI_FILES=`pm_mktemp DI-FILES`
 
-	if [ -z "$RECURSE_THOROUGH" ]; then
+	if [ -z "$PM_THOROUGH" ]; then
 		read_distinfos
 	else
 		read_distinfos_all
@@ -1529,10 +1528,9 @@ check_force_multi () {
 
 check_for_updates () {
 	# Global: num_updates
-	local multi nf iport origin port_ver do_update skip
+	local nf iport origin port_ver do_update skip
 
-	[ "$1" = 'list' ] && { nf=nonfatal; shift; }
-	[ "$1" = 'multi' ] && { multi=multi; nf=nonfatal; shift; }
+	[ "$1" = 'list' -o "$1" = 'multi' ] && { nf=nonfatal; shift; }
 
 	iport=$1 ; origin=${2:-`origin_from_pdb $iport`} || return 0
 
@@ -1546,10 +1544,16 @@ check_for_updates () {
 		[ -z "$do_update" -a -z "$LIST_PLUS" ] && {
 			check_force_multi $iport $origin || do_update=upd_fm_idx; }
 
-		[ -n "$PM_INDEX_FIRST" ] || skip=index_skip
+		if [ -z "$do_update" -a -n "$PM_INDEX_ONLY" -a -n "$PM_THOROUGH" ]; then
+			port_ver=`parse_index $origin name` || {
+				echo "	===>>> $pd/$origin does not exist in $PM_INDEX";
+				echo "	===>>> This port should probably be updated"; }
+		else
+			[ -n "$PM_INDEX_FIRST" ] || skip=index_skip
+		fi
 	fi
 
-	if [ -z "$do_update" -a -z "$skip" ] && [ -d "$pd/$origin" ]; then
+	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ] && [ -d "$pd/$origin" ]; then
 		if ! pm_cd $pd/$origin; then
 			if [ -e "$pdb/$iport/+IGNOREME" ]; then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
@@ -1563,7 +1567,7 @@ check_for_updates () {
 		fi
 		port_ver=`pm_make -V PKGNAME`
 		[ -z "$port_ver" ] && fail "Is $pd/$origin/Makefile missing?"
-	elif [ -z "$do_update" -a -z "$skip" ]; then
+	elif [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ]; then
 		find_moved_port $origin $iport $nf
 
 		# If the port has moved and no +IGNOREME, we have to update it
@@ -1622,7 +1626,7 @@ check_for_updates () {
 			unset moved_npd
 		fi
 		return 0
-	elif [ -n "$multi" ]; then
+	elif [ -n "$PM_UPDATE_IF_NEWER" ]; then
 		return 1
 	elif [ "$PM_RBP" = "$iport" ]; then
 		PM_RBP_NEEDS_UPGRADE=pm_rbp_needs_upgrade
@@ -2377,7 +2381,7 @@ dependency_check () {
 			esac
 		done
 
-		if [ -z "$RECURSE_THOROUGH" ]; then
+		if [ -z "$PM_THOROUGH" ]; then
 			d_port_list="$build_only_dl $run_dl"
 		else
 			build_only_dl=`gen_dep_list build-depends-list`
@@ -2658,6 +2662,7 @@ multiport () {
 					continue
 				fi
 			fi
+			unset PM_UPDATE_IF_NEWER
 		fi
 
 		worklist="$worklist $port"
@@ -3193,7 +3198,7 @@ if [ -n "$PM_FIRST_PASS" ]; then
 		[ -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
 		dep_check_type='build-depends-list run-depends-list'
-		[ -n "$RECURSE_THOROUGH" ] && dep_check_type=all-depends-list
+		[ -n "$PM_THOROUGH" ] && dep_check_type=all-depends-list
 	else
 		dep_check_type=run-depends-list
 	fi
@@ -3273,7 +3278,7 @@ if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 fi
 
 if [ -z "$NO_DEP_UPDATES" ]; then
-	if [ -z "$RECURSE_THOROUGH" ]; then
+	if [ -z "$PM_THOROUGH" ]; then
 		if [ -z "$PM_PACKAGES" ]; then
 			echo "===>>> Starting check for build dependencies"
 			dependency_check build-depends-list
@@ -3522,7 +3527,7 @@ if [ -z "$use_package" ]; then
 	if [ -n "$PM_PACKAGES" ]; then
 		[ -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
-		if [ -z "$RECURSE_THOROUGH" ]; then
+		if [ -z "$PM_THOROUGH" ]; then
 			echo "===>>> Starting check for build dependencies"
 			dependency_check build-depends-list
 		fi
@@ -3613,7 +3618,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
 	pm_cd_pd $portdir
 fi
 
-if [ -z "$RECURSE_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
+if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 	echo '' ; echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
 	pm_cd_pd $portdir
