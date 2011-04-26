@@ -1585,7 +1585,7 @@ check_for_updates () {
 
 	if [ -z "$do_update" -a -n "$port_ver" ]; then
 		if [ "$iport" = "$port_ver" ]; then
-			if [ -n "$LIST_PLUS" ]; then
+			if [ -n "$LIST_PLUS" -a -z "$PM_INDEX_ONLY" ]; then
 				check_state
 				return 0
 			elif [ -n "$LIST" ]; then
