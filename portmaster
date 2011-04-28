@@ -733,6 +733,8 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	[ $# -gt 0 ] && fail 'The -[lL] options are not compatible with updates or installs'
 fi
 
+[ -n "$PM_PACKAGES" -a -n "$FETCH_ONLY" ] && export PM_NO_CONFIRM=pm_no_confirm
+
 unset my_environment COMMAND_LINE_ARGUMENT
 unset -f packages_init cross_idx test_command_line
 
@@ -2154,26 +2156,26 @@ check_exclude () {
 
 check_fetch_only () {
 	[ -n "$FETCH_ONLY" ] || return 0
+	[ -z "$1" -a -n "$PM_PACKAGES" ] && return 0
 
-	local sleep nf fetches
+	local count nf fetches
 
 	echo ''
-	sleep=5
-	while `ls ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-* >/dev/null 2>&1`; do
-		nf=`ps -ax | grep [f]etch | wc -l`
+	count=0
+	while nf=`ls ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-* 2>/dev/null | wc -l`; do
 		nf=${nf##* }
-		[ "$nf" -eq 0 ] && break	# Not often, but it happens
-		fetches=fetches ; [ "$nf" -eq 1 ] && fetches=fetch
-		echo "===>>> Waiting for ${nf##* } distfile $fetches to finish"
-		sleep $sleep
+		[ $nf -eq 0 ] && break
+		fetches=fetches ; [ $nf -eq 1 ] && fetches=fetch
 
-		if [ $sleep -eq 10 ]; then
-			sleep=5
-		else
-			sleep=$(( $sleep + 1 ))
+		count=$(( $count + 1 ))
+		if [ $count -eq 1 ]; then
+			echo "===>>> Waiting for $nf distfile $fetches to finish"
+		elif [ $count -eq 3 ]; then
+			count=0
 		fi
+		sleep 2
 	done
-	echo "===>>> Distfile fetching is complete"
+	echo "===>>> ${1:-Distfile} fetching is complete"
 	FETCH_ONLY_DONE=fetch_only_done
 	safe_exit
 }
@@ -2840,10 +2842,11 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	fi
 
 	PM_FIRST_PASS=pm_first_pass ; export PM_FIRST_PASS
+	PM_NEEDS_UPDATE=' ' ; export PM_NEEDS_UPDATE	# Used with -F for multiport and -a
 
 	if [ -z "$FETCH_ONLY" ]; then
-		PM_NEEDS_UPDATE=' ' ; NO_DEP_UPDATES=no_dep_updates ; build_l=''
-		export PM_NEEDS_UPDATE NO_DEP_UPDATES build_l
+		NO_DEP_UPDATES=no_dep_updates ; build_l=''
+		export NO_DEP_UPDATES build_l
 
 		[ -z "$PM_INDEX_ONLY" ] &&
 			pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
@@ -3137,6 +3140,8 @@ if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 	else
 		update_build_l $portdir
 	fi
+elif [ -n "$FETCH_ONLY" -a -n "$PM_PACKAGES" ]; then
+	update_pm_nu $portdir
 fi
 
 # Do these things first time through
@@ -3525,13 +3530,14 @@ notnewer () {
 			fail "There is no valid package to install"
 		else
 			echo ''
+			[ -n "$FETCH_ONLY" ] && safe_exit
 			echo "===>>> There is no valid package to install, building port instead"
 			echo ''
 		fi
 	fi
 fi	# [ -n "$pm_package_time" ]
 
-if [ -z "$use_package" ]; then
+if [ -z "$use_package" -a -z "$FETCH_ONLY" ]; then
 	if [ -n "$PM_PACKAGES" ]; then
 		[ -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
@@ -3545,21 +3551,20 @@ if [ -z "$use_package" ]; then
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; echo ''; }
 
-	sleep=3
 	fl_read=`echo ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-${portdir#*/}.*`
+	count=0
 	while [ -f "$fl_read" ]; do
-		echo "===>>> Waiting on fetch & checksum for $portdir <<<==="
-		tail -10 $fl_read 2>/dev/null
-		echo '' ; echo ''
-		sleep $sleep
-
-		if [ $sleep -eq 10 ]; then
-			sleep=3
-		else
-			sleep=$(( $sleep + 1 ))
+		count=$(( $count + 1 ))
+		if [ $count -eq 1 ]; then
+			echo "===>>> Waiting on fetch & checksum for $portdir <<<==="
+			tail -10 $fl_read 2>/dev/null
+			echo '' ; echo ''
+		elif [ $count -eq 3 ]; then
+			count=0
 		fi
+		sleep 2
 	done
-	unset sleep fl_read
+	unset count fl_read
 
 	if [ -n "$HIDE_BUILD" ]; then
 		port_log=`mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}` ||
@@ -3574,6 +3579,7 @@ if [ -z "$use_package" ]; then
 else
 	[ -z "$local_package" ] && {
 		fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"; }
+	check_fetch_only Package
 fi
 
 # Ignore if no old port exists
