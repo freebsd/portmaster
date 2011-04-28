@@ -3116,9 +3116,17 @@ echo "===>>> Port directory: $pd/$portdir" ; echo ''
 if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		if ! check_state; then
-			echo "	===>>> If you are sure you can build it, remove the"
-			echo "	       $state line in the Makefile and try again."
-			safe_exit 1
+			check_state_fail=check_state_fail
+			if [ -n "$PM_FORCE_CONFIG" ]; then
+				sleep 4
+				make_config
+				check_state && unset check_state_fail
+			fi
+			if [ -n "$check_state_fail" ]; then
+				echo "	===>>> If you are sure you can build it, remove the"
+				echo "	       $state line in the Makefile and try again."
+				safe_exit 1
+			fi
 		fi
 	fi
 
