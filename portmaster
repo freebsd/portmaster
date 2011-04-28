@@ -3537,7 +3537,7 @@ notnewer () {
 	fi
 fi	# [ -n "$pm_package_time" ]
 
-if [ -z "$use_package" -a -z "$FETCH_ONLY" ]; then
+if [ -z "$use_package" ]; then
 	if [ -n "$PM_PACKAGES" ]; then
 		[ -z "$PM_NO_MAKE_CONFIG" ] && make_config
 
@@ -3579,11 +3579,10 @@ if [ -z "$use_package" -a -z "$FETCH_ONLY" ]; then
 else
 	[ -z "$local_package" ] && {
 		fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"; }
-	check_fetch_only Package
 fi
 
-# Ignore if no old port exists
-if [ -n "$upg_port" -o -n "$ro_upg_port" ]; then
+# Ignore if no old port exists, or -F
+if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	UPGRADE_PORT="${ro_upg_port:-$upg_port}"
 	UPGRADE_PORT_VER=`echo $UPGRADE_PORT | sed 's#.*-\(.*\)#\1#'`
 	export UPGRADE_PORT UPGRADE_PORT_VER
@@ -3635,6 +3634,7 @@ fi
 if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 	echo '' ; echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
+	[ -n "$use_package" ] && check_fetch_only Package
 	pm_cd_pd $portdir
 fi
 
