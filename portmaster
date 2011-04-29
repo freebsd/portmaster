@@ -2284,16 +2284,16 @@ update_port () {
 }
 
 uniquify_list () {
-	local item temp_list
+	local ul_item ul_temp_list
 
-	for item in "$@"; do
-		case "$temp_list" in
-		*" $item "*) ;;
-		*)	temp_list=" $temp_list $item " ;;
+	for ul_item in "$@"; do
+		case "$ul_temp_list" in
+		*" $ul_item "*) ;;
+		*)	ul_temp_list=" $ul_temp_list $ul_item " ;;
 		esac
 	done
 
-	echo $temp_list
+	echo $ul_temp_list
 }
 
 clean_build_only_list () {
@@ -2989,6 +2989,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 		esac
 		unset glob_dirs
 	fi
+	unset argv
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
 	if [ -z "$PM_INDEX_ONLY" ]; then
@@ -3217,6 +3218,7 @@ if [ -n "$PM_FIRST_PASS" ]; then
 	fi
 
 	dependency_check "$dep_check_type"
+# XXX
 
 	[ -n "$UPDATE_REQ_BYS" -o -n "$URB_YES" ] &&
 		URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
@@ -3814,6 +3816,7 @@ if [ -n "$upg_port" ]; then
 	else
 		ilist="Re-installation of $upg_port"
 	fi
+	unset argv
 else
 	ilist="Installation of $portdir ($new_port)"
 fi
