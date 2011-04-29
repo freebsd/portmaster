@@ -907,16 +907,13 @@ check_dependency_files () {
 		if [ -s "$pdb/$iport/+REQUIRED_BY" ]; then
 			# No actual dependencies exist, so this file is stale
 			# Zero it out so that -s mode can find it
-			if [ -n "$PM_VERBOSE" -o -n "$CHECK_DEPENDS" ]; then
-				echo "	===>>> No installed ports depend on $iport"
-				echo "	===>>> Emptying +REQUIRED_BY file.  Try ${0##*/} -s"
-			fi
+			pm_v "	===>>> No installed ports depend on $iport"
+			pm_v "	===>>> Emptying +REQUIRED_BY file.  Try ${0##*/} -s"
 
 			check_regular_file $pdb/$iport/+REQUIRED_BY
 			$PM_SU_CMD truncate -s0 $pdb/$iport/+REQUIRED_BY
 		fi
 	fi
-	return 0
 }
 
 # Takes default value, optional value, and message as input
@@ -1002,8 +999,7 @@ IFS='
 			fi
 
 			if [ -n "$d_iport" ]; then
-				[ -n "$PM_VERBOSE" -o -n "$CHECK_DEPENDS" ] &&
-					echo "	===>>> Updating @pkgdep for $d_origin"
+				pm_v "	===>>> Updating @pkgdep for $d_origin"
 			else
 				echo "	===>>> $d_origin is listed as a dependency"
 				echo "	===>>> but there is no installed version"
@@ -1051,8 +1047,7 @@ IFS='
 	cmp -s $contents $new_cont && { pm_unlink $new_cont ; return; }
 
 	check_regular_file $contents
-	[ -n "$PM_VERBOSE" -o -n "$CHECK_DEPENDS" ] &&
-		{ echo "	===>>> Installing the new +CONTENTS file" ; echo ''; }
+	pm_v "	===>>> Installing the new +CONTENTS file"
 	pm_install_s $new_cont $contents
 	pm_unlink $new_cont
 }
@@ -1256,6 +1251,24 @@ parse_index () {
 	esac
 }
 
+update_required_by () {
+	# Global: grep_deps
+	local do_update
+
+	if [ -e "$pdb/$1/+REQUIRED_BY" ]; then
+		sort $pdb/$1/+REQUIRED_BY | cmp -s $grep_deps - || do_update=do_update
+		check_regular_file $pdb/$1/+REQUIRED_BY
+	else
+		do_update=do_update2
+	fi
+	if [ -n "$do_update" ]; then
+		pm_v "	===>>> Updating $1/+REQUIRED_BY"
+		pm_install_s $grep_deps $pdb/$1/+REQUIRED_BY
+	fi
+
+	pm_unlink $grep_deps && unset grep_deps
+}
+
 #=============== End functions relevant to --features and main ===============
 #=============== Begin code relevant only to --features ===============
 
@@ -1377,7 +1390,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 fi	# [ -n "$CLEAN_PACKAGES" ]
 
 if [ -n "$CHECK_DEPENDS" ]; then
-	d_orig_ok=':'
+	PM_VERBOSE=pmv_check_depends
 IFS='
 '
 	for pkg in $pdb/*; do
@@ -1409,21 +1422,7 @@ IFS='
 		fi
 
 		check_dependency_files $origin $iport
-		if [ -s "$grep_deps" ]; then
-			if [ -e "$pkg/+REQUIRED_BY" ]; then
-				sort $pkg/+REQUIRED_BY | cmp -s $grep_deps - ||
-					do_update=do_update
-				check_regular_file $pkg/+REQUIRED_BY
-			else
-				do_update=do_update2
-			fi
-			if [ -n "$do_update" ]; then
-				unset do_update
-				echo "	===>>> Updating +REQUIRED_BY"
-				pm_install_s $grep_deps $pkg/+REQUIRED_BY
-			fi
-		fi
-		[ -n "$grep_deps" ] && { pm_unlink $grep_deps && unset grep_deps; }
+		[ -s "$grep_deps" ] && update_required_by $iport
 
 		update_contents $pkg/+CONTENTS
 	done
@@ -3218,7 +3217,6 @@ if [ -n "$PM_FIRST_PASS" ]; then
 	fi
 
 	dependency_check "$dep_check_type"
-# XXX
 
 	[ -n "$UPDATE_REQ_BYS" -o -n "$URB_YES" ] &&
 		URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
@@ -3756,6 +3754,17 @@ if [ -n "$use_package" ]; then
 		echo "===>>> Updating dependencies for $new_port to match installed versions"
 		update_contents $pdb/$new_port/+CONTENTS
 		echo ''
+
+		while read atc s; do
+			case "$atc" in
+			@pkgdep)	[ -n "$s" ] && pkgdep=$s ;;
+			@comment)	[ -n "$pkgdep" ] || continue
+					check_dependency_files ${s#DEPORIGIN:} $pkgdep
+					[ -s "$grep_deps" ] && update_required_by $pkgdep
+					unset pkgdep ;;
+			esac
+		done < $pdb/$new_port/+CONTENTS
+		unset atc s ; pm_v
 	fi
 fi
 
@@ -3795,19 +3804,7 @@ if [ -s "$grep_deps" ]; then
 	done < $grep_deps
 	unset d_port dp_cont do_update
 
-	if [ -e "$pdb/$new_port/+REQUIRED_BY" ]; then
-		sort $pdb/$new_port/+REQUIRED_BY | cmp -s $grep_deps - || do_update=do_update
-		check_regular_file $pdb/$new_port/+REQUIRED_BY
-	else
-		do_update=do_update2
-	fi
-	if [ -n "$do_update" ]; then
-		pm_v ; pm_v "	===>>> Updating $new_port/+REQUIRED_BY"
-		pm_install_s $grep_deps $pdb/$new_port/+REQUIRED_BY
-	fi
-
-	pm_unlink $grep_deps && unset grep_deps do_update
-	echo ''
+	update_required_by $new_port
 fi
 
 if [ -n "$upg_port" ]; then
