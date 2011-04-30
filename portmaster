@@ -2663,13 +2663,13 @@ multiport () {
 					continue
 				fi
 			fi
-			unset PM_UPDATE_IF_NEWER
 		fi
 
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
 		PM_MULTI_PORTS="${PM_MULTI_PORTS}${port}:"
 	done
+	unset PM_UPDATE_IF_NEWER
 
 	echo ''
 	if [ -z "$worklist" ]; then
