@@ -2786,6 +2786,8 @@ urb_final () {
 	echo "===>>> Done updating ports that depend on $new_port"
 	echo ''
 
+	check_fetch_only Package
+
 	safe_exit
 }
 
@@ -3634,8 +3636,17 @@ fi
 if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 	echo '' ; echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
-	[ -n "$use_package" ] && check_fetch_only Package
 	pm_cd_pd $portdir
+fi
+
+if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
+	if [ -n "$UPDATE_REQ_BYS" ] && [ -s "$pdb/$new_port/+REQUIRED_BY" ]; then
+		urb_final
+	elif [ "$$" -eq "$PM_PARENT_PID" ]; then
+		check_fetch_only Package
+	else
+		safe_exit
+	fi
 fi
 
 install_failed () {
@@ -3840,7 +3851,7 @@ if [ -z "$DONT_SCRUB_DISTFILES" ]; then
 	fi
 fi
 
-[ -n "$UPDATE_REQ_BYS" -a -s "$pdb/$new_port/+REQUIRED_BY" ] && urb_final
+[ -n "$UPDATE_REQ_BYS" ] && [ -s "$pdb/$new_port/+REQUIRED_BY" ] && urb_final
 
 safe_exit
 
