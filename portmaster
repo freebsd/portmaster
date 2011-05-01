@@ -216,7 +216,7 @@ parent_exit () {
 	fi
 
 	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
-	if [ -n "$1" -a -n "$PM_NEEDS_UPDATE" -a -n "$PM_BUILDING" ]; then
+	if [ -n "$1" -a -n "$PM_NEEDS_UPDATE" -a -n "$PM_BUILDING" -a -z "$FETCH_ONLY" ]; then
 		echo ''
 		echo "===>>> You can restart from the point of failure with this command line:"
 		echo "       ${0##*/} <flags> $PM_NEEDS_UPDATE"
