@@ -332,7 +332,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 	export pdb
 
-	[ -z "$port_dbdir" -a -d /var/db/ports ] && port_dbdir=/var/db/ports
+	[ -z "$port_dbdir" ] && [ -d /var/db/ports ] && port_dbdir=/var/db/ports
 	[ -z "$port_dbdir" ] &&
 		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
 	[ -n "$port_dbdir" ] && export port_dbdir
@@ -3049,7 +3049,7 @@ elif [ -z "$portdir" ]; then
 	no_valid_port
 fi
 
-if [ ! -d "$pd/$portdir" -a -z "$PM_INDEX_ONLY" ]; then
+if [ -z "$PM_INDEX_ONLY" ] && [ ! -d "$pd/$portdir" ]; then
 	find_moved_port $portdir $upg_port || no_valid_port
 	[ -n "$moved_npd" ] || no_valid_port
 	[ -d "$pd/$moved_npd" ] || no_valid_port
@@ -3640,8 +3640,12 @@ if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 fi
 
 if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
-	if [ -n "$UPDATE_REQ_BYS" ] && [ -s "$pdb/$new_port/+REQUIRED_BY" ]; then
-		urb_final
+	if [ -n "$UPDATE_REQ_BYS" ]; then
+		if [ -s "$pdb/$new_port/+REQUIRED_BY" ]; then
+			urb_final
+		else
+			safe_exit
+		fi
 	elif [ "$$" -eq "$PM_PARENT_PID" ]; then
 		check_fetch_only Package
 	else
@@ -3695,7 +3699,7 @@ echo ''
 # Remove saved libs that match newly installed files
 
 temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
-if [ -z "$temp" -a -d "$LOCALBASE_COMPAT" ]; then
+if [ -z "$temp" ] && [ -d "$LOCALBASE_COMPAT" ]; then
 	unset files
 	for file in `pkg_info -q -L $new_port`; do
 		[ -f "${LOCALBASE_COMPAT}/${file##*/}" ] &&
@@ -3824,7 +3828,6 @@ if [ -n "$upg_port" ]; then
 	else
 		ilist="Re-installation of $upg_port"
 	fi
-	unset argv
 else
 	ilist="Installation of $portdir ($new_port)"
 fi
