@@ -375,7 +375,7 @@ usage () {
 	echo ''
 	echo "${0##*/} --list-origins"
 	echo ''
-	echo "${0##*/} [--force-config|-G] [-aftv] -F"
+	echo "${0##*/} [--force-config|-G] [[--packages|-P]|[--packages-only|-PP]] [-aftv] -F"
 	echo ''
 	echo "${0##*/} [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
 	echo "${0##*/} [-n|y] [-b] [-D|d] -s"
