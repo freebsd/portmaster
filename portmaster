@@ -3464,7 +3464,29 @@ fetch_package () {
 		echo ''
 		echo "       Check the pkg_add(1) man page for information"
 		echo "       on setting the PACKAGESITE environment variable"
-		[ "$PM_PACKAGES" = only ] && fail $ponly_err
+		[ "$PM_PACKAGES" = only -a -z "$FETCH_ONLY" ] && fail $ponly_err
+		if [ -n "$FETCH_ONLY" ]; then
+			while [ -z "$continue" ]; do
+				echo -e "\n===>>> There is no valid package to install\n"
+				echo "===>>> Abort update         [a]"
+				echo "===>>> Retry fetch          [r]"
+				echo "===>>> Continue if possible [c]"
+				echo ''
+				echo -n "===>>> How would you like to proceed? [a] "
+				read answer ; echo ''
+
+				case "$answer" in
+				a|'')	fail "No package exists for $new_port" ;;
+				r)	if fetch_package $new_port try ; then
+						latest_pv=$new_port
+						continue=continue
+					fi ;;
+				c)	safe_exit ;;
+				*)	echo "	===>>> $answer is not a valid response" ;;
+				esac
+			done
+			unset continue answer
+		fi
 	else
 		latest_pv=${latest_pv#*href=\"}
 		latest_pv=${latest_pv%%\.tbz*}
