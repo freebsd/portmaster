@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 10, 2011
+.Dd May 1, 2011
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -83,11 +83,15 @@ and/or multiple globs from /var/db/pkg
 .Op Fl R
 .Fl r Ar name/glob of port in /var/db/pkg
 .Nm
-.Fl [l|L]
+.Fl l
+.Nm
+.Op --index-only [-t]
+.Fl L
 .Nm
 .Fl -list-origins
 .Nm
 .Op Fl -force-config|-G
+.Op Fl P|-PP
 .Op Fl aftv
 .Fl F
 .Nm
