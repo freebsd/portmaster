@@ -145,7 +145,7 @@ parent_exit () {
 		pm_rmdir_s $pbu
 	fi
 
-	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do pm_unlink $f ; done
+	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do /bin/unlink $f ; done
 
 	[ -n "$PM_WRKDIRPREFIX" ] &&
 		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
@@ -278,7 +278,7 @@ pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
 		fail "mktemp for $1 failed"; }
-pm_unlink () { /bin/test -e $1 && /bin/unlink $1; }
+pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 
 # Superuser versions for commands that need root privileges
 
@@ -291,7 +291,7 @@ pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
 pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
 pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
-pm_unlink_s       () { /bin/test -e $1 && $PM_SU_CMD /bin/unlink $1; }
+pm_unlink_s       () { [ -e "$1" ] && $PM_SU_CMD /bin/unlink $1; }
 
 pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
 pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
@@ -913,6 +913,7 @@ check_dependency_files () {
 			check_regular_file $pdb/$iport/+REQUIRED_BY
 			$PM_SU_CMD truncate -s0 $pdb/$iport/+REQUIRED_BY
 		fi
+		/bin/unlink $grep_deps
 	fi
 }
 
@@ -1044,7 +1045,7 @@ IFS='
 	done
 	[ -n "$prev_line" ] && echo $prev_line >> $new_cont
 
-	cmp -s $contents $new_cont && { pm_unlink $new_cont ; return; }
+	cmp -s $contents $new_cont && { /bin/unlink $new_cont ; return; }
 
 	check_regular_file $contents
 	pm_v "	===>>> Installing the new +CONTENTS file"
@@ -1142,9 +1143,9 @@ read_distinfos () {
 	done
 
 	# Tell safe_exit that we are done
-	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
+	pm_unlink ${DI_FILES}-e
 	sed -i -e 1s/############/%%%%%%%%%%%%/ $DI_FILES
-	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
+	pm_unlink ${DI_FILES}-e
 }
 
 read_distinfos_all () {
@@ -1179,9 +1180,9 @@ read_distinfos_all () {
 	done
 
 	# Tell safe_exit that we are done
-	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
+	pm_unlink ${DI_FILES}-e
 	sed -i -e 1s/############/%%%%%%%%%%%%/ $DI_FILES
-	[ -e "${DI_FILES}-e" ] && unlink ${DI_FILES}-e
+	pm_unlink ${DI_FILES}-e
 }
 
 ports_by_category () {
@@ -1266,7 +1267,7 @@ update_required_by () {
 		pm_install_s $grep_deps $pdb/$1/+REQUIRED_BY
 	fi
 
-	pm_unlink $grep_deps && unset grep_deps
+	/bin/unlink $grep_deps && unset grep_deps
 }
 
 #=============== End functions relevant to --features and main ===============
@@ -1291,7 +1292,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 			get_answer_yn n "	===>>> Delete stale file: ${f}"
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
-				pm_unlink $df ;;
+				/bin/unlink $df ;;
 			*)	continue ;;
 			esac
 		fi
@@ -1919,7 +1920,7 @@ delete_all_distfiles () {
 			[yY])	for f in $dist_list_files; do
 					if [ -f "${DISTDIR}${f}" ]; then
 						echo "       Deleting ${DISTDIR}${f}"
-						pm_unlink ${DISTDIR}${f}
+						/bin/unlink ${DISTDIR}${f}
 					fi
 				done ;;
 			esac
@@ -3635,7 +3636,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
 		fi
 
-		pm_unlink $ldconfig_out ; unset ldconfig_out temp file
+		/bin/unlink $ldconfig_out ; unset ldconfig_out temp file
 	fi
 
 	find_dl_distfiles $portdir
@@ -3783,7 +3784,7 @@ if [ -n "$distfiles" ]; then
 
 	pm_sv Installing $dist_list
 	pm_install_s $dist_list_temp $dist_list
-	pm_unlink $dist_list_temp ; unset ds dist_list_temp
+	/bin/unlink $dist_list_temp ; unset ds dist_list_temp
 fi
 
 if [ -n "$use_package" ]; then
