@@ -145,7 +145,10 @@ parent_exit () {
 		pm_rmdir_s $pbu
 	fi
 
-	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do /bin/unlink $f ; done
+	for f in ${TMPDIR}/f-${PM_PARENT_PID}-*; do
+		case "$f" in */f-${PM_PARENT_PID}-\*) continue ;; esac
+		/bin/unlink $f
+	done
 
 	[ -n "$PM_WRKDIRPREFIX" ] &&
 		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
