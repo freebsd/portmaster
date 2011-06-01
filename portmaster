@@ -3193,7 +3193,8 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 	fi
 
 	if [ -z "$FETCH_ONLY" -a ! "$PM_PACKAGES" = only ]; then
-		TESTINT=`grep -l ^IS_INTERACTIVE Makefile`
+		TESTINT=`grep -l ^IS_INTERACTIVE Makefile` &&
+		    TESTINT=`pm_make_b -V IS_INTERACTIVE`
 	else
 		[ -n "$ALL_FETCH" ] && safe_exit
 	fi
