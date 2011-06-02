@@ -5,15 +5,17 @@
 
 trap trap_exit INT
 
+umask 022
+
 # Initialize crucial values for the parent, and export them for the children
 if [ -z "$PM_PARENT_PID" ]; then
 	PM_PARENT_PID=$$
-	: ${TMPDIR:=/tmp}
+	: ${TMPDIR:=/tmp} ; /bin/mkdir -p $TMPDIR
 	UPGRADE_TOOL=portmaster
 
 	# /usr/local is needed in the path for make
 	PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-	[ -e /usr/X11R6 -a ! -L /usr/X11R6 ] && PATH=$PATH:/usr/X11R6/bin
+	[ -e /usr/X11R6 ] && [ ! -L /usr/X11R6 ] && PATH=$PATH:/usr/X11R6/bin
 	[ -n "$CCACHE_PATH" -a -z "$NOCCACHE" ] && PATH="/usr/local/libexec/ccache:$PATH"
 	export PM_PARENT_PID TMPDIR UPGRADE_TOOL PATH
 
@@ -43,8 +45,6 @@ if [ -z "$PM_PARENT_PID" ]; then
 	[ $euid -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
 	unset euid
 fi
-
-umask 022
 
 #=============== Begin functions we always want to have ===============
 
