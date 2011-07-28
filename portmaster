@@ -3376,6 +3376,7 @@ fetch_package () {
 		fi
 	else
 		do_fetch=do_fetch_always_fetch
+		pm_unlink_s ${ppd}/${1}.tbz
 	fi
 
 	if [ -n "$do_fetch" ]; then
