@@ -2946,7 +2946,7 @@ all_first_pass () {
 			safe_exit
 		fi
 
-		post_first_pass 'for ports that need updating'
+		post_first_pass 'ports that need updating'
 
 		[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
 	fi
