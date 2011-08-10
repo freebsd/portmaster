@@ -292,7 +292,7 @@ pm_pkg_delete_s   () {
 	if [ -z "${use_pkgng}" ]; then
 		$PM_SU_CMD /usr/sbin/pkg_delete $*;
 	else
-		$PM_SU_CMD /usr/sbin/pkg delete $*;
+		$PM_SU_CMD /usr/sbin/pkg delete -y $*;
 	fi
 }
 pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
@@ -1762,6 +1762,11 @@ pm_pkg_create () {
 	fi
 
 	pm_cd $pkgdir || fail "Cannot cd into $pkgdir to create a package"
+	if [ -z "${use_pkgng}" ]; then
+		pm_pkg_create="pkg_create -b"
+	else
+		pm_pkg_create="pkg create "
+	fi
 	if $PM_SU_CMD pkg_create -b $2; then
 		if [ "$1" = "$pbu" ]; then
 			if [ -n "$BACKUP" ]; then
