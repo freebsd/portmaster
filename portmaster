@@ -1265,19 +1265,17 @@ ports_by_category () {
 		local nb_rdep
 		local nb_dep
 		for pkg in `pkg info -qa`; do
-			nb_rdep=`pkg info -qr $pkg | wc -l`
-			nb_dep=`pkg info -qd $pkg | wc -l`
-			if [ $nb_rdep -gt 0 ]; then
-				if [ $nb_dep -gt 0 ]; then
+			eval "$(pkg query "dep=%?d\nrdep=%?r" $pkg)"
+			if [ $rdep -eq 0 ]; then
+				if [ $dep -eq 0 ]; then
 					branches="$branches ${pkg}"
 				else
 					trunks="$trunks ${pkg}"
 				fi
 			else
-				if [ $nb_dep -gt 0 ]; then
+				if [ $dep -eq 0 ]; then
 					leaves="$leaves ${pkg}"
 				else
-					pkg info -e $pkg || continue
 					roots="$roots ${pkg}"
 				fi
 			fi
