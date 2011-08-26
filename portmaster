@@ -1332,16 +1332,14 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		if [ -n "$port_ver" ]; then
 			if [ "${port_ver}.tbz" = "${package##*/}" ]; then
 				echo "===>>> ${package##*/} is up to date"
-				if [ -z "$PM_YES" ]; then
-					if [ ! -d "${pdb}/${pkg_dir}" ]; then
-						echo "	===>>> $pkg_dir is not installed"
-						echo "	===>>> Path: ${package}"
-						get_answer_yn y "	===>>> Delete stale package: ${package##*/}"
-						case "$?" in
-						0)	echo "	===>>> Deleting $package"
-							pm_unlink_s $package ;;
-						esac
-					fi
+				if [ ! -d "${pdb}/${pkg_dir}" ]; then
+					echo "	===>>> $pkg_dir is not installed"
+					echo "	===>>> Path: ${package}"
+					get_answer_yn y "	===>>> Delete stale package: ${package##*/}"
+					case "$?" in
+					0)	echo "	===>>> Deleting $package"
+						pm_unlink_s $package ;;
+					esac
 				fi
 				unset port_ver
 				continue
