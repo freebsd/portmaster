@@ -125,7 +125,7 @@ parent_exit () {
 	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && kill_bad_children
 
 	if [ -z "$1" ]; then
-		if [ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ]; then
+		if [ -n "$PM_URB" -o -n "$PM_FORCE" ]; then
 			files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 			if [ -n "$files" ]; then
 				pm_sv Deleting \'install complete\' flags
@@ -264,11 +264,11 @@ safe_exit () {
 			echo "INTERACTIVE_YES='$INTERACTIVE_YES'" >> $IPC_SAVE
 			echo "INTERACTIVE_NO='$INTERACTIVE_NO'" >> $IPC_SAVE
 		fi
-		[ -n "$URB_YES" ] && echo "URB_DONE_LIST='$URB_DONE_LIST'" >> $IPC_SAVE
+		[ -n "$PM_URB" -o -n "$PM_URB_UP" ] && echo "PM_URB_DONE='$PM_URB_DONE'" >> $IPC_SAVE
 	fi
 
 	exit ${1:-0}
-}
+} # safe_exit()
 
 pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
@@ -276,7 +276,7 @@ pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-		 unset -v MASTER_RB_LIST;
+		 unset -v PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
@@ -288,7 +288,7 @@ pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
 pm_install_s      () { $PM_SU_CMD /usr/bin/install -p -o root -g wheel -m 644 $1 $2; }
 pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-			 unset -v MASTER_RB_LIST;
+			 unset -v PM_URB_LIST;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
@@ -372,6 +372,7 @@ usage () {
 	echo ''
 	echo "${0##*/} [Common flags] -o <new port dir in $pd> <installed port>"
 	echo "${0##*/} [Common flags] [-R] -r <name/glob of port directory in $pdb>"
+	echo '         (-r <port> can be specified multiple times)'
 	echo ''
 	echo "${0##*/} -l"
 	echo "${0##*/} [--index-only [-t]] -L"
@@ -663,7 +664,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;;
 	p)	fail 'The -p option has been deprecated' ;;
-	r)	UPDATE_REQ_BYS=ropt
+	r)	PM_URB=ropt
 		if [ -d "$pdb/$OPTARG" ]; then
 			glob_dirs=$OPTARG
 		else
@@ -673,8 +674,9 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 			2)	fail 'The argument to -r must match only one port' ;;
 			esac
 		fi
-		PM_RBP=${glob_dirs##*/} ; unset glob_dirs
-		portdir=`origin_from_pdb $PM_RBP` ;;
+		PM_URB_IPORTS="${PM_URB_IPORTS}${glob_dirs##*/} "
+		PM_URB_ORIGINS="${PM_URB_ORIGINS}`origin_from_pdb ${glob_dirs##*/}` "
+		unset glob_dirs ;;
 	s)	CLEAN_STALE=sopt ;;
 	t)	PM_THOROUGH=topt; ARGS="-t $ARGS" ;;
 	u)	fail 'The -u option has been deprecated' ;;
@@ -730,7 +732,7 @@ fi
 if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	if [ -n "$FETCH_ONLY" -o -n "$RESTART" -o -n "$UPDATE_ALL" -o \
 	    -n "$EXPUNGE" -o -n "$PM_FORCE" -o -n "$NO_ACTION" -o \
-	    -n "$REPLACE_ORIGIN" -o -n "$UPDATE_REQ_BYS" -o -n "$CLEAN_STALE" ]; then
+	    -n "$REPLACE_ORIGIN" -o -n "$PM_URB" -o -n "$CLEAN_STALE" ]; then
 		fail 'The -[lL] options are not compatible with -FRaefnors'
 	fi
 	[ $# -gt 0 ] && fail 'The -[lL] options are not compatible with updates or installs'
@@ -745,6 +747,9 @@ unset -f packages_init cross_idx test_command_line
 
 # Update based on options chosen above
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
+	# Continue error checking in parent only
+	[ -n "$PM_URB" -a -n "$1" ] && fail 'The -r option is not compatible with other updates'
+
 	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
 		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
 			fail Package installation support requires FreeBSD 6.4 or newer
@@ -1517,9 +1522,8 @@ check_state () {
 check_force_multi () {
 	if [ -n "$PM_FORCE" ]; then
 		check_restart_and_udf $1 || return 1
-	elif [ -n "$URB_YES" ]; then
-		case "$MASTER_RB_LIST" in
-		*" $1 "*) check_restart_and_udf $1 || return 1 ;;
+	elif [ -n "$PM_URB_UP" ]; then
+		case " $PM_URB_LIST " in *" $1 "*) check_restart_and_udf $1 || return 1 ;;
 		esac
 	elif [ -n "$PM_MULTI_PORTS" ]; then
 		case "$PM_MULTI_PORTS" in
@@ -1631,9 +1635,6 @@ check_for_updates () {
 		return 0
 	elif [ -n "$PM_UPDATE_IF_NEWER" ]; then
 		return 1
-	elif [ "$PM_RBP" = "$iport" ]; then
-		PM_RBP_NEEDS_UPGRADE=pm_rbp_needs_upgrade
-		return 0
 	fi
 
 	# No need for check_exclude here because it is already
@@ -2097,7 +2098,7 @@ fi
 
 already_done () {
 	[ -n "$PM_VERBOSE" ] || return 0
-	echo "===>>> The update for $1 is already done"
+	echo "===>>> The update for $1 is already done" ; echo ''
 }
 
 check_restart_and_udf () {
@@ -2108,7 +2109,7 @@ check_restart_and_udf () {
 	if [ ! -e "$pdb/${1}/PM_UPGRADE_DONE_FLAG" ]; then
 		return 1
 	else
-		already_done $1 ; echo ''
+		already_done $1
 	fi
 }
 
@@ -2273,7 +2274,7 @@ update_port () {
 		term_printf " (${num_of_deps})"
 		echo "===>>> Returning to update check of installed ports"
 		echo ''
-	elif [ -n "$UPDATE_REQ_BYS" ]; then
+	elif [ -n "$PM_URB" ]; then
 		return 0
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
 		echo "===>>> Continuing initial dependency check for $portdir"
@@ -2282,7 +2283,7 @@ update_port () {
 		echo "===>>> Returning to dependency check for $portdir"
 	fi
 	return 0
-}
+} # update_port()
 
 uniquify_list () {
 	local ul_item ul_temp_list
@@ -2423,7 +2424,7 @@ dependency_check () {
 		[ -n "$PM_FIRST_PASS" ] &&
 			case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
 
-		[ -z "$URB_YES" ] &&
+		[ -z "$PM_URB_UP" ] &&
 			case "$CUR_DEPS" in *:${origin}:*) continue ;; esac
 
 		if [ -z "$PM_INDEX_ONLY" ]; then
@@ -2462,17 +2463,17 @@ dependency_check () {
 				CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
 			fi
 			continue
-		elif [ -n "$URB_YES" -a -n "$iport" ]; then
-			case "$URB_DONE_LIST" in
+		elif [ -n "$PM_URB_UP" -a -n "$iport" ]; then
+			case "$PM_URB_DONE" in
 			*:${iport}:*) already_done $iport ; continue ;; esac
 
-			case "$MASTER_RB_LIST" in *" $iport "*)
+			case " $PM_URB_LIST " in *" $iport "*)
 				check_interactive $iport || continue
 				if ! check_restart_and_udf $iport; then
 					update_port $iport
 				else
 					CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
-					URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
+					PM_URB_DONE="${PM_URB_DONE}${upg_port}:"
 				fi
 				continue ;;
 			esac
@@ -2507,36 +2508,12 @@ dependency_check () {
 			fi ;;
 		esac
 	fi
-}
-
-create_master_rb_list () {
-	# Global: MASTER_RB_LIST
-	local req_by
-
-	for req_by in `grep -l DEPORIGIN:$portdir$ $pdb/*/+CONTENTS`; do
-		req_by="${req_by%/+CONTENTS}"
-		req_by="${req_by##*/}"
-		MASTER_RB_LIST="${MASTER_RB_LIST}${req_by} "
-	done
-
-	[ -n "$MASTER_RB_LIST" ] && export MASTER_RB_LIST=" $MASTER_RB_LIST"
-}
+} # dependency_check()
 
 post_first_pass () {
 	local action
 
-	if [ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" ]; then
-		if [ -n "$PM_RBP_NEEDS_UPGRADE" ]; then
-			echo "===>>> $PM_RBP and/or dependencies are out of date, forcing rebuild"
-		else
-			echo "===>>> $PM_RBP is up to date, skipping rebuild due to -R flag"
-			PM_REQ_BY_SKIP_PARENT=pm_req_by_skip_parent
-			build_l="${build_l#*\\n}"
-		fi
-		echo ''
-	fi
-
-	if [ $num_of_deps -gt 0 ]; then
+	if [ ${num_of_deps:-0} -gt 0 ]; then
 		term_printf " (${num_of_deps})"
 
 		if [ -z "$PM_NO_CONFIRM" ]; then
@@ -2614,6 +2591,62 @@ init_term_printf () {
 	term_printf
 }
 
+if [ -n "$PM_URB" ]; then
+	[ -n "$RESTART" ] && PM_UPDATE_IF_NEWER=pm_update_if_newer_urb
+
+urb_update () {
+	# Global: PM_URB_UP
+	local verb origin req_by
+
+	verb=checking ; [ -n "$1" ] && verb=updating
+
+	export PM_URB_UP=pm_urb_up
+	echo ''
+	echo "===>>> Begin $verb ports that depend on $PM_URB_IPORTS"
+	echo ''
+
+	for origin in $PM_URB_ORIGINS; do
+		for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
+			req_by="${req_by%/+CONTENTS}"
+			req_by="${req_by##*/}"
+			PM_URB_LIST="${PM_URB_LIST} ${req_by}"
+		done
+	done
+
+	if [ -n "$PM_URB_LIST" ]; then
+		PM_URB_LIST="`uniquify_list $PM_URB_LIST`"
+		export PM_URB_LIST
+	else
+		echo "===>>> No ports depend on $PM_URB_IPORTS" ; echo ''
+	fi
+
+	for req_by in $PM_URB_LIST; do
+		# Probably not needed, but JIC
+		[ -d "$pdb/$req_by" ] || continue
+
+		pm_v "===>>> $req_by depends on $PM_URB_IPORTS"
+
+		case "$PM_URB_DONE" in
+		*:${req_by}:*) already_done $req_by ; continue ;; esac
+
+		check_exclude $req_by || continue
+		check_interactive $req_by || continue
+
+		# Shortcut, since check_for will force it
+		if [ -z "$RESTART" -a -z "$PM_FORCE" ]; then
+			update_port $req_by
+		else
+			check_for_updates $req_by || fail 'Update failed'
+		fi
+		echo -e "\n===>>> Returning to check of ports depending on $PM_URB_IPORTS"
+	done
+	echo ''
+	echo "===>>> Done $verb ports that depend on $PM_URB_IPORTS"
+	echo ''
+	unset PM_URB_UP PM_URB_LIST PM_URB_DONE
+}
+fi
+
 multiport () {
 	# Global
 	PM_MULTI_PORTS=':' ; export PM_MULTI_PORTS
@@ -2656,14 +2689,16 @@ multiport () {
 			*)	iport=$port ;;
 			esac
 
-			if [ -n "$iport" ]; then
-				if check_for_updates multi $iport; then
-					if [ -n "$PM_VERBOSE" ]; then
-						echo ''
-						echo "===>>> $port is up to date, skipping"
-					fi
-					continue
+			if [ -n "$iport" ] && check_for_updates multi $iport; then
+				if [ -n "$PM_URB" -a -n "$RESTART" ]; then
+					echo ''
+					echo "===>>> $iport is up to date, skipping rebuild due to -R flag"
+					udl_prime="${udl_prime}${iport}:"
+				elif [ -n "$PM_VERBOSE" ]; then
+					echo ''
+					echo "===>>> $port is up to date, skipping"
 				fi
+				continue
 			fi
 		fi
 
@@ -2673,49 +2708,61 @@ multiport () {
 	done
 	unset PM_UPDATE_IF_NEWER
 
-	echo ''
 	if [ -z "$worklist" ]; then
-		echo "===>>> All listed ports are up to date, exiting" ; echo ''
-		safe_exit
-	fi
-	echo "===>>> Working on multiple ports:"
-	echo -e $portlist
-
-	if [ -n "$PM_FIRST_PASS" ]; then
-		if [ -n "$PM_BUILD_ONLY_LIST" ]; then
-			PM_BUILD_ONLY_LIST=pmp_doing_build_deps
-			for port in $worklist; do
-				case "$port" in
-				*/*)	run_dl_g="$run_dl_g ${pd}/${port} " ;;
-				*)	run_dl_g="$run_dl_g ${pd}/`origin_from_pdb $port` " ;;
-				esac
-			done
+		if [ -z "$PM_URB" ]; then
+			echo ''
+			echo "===>>> All listed ports are up to date, exiting" ; echo ''
+			safe_exit
 		fi
+	else
+		echo ''
+		echo "===>>> Working on:"
+		echo -e $portlist
+	fi
 
-		numports=0
+	# First Pass
+	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
+		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 		for port in $worklist; do
 			case "$port" in
-			*/*)	origin=$port ;;
-			*)	origin=`origin_from_pdb $port` ;;
-			esac
-
-			case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
-
-			numports=$(( $numports + 1 ))
-			init_term_printf "$port ${numports}/${numports}"
-			($0 $ARGS $port) || fail "Update for $port failed"
-			. $IPC_SAVE
-
-			case "$PM_NEEDS_UPDATE" in
-			*\ $origin\ *)		continue ;;
-						# Handle +IGNOREME in child
-			*)			numports=$(( $numports - 1 )) ;;
+			*/*)	run_dl_g="$run_dl_g ${pd}/${port} " ;;
+			*)	run_dl_g="$run_dl_g ${pd}/`origin_from_pdb $port` " ;;
 			esac
 		done
-
-		check_fetch_only
-		post_first_pass multiple ports
 	fi
+
+	[ -n "$PM_URB" ] && export PM_URB
+
+	numports=0
+	for port in $worklist; do
+		case "$port" in
+		*/*)	origin=$port ;;
+		*)	origin=`origin_from_pdb $port` ;;
+		esac
+
+		case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
+
+		numports=$(( $numports + 1 ))
+		init_term_printf "$port ${numports}/${numports}"
+		($0 $ARGS $port) || fail "Update for $port failed"
+		. $IPC_SAVE
+
+		case "$PM_NEEDS_UPDATE" in
+		*\ $origin\ *)	continue ;;	# Handle +IGNOREME in child
+		*)		numports=$(( $numports - 1 )) ;;
+		esac
+	done
+
+	if [ -n "$PM_URB" ]; then
+		unset PM_URB ; PM_URB=pm_urb_post_first_pass
+		PM_URB_DONE=":${udl_prime}" ; export PM_URB_DONE
+		urb_update
+	fi
+
+	check_fetch_only
+	post_first_pass multiple ports
+
+	[ -n "$PM_URB" ] && export PM_URB
 
 	export PM_BUILDING=pmbuildingmultiport
 	num=0
@@ -2741,6 +2788,13 @@ multiport () {
 		($0 $ARGS $port) || fail "Update for $port failed"
 		. $IPC_SAVE
 	done
+
+	if [ -n "$PM_URB" ]; then
+		unset PM_URB ; PM_URB=pm_urb_post_build
+		PM_URB_DONE=":${udl_prime}" ; export PM_URB_DONE
+		urb_update urb_update_after_build
+	fi
+
 	safe_exit
 }
 
@@ -2752,45 +2806,6 @@ make_config () {
 	pm_sv Running \'make $config_type\'
 	pm_cd_pd $portdir
 	pm_make_s $config_type
-}
-
-urb_final () {
-	# Global: URB_YES
-	local req_by
-
-	export URB_YES=urb_yes_final
-	echo "===>>> Updating ports that depend on $new_port"
-	echo ''
-	create_master_rb_list
-	for req_by in $MASTER_RB_LIST; do
-		# Probably not needed, but JIC
-		[ -d "$pdb/$req_by" ] || continue
-
-		case "$URB_DONE_LIST" in
-		*:${req_by}:*) already_done $req_by ; continue ;;
-		esac
-
-		# Check here since if "no" it will not prompt
-		check_interactive $req_by || continue
-
-		pm_v "===>>> $new_port is required by $req_by"
-		check_exclude $req_by || continue
-
-		# Shortcut, since check_for will force it
-		if [ -z "$RESTART" -a -z "$PM_FORCE" ]; then
-			update_port $req_by
-		else
-			check_for_updates $req_by || fail 'Update failed'
-		fi
-		echo "===>>> Returning to check of ports depending on $upg_port"
-	done
-	echo ''
-	echo "===>>> Done updating ports that depend on $new_port"
-	echo ''
-
-	check_fetch_only Package
-
-	safe_exit
 }
 
 #=============== End functions for main ===============
@@ -2827,8 +2842,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		export INTERACTIVE_YES INTERACTIVE_NO
 	fi
 
-	[ -n "$UPDATE_REQ_BYS" ] && export URB_DONE_LIST=':'
-	if [ -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ]; then
+	if [ -n "$PM_URB" -o -n "$PM_FORCE" ]; then
 		if [ -z "$RESTART" ]; then
 			files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 			if [ -n "$files" ]; then
@@ -2878,6 +2892,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	[ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" -a -z "$PM_PACKAGES" ] &&
 		export DI_FILES=`pm_mktemp DI-FILES`
 
+	[ -n "$PM_URB" ] && multiport $PM_URB_IPORTS
 	[ $# -gt 1 -a -z "$REPLACE_ORIGIN" ] && multiport "$@"
 fi
 
@@ -3090,7 +3105,7 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 				safe_exit
 			fi ;;
 		esac
-	elif [ -n "$URB_YES" ]; then
+	elif [ -n "$PM_URB_UP" ]; then
 		echo ''
 		echo "===>>> $upg_port has an +IGNOREME file, ignoring"
 		echo ''
@@ -3139,8 +3154,6 @@ if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 
 	if [ -n "$upg_port" ]; then
 		update_build_l $upg_port
-		[ -n "$UPDATE_REQ_BYS" -a -n "$RESTART" -a "$$" -eq "$PM_PARENT_PID" ] &&
-			check_for_updates $upg_port
 	else
 		update_build_l $portdir
 	fi
@@ -3223,8 +3236,8 @@ if [ -n "$PM_FIRST_PASS" ]; then
 
 	dependency_check "$dep_check_type"
 
-	[ -n "$UPDATE_REQ_BYS" -o -n "$URB_YES" ] &&
-		URB_DONE_LIST="${URB_DONE_LIST}${upg_port}:"
+	[ -n "$PM_URB" -o -n "$PM_URB_UP" ] &&
+		PM_URB_DONE="${PM_URB_DONE}${upg_port}:"
 
 	if [ ! "$$" -eq "$PM_PARENT_PID" ]; then
 		# Save state for the parent process to read back in
@@ -3241,40 +3254,6 @@ if [ -n "$PM_FIRST_PASS" ]; then
 		fi
 
 		safe_exit
-	elif [ -n "$UPDATE_REQ_BYS" ]; then
-		[ -z "$NO_DEP_UPDATES" ] && PM_RBP_NEEDS_UPGRADE=pm_rbp_needs_upgrade
-		export URB_YES=urb_yes
-		echo ''
-		echo "===>>> Checking ports that depend on $upg_port"
-		echo ''
-		create_master_rb_list
-		[ -n "$MASTER_RB_LIST" ] || {
-			echo "===>>> No ports depend on $upg_port" ; echo ''; }
-		for req_by in $MASTER_RB_LIST; do
-			# Probably not needed, but JIC
-			[ -d "$pdb/$req_by" ] || continue
-
-			case "$URB_DONE_LIST" in
-			*:${req_by}:*) already_done $req_by
-			continue ;; esac
-
-			pm_v "===>>> $upg_port is required by $req_by"
-
-			check_exclude $req_by || continue
-			check_interactive $req_by || continue
-
-			# Shortcut, since check_for will force it
-			if [ -z "$RESTART" -a -z "$PM_FORCE" ]; then
-				update_port $req_by
-			else
-				check_for_updates $req_by || fail 'Update failed'
-			fi
-			echo "===>>> Returning to check of ports depending on $upg_port"
-		done
-		echo ''
-		echo "===>>> Done checking ports that depend on $upg_port"
-		echo ''
-		unset URB_YES MASTER_RB_LIST ; URB_DONE_LIST=':'
 	fi
 
 	check_fetch_only
@@ -3329,8 +3308,6 @@ if [ -z "$new_port" ]; then
 			fail "No entry for $origin in $PM_INDEX"
 	fi
 fi
-
-[ -n "$PM_REQ_BY_SKIP_PARENT" ] && urb_final
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 	case `pm_make_b -V PT_NO_INSTALL_PACKAGE` in
@@ -3666,13 +3643,7 @@ if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 fi
 
 if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
-	if [ -n "$UPDATE_REQ_BYS" ]; then
-		if [ -s "$pdb/$new_port/+REQUIRED_BY" ]; then
-			urb_final
-		else
-			safe_exit
-		fi
-	elif [ "$$" -eq "$PM_PARENT_PID" ]; then
+	if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		check_fetch_only Package
 	else
 		safe_exit
@@ -3858,7 +3829,7 @@ else
 	ilist="Installation of $portdir ($new_port)"
 fi
 
-if [ "$$" -ne "$PM_PARENT_PID" -o -n "$UPDATE_REQ_BYS" ]; then
+if [ "$$" -ne "$PM_PARENT_PID" -o -n "$PM_URB" ]; then
 	echo "===>>> $ilist succeeded" ; echo ''
 fi
 
@@ -3868,8 +3839,8 @@ CUR_DEPS="${CUR_DEPS}${new_port}:${portdir}:"
 
 [ -n "$HIDE_BUILD" -a -n "$port_log" ] && pm_unlink $port_log
 
-[ -n "$URB_YES" -o -n "$UPDATE_REQ_BYS" ] && URB_DONE_LIST="${URB_DONE_LIST}${new_port}:"
-[ -n "$URB_YES" -o -n "$UPDATE_REQ_BYS" -o -n "$PM_FORCE" ] &&
+[ -n "$PM_URB" -o -n "$PM_URB_UP" ] && PM_URB_DONE="${PM_URB_DONE}${new_port}:"
+[ -n "$PM_URB" -o -n "$PM_URB_UP" -o -n "$PM_FORCE" ] &&
 	$PM_SU_CMD touch $pdb/$new_port/PM_UPGRADE_DONE_FLAG
 
 if [ -z "$DONT_SCRUB_DISTFILES" ]; then
@@ -3879,8 +3850,6 @@ if [ -z "$DONT_SCRUB_DISTFILES" ]; then
 		delete_dist_list
 	fi
 fi
-
-[ -n "$UPDATE_REQ_BYS" ] && [ -s "$pdb/$new_port/+REQUIRED_BY" ] && urb_final
 
 safe_exit
 
