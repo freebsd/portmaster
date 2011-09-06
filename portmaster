@@ -748,7 +748,8 @@ unset -f packages_init cross_idx test_command_line
 # Update based on options chosen above
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	# Continue error checking in parent only
-	[ -n "$PM_URB" -a -n "$1" ] && fail 'The -r option is not compatible with other updates'
+	[ -n "$PM_URB" -o -n "$UPDATE_ALL" ] && [ -n "$1" ] &&
+	    fail 'The -[ar] options are not compatible with other updates'
 
 	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
 		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
