@@ -937,7 +937,7 @@ get_answer_g () {
 	default=$1 ; option=$2 ; shift 2
 
 	while : ; do
-		echo -n "${*} [${default}] "
+		echo -e "${*} [${default}] \c"
 		read answer
 		echo ''
 
@@ -1015,7 +1015,7 @@ IFS='
 				echo "	===>>> but there is no installed version"
 				echo ''
 				if [ -n "$CHECK_DEPENDS" ]; then
-					get_answer_yn n "	===>>> Delete this dependency data"
+					get_answer_yn n "\t===>>> Delete this dependency data"
 					case "$?" in 0) unset prev_line line ; continue ;; esac
 				else
 					echo "	===>>> Try ${0##*/} --check-depends"
@@ -1298,7 +1298,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	for df in `find $DISTDIR -type f | sort`; do
 		f=${df#$DISTDIR}
 		if ! grep -ql $f $DI_FILES; then
-			get_answer_yn n "	===>>> Delete stale file: ${f}"
+			get_answer_yn n "\t===>>> Delete stale file: ${f}"
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
 				/bin/unlink $df ;;
@@ -1341,7 +1341,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 				if [ ! -d "${pdb}/${pkg_dir}" ]; then
 					echo "	===>>> $pkg_dir is not installed"
 					echo "	===>>> Path: ${package}"
-					get_answer_yn y "	===>>> Delete stale package: ${package##*/}"
+					get_answer_yn y "\n\t===>>> Delete stale package: ${package##*/}"
 					case "$?" in
 					0)	echo "	===>>> Deleting $package"
 						pm_unlink_s $package ;;
@@ -1365,7 +1365,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 
 		echo "	===>>> Path: ${package}"
 
-		get_answer_yn n "	===>>> Delete stale package: ${package##*/}"
+		get_answer_yn n "\n\t===>>> Delete stale package: ${package##*/}"
 		case "$?" in
 		0)	echo "	===>>> Deleting $package"
 			pm_unlink_s $package ;;
@@ -1478,7 +1478,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 		*:${dbdir}:*)	pm_v "Ok" ;;
 		*)	pm_v
 			echo "	===>>> $dbdir does not seem to be installed"
-			get_answer_yn n "	===>>> Delete ${dir}"
+			get_answer_yn n "\n\t===>>> Delete ${dir}"
 			case "$?" in 0) pm_rm_s -rf $dir ;; esac
 			echo '' ;;
 		esac
@@ -1715,8 +1715,7 @@ pm_pkg_create () {
 
 		echo "===>>> Ignore this error  [i]"
 		echo "===>>> Abort              [a]"
-		echo ''
-		get_answer_g i a "===>>> How would you like to proceed?"
+		get_answer_g i a "\n===>>> How would you like to proceed?"
 		case "$?" in 1)	fail "Package creation failed for $2" ;; esac
 	fi
 }
@@ -1771,17 +1770,16 @@ delete_dist_list () {
 
 find_and_delete_distfiles () {
 	# Global: port_subdir DISTDIR distfiles distfiles_checked delete_all
-	local ps pattern file answer
+	local ps file answer
 
 	ps=${port_subdir#$DISTDIR}
 
-	pattern=${1%[_-]*}
-	for file in ${pattern}*; do
+	for file in ${1}*; do
 		# This generally means the pattern did not match
 		case "$file" in
-		*\*)	[ "$pattern" = "${pattern%[_-]*}" ] && return 0
+		*\*)	[ "$1" = "${1%[_-]*}" ] && return 0
 			# This will happen for files like foo-bar_baz-1.23
-			find_and_delete_distfiles $pattern ;;
+			find_and_delete_distfiles ${1%[_-]*} ;;
 		esac
 
 		case "$distfiles_checked" in *:${file}:*) continue ;; esac
@@ -1793,7 +1791,11 @@ find_and_delete_distfiles () {
 			pm_v "===>>> Keeping current distfile: $file"
 			continue ;;	# Do not delete current version
 		*)	if [ -s "$DI_FILES" ]; then
-				grep -ql ${ps}$file $DI_FILES && continue
+				if grep -ql ${ps}$file $DI_FILES; then
+					distfiles_checked="${distfiles_checked}${file}:"
+					pm_v "===>>> Keeping current distfile: $file"
+					continue 	# Do not delete current version
+				fi
 			fi
 
 			if [ -n "$ALWAYS_SCRUB_DISTFILES" -o -n "$delete_all" ]; then
@@ -1802,7 +1804,7 @@ find_and_delete_distfiles () {
 				continue
 			fi
 
-			get_answer_g n y "===>>> Delete $file? y/n"
+			get_answer_g n y "\n===>>> Delete $file? y/n"
 			case "$?" in
 			1)	pm_unlink $file ;;
 			0)	distfiles_checked="${distfiles_checked}${file}:" ;;
@@ -1877,7 +1879,7 @@ delete_stale_distfiles () {
 				continue
 			fi
 
-			get_answer_g n y "===>>> Delete $file? y/n"
+			get_answer_g n y "\n===>>> Delete $file? y/n"
 			case "$?" in
 			1)	pm_unlink $file ;;
 			0)	distfiles_checked="${distfiles_checked}${file}:" ;;
@@ -1889,7 +1891,7 @@ delete_stale_distfiles () {
 	# flag, but until the DISTFILE stuff is well populated in PORT_DBDIR,
 	# keep doing it both ways.
 	for file in $distfiles $dist_list_files; do
-		find_and_delete_distfiles $file
+		find_and_delete_distfiles ${file%[-]*}-[0-9]
 	done
 
 	pm_v "===>>> Distfile cleaning complete" ; pm_v
@@ -2026,8 +2028,7 @@ if [ -n "$EXPUNGE" ]; then
 		for dep in $deplist; do
 			dep=${dep%/+CON*} ; echo "	${dep##*/}"
 		done
-		echo ''
-		get_answer_yn n "	===>>> Delete this dependency data"
+		get_answer_yn n "\n\t===>>> Delete this dependency data"
 		case "$?" in
 		0)	for f in $deplist; do
 				update_contents delete $f $origin
@@ -2071,7 +2072,7 @@ if [ -n "$CLEAN_STALE" ]; then
 
 		pkg_info $iport
 
-		get_answer_yn n "	===>>> ${iport} is no longer depended on, delete"
+		get_answer_yn n "\t===>>> ${iport} is no longer depended on, delete"
 		case "$?" in
 		0)	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
 			[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
@@ -2080,7 +2081,7 @@ if [ -n "$CLEAN_STALE" ]; then
 			pm_pkg_delete_s -f $iport || fail 'pkg_delete failed'
 
 			exec $0 -s $ARGS ;;
-		*)	get_answer_yn n "	===>>> Delete this dependency data"
+		*)	get_answer_yn n "\t===>>> Delete this dependency data"
 			case "$?" in
 			0)	pm_unlink_s $file ;;
 			*)	no_del_list="${no_del_list}${iport}:" ;;
@@ -2127,8 +2128,8 @@ check_interactive () {
 	if [ -e "$pdb/$1/+IGNOREME" ]; then
 		echo ''
 		echo "===>>> +IGNOREME file is present for $1"
+		echo ''
 	fi
-	echo ''
 	get_answer_g y n "===>>> Update ${1}${update_to}? y/n"
 	case "$?" in
 	0)	INTERACTIVE_YES="${INTERACTIVE_YES}${1}:" ;;
@@ -3086,8 +3087,7 @@ if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
 		*)	if [ -z "$FETCH_ONLY" ]; then
 				echo ''
 				echo "===>>> $upg_port has an +IGNOREME file"
-				echo ''
-				get_answer_g n y "===>>> Update anyway? y/n"
+				get_answer_g n y "\t===>>> Update anyway? y/n"
 				case "$?" in
 				1)	;;	# Let it build
 				0)	CUR_DEPS="${CUR_DEPS}${upg_port}:${portdir}:"
