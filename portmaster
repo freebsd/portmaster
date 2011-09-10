@@ -850,9 +850,16 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		fi
 	fi
 
-	[ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
-	    -z "$CHECK_PORT_DBDIR" -a -z "$LIST_ORIGINS" ] &&
-		DISTDIR=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`
+	if [ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
+	    -z "$CHECK_PORT_DBDIR" -a -z "$LIST_ORIGINS" ]; then
+		if ! DISTDIR=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`; then
+			if [ ! -d "$PWD" ]; then
+				echo ''
+				echo "===>>> Your current working directory no longer seems to exist"
+				fail 'Try: cd'
+			fi
+		fi
+	fi
 
 	[ -n "$DISTDIR" ] && { DISTDIR="${DISTDIR%/}/"; export DISTDIR; }
 
