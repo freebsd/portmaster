@@ -1516,8 +1516,7 @@ check_state () {
 			state_set=`pm_make -V $state`
 			if [ -n "$state_set" ]; then
 				echo "	===>>> This port is marked $state"
-				printf "	===>>> $state_set\n"
-				echo ''
+				echo -e "\t===>>> $state_set\n\n"
 				return 1
 			fi
 		done
