@@ -3393,11 +3393,12 @@ fetch_package () {
 		release=`uname -r`
 
 		case "$release" in
-		[678]\.[0-9]-STABLE|[678]\.[0-9]-PRERELEASE)
+		[789]\.[0-9]-STABLE|[789]\.[0-9]-PRERELEASE)
 				release=packages-${release%%\.*}-stable ;;
-		[678]\.[0-9]-RELEASE*)
+		[789]\.[0-9]-RELEASE*)
 				release=packages-${release%-RELEASE*}-release ;;
 		9\.0-CURRENT*)	release=packages-9-current ;;
+		10\.0-CURRENT*)	release=packages-10-current ;;
 		*RC[0-9]*)	release=${release%-RC[0-9]}
 				release=packages-${release}-release ;;
 		*BETA[0-9]*)	release=${release%-BETA[0-9]}
