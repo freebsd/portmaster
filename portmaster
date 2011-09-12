@@ -1714,16 +1714,27 @@ pm_pkg_create () {
 			echo "  ===>>> Package saved to ${1}/All" ; echo ''
 		fi
 	else
-		echo ''
-		echo "===>>> Package creation failed for ${2}!"
-		echo ''
+		local answer
 
-		[ -n "$backup" -a -n "$PM_IGNORE_FAILED_BACKUP_PACKAGE" ] && return
+		while : ; do
+			echo -e "\n===>>> Package creation failed for ${2}!\n"
 
-		echo "===>>> Ignore this error  [i]"
-		echo "===>>> Abort              [a]"
-		get_answer_g i a "\n===>>> How would you like to proceed?"
-		case "$?" in 1)	fail "Package creation failed for $2" ;; esac
+			[ -n "$backup" -a -n "$PM_IGNORE_FAILED_BACKUP_PACKAGE" ] && return
+
+			echo "===>>> Ignore this error  [i]"
+			echo "===>>> Abort update       [a]"
+			echo "===>>> Retry              [r]"
+			echo -e "\n===>>> How would you like to proceed? [i] \c"
+			read answer ; echo ''
+
+			case "$answer" in
+			''|[iI]) break ;;
+			[aA])	fail "Package creation failed for $2" ;;
+			[rR])	pm_pkg_create $1 $2 ; break ;;
+			*)	echo "	===>>> $answer is not a valid response" ;;
+			esac
+		done
+		unset answer
 	fi
 }
 
@@ -3455,26 +3466,25 @@ fetch_package () {
 		echo "       on setting the PACKAGESITE environment variable"
 		[ "$PM_PACKAGES" = only -a -z "$FETCH_ONLY" ] && fail $ponly_err
 		if [ -n "$FETCH_ONLY" ]; then
-			while [ -z "$continue" ]; do
+			while : ; do
 				echo -e "\n===>>> There is no valid package to install\n"
 				echo "===>>> Abort update         [a]"
 				echo "===>>> Retry fetch          [r]"
 				echo "===>>> Continue if possible [c]"
-				echo ''
-				echo -n "===>>> How would you like to proceed? [a] "
+				echo -e "\n===>>> How would you like to proceed? [a] \c"
 				read answer ; echo ''
 
 				case "$answer" in
-				a|'')	fail "No package exists for $new_port" ;;
-				r)	if fetch_package $new_port try ; then
+				''|[aA]) fail "No package exists for $new_port" ;;
+				[rR])	if fetch_package $new_port try ; then
 						latest_pv=$new_port
-						continue=continue
+						break
 					fi ;;
-				c)	safe_exit ;;
+				[cC])	safe_exit ;;
 				*)	echo "	===>>> $answer is not a valid response" ;;
 				esac
 			done
-			unset continue answer
+			unset answer
 		fi
 	else
 		latest_pv=${latest_pv#*href=\"}
