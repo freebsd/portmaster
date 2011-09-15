@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 1, 2011
+.Dd September 14, 2011
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -349,7 +349,7 @@ recurse dependencies thoroughly, using all-depends-list.
 .Sy RECOMMENDED FOR USE ONLY WHEN NEEDED, NOT ROUTINELY.
 When applied to the
 .Fl -clean-distfiles
-option it allows a distfile to be valid if it matches
+option it allows a distfile to be kept if it matches
 any up to date port,
 not just the ones that are installed.
 .It Fl v
@@ -515,9 +515,10 @@ then recurse through all files in
 to make sure that they are still associated with
 an installed port.
 If not, offer to delete the stale file.
-With
+With the
 .Fl t
-distfile is valid from any port, not just those installed.
+option a distfile is considered valid if it is in
+use by any port, not just those installed.
 .It [-t]
 .Fl y
 .Fl -clean-distfiles
@@ -797,8 +798,8 @@ of the
 command:
 .Pp
 Update one port:
-.Dl "portmaster fooport-1.23"
-.Dl "portmaster fooport"
+.Dl "portmaster fooport-1.23 or"
+.Dl "portmaster fooport or"
 .Dl "portmaster foo/fooport"
 .Pp
 Use a package if available:
@@ -819,13 +820,13 @@ Update all ports that need updating:
 .Pp
 Update all ports that need updating, and delete stale
 distfiles after the update is done:
-.Dl "portmaster -aD"
-.Dl "portmaster --clean-distfiles"
+.Dl "1. portmaster -aD"
+.Dl "2. portmaster --clean-distfiles"
 .Pp
 More complex tasks (please see the details for these options above):
 .Dl "portmaster -r fooport-1.23"
+.Dl "portmaster -r fooport-1.23 -r barport-2.34"
 .Dl "portmaster -o emulators/linux_base-fc4 linux_base-8-8.0_15"
-.Dl "portmaster -x cvsup -f -a"
 .Dl "portmaster -a -x gstreamer -x linux"
 .Pp
 Print only the ports that have available updates.
