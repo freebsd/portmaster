@@ -2451,8 +2451,11 @@ dependency_check () {
 
 			conflicts=''
 			if pm_cd $d_port; then
-				grep -ql ^CONFLICTS Makefile &&
+				if grep -ql ^CONFLICTS Makefile ; then
 					conflicts=`pm_make_b -V CONFLICTS`
+					conflicts="$conflicts `pm_make_b -V CONFLICTS_BUILD`"
+					conflicts="$conflicts `pm_make_b -V CONFLICTS_INSTALL`"
+				fi
 			else
 				fail "Cannot cd to $d_port"
 			fi
