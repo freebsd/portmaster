@@ -118,11 +118,11 @@ kill_bad_children () {
 }
 
 parent_exit () {
-	local files f DISCARD show_list
+	local need_kbc files f DISCARD show_list
 
-	[ -s "$DI_FILES" ] && { grep -q '%%%%%%%%%%%%' $DI_FILES || kill_bad_children; }
+	[ -s "$DI_FILES" ] && { grep -q '%%%%%%%%%%%%' $DI_FILES || need_kbc=need_kbc_dif; }
 
-	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && kill_bad_children
+	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && need_kbc=need_kbc_fo
 
 	if [ -z "$1" ]; then
 		if [ -n "$PM_URB" -o -n "$PM_FORCE" ]; then
@@ -137,7 +137,11 @@ parent_exit () {
 			pm_cd $pbu || fail "Cannot cd to $pbu"
 			pm_rm_s $NB_DELETE
 		fi
+	else
+		need_kbc=need_kbc_ec
 	fi
+
+	[ -n "$need_kbc" ] && kill_bad_children
 
 	[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
 	if [ -d "$pbu" ]; then
