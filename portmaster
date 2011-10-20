@@ -2260,14 +2260,18 @@ update_port () {
 	if [ -n "$2" ]; then
 		echo "===>>> Launching child to update $1 to $2"
 	else
-		case "$1" in
-		*/*)	echo "===>>> Launching child to install ${1#$pd/}" ;;
-		*)	if [ -z "$FETCH_ONLY" ]; then
-				echo "===>>> Launching child to reinstall $1"
-			else
+		if [ -z "$FETCH_ONLY" ]; then
+			case "$1" in
+			*/*)	echo "===>>> Launching child to install ${1#$pd/}" ;;
+			*)	echo "===>>> Launching child to reinstall $1" ;;
+			esac
+		else
+			if [ "$PM_PACKAGES" != 'only' ]; then
 				echo "===>>> Launching child to check distfiles for $1"
-			fi ;;
-		esac
+			else
+				echo "===>>> Launching child to check package files for $1"
+			fi
+		fi
 	fi
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
@@ -2565,7 +2569,9 @@ post_first_pass () {
 	[ "$PM_NEEDS_UPDATE" = ' ' ] && return
 
 	action=build
-	if [ "$PM_PACKAGES" = only ]; then
+	if [ -n "$FETCH_ONLY" ]; then
+		action='fetch'
+	elif [ "$PM_PACKAGES" = only ]; then
 		action=install
 	elif [ -n "$PM_PACKAGES" ]; then
 		action='build and/or install'
@@ -2821,6 +2827,11 @@ multiport () {
 		urb_update urb_update_after_build
 	fi
 
+	if [ "$PM_PACKAGES" != 'only' ]; then
+		check_fetch_only
+	else
+		check_fetch_only Package
+	fi
 	safe_exit
 }
 
@@ -3668,6 +3679,8 @@ if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 fi
 
 if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
+	CUR_DEPS="${CUR_DEPS}${new_port}:${portdir}:"
+
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		check_fetch_only Package
 	else
