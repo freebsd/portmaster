@@ -2641,6 +2641,10 @@ urb_update () {
 		for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
 			req_by="${req_by%/+CONTENTS}"
 			req_by="${req_by##*/}"
+
+			case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
+			case " $PM_URB_ORIGINS" in *" `origin_from_pdb $req_by` "*) continue ;; esac
+
 			PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 		done
 	done
