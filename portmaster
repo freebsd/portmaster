@@ -3751,7 +3751,7 @@ for file in $preserve_port_files; do
 	mv ${preserve_dir}/${file##*/} $file
 	oldmd5="MD5:`md5 -q $file`"
 
-	newcon=`pm_mktemp contents`
+	new_cont=`pm_mktemp contents`
 	while read left right; do
 		case "$left" in
 		@cwd)		short_file="${file#${right}/}" ;;
@@ -3764,9 +3764,10 @@ for file in $preserve_port_files; do
 				fi ;;
 		esac
 		echo "$left $right"
-	done < $pdb/$new_port/+CONTENTS > $newcon
-	mv $newcon $pdb/$new_port/+CONTENTS
-	unset file oldmd5 newcon left right short_file
+	done < $pdb/$new_port/+CONTENTS > $new_cont
+	pm_install_s $new_cont $contents
+	pm_unlink $new_cont
+	unset file oldmd5 new_cont left right short_file
 done
 if [ -n "$preserve_dir" ]; then
 	rmdir $preserve_dir 2>/dev/null
