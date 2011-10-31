@@ -3672,6 +3672,18 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	# Could be empty if -o
 	if [ -n "$upg_port" ]; then
+		case " $PM_PRESERVE_PORTS " in
+		*" $portdir "*)
+			preserve_port=`echo $portdir | sed 's#[-+/\.]#_#g'`
+			eval preserve_port_files="\$${preserve_port}_files"
+			preserve_dir=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port}`
+			for file in $preserve_port_files; do
+				cp -p $file ${preserve_dir}/ ||
+				    fail "Cannot copy $file, which is in \$${preserve_port}_files"
+			done
+			unset preserve_port files
+		esac
+
 		pm_sv "Running pkg_delete for $upg_port"
 		pm_pkg_delete_s -f $upg_port
 	fi
@@ -3733,6 +3745,34 @@ else
 		install_failed ${latest_pv}.tbz
 	fi
 fi
+
+for file in $preserve_port_files; do
+	mv $file ${file}-new
+	mv ${preserve_dir}/${file##*/} $file
+	oldmd5="MD5:`md5 -q $file`"
+
+	newcon=`pm_mktemp contents`
+	while read left right; do
+		case "$left" in
+		@cwd)		short_file="${file#${right}/}" ;;
+		$short_file)	found_it=found_it ; continue;;
+		@comment)	if [ -n "$found_it" ]; then
+					echo -e "${short_file}-new\n$left $right"
+					echo -e "$short_file\n@comment $oldmd5"
+					unset found_it
+					continue
+				fi ;;
+		esac
+		echo "$left $right" 
+	done < $pdb/$new_port/+CONTENTS > $newcon
+	mv $newcon $pdb/$new_port/+CONTENTS
+	unset file oldmd5 newcon left right short_file
+done
+if [ -n "$preserve_dir" ]; then
+	rmdir $preserve_dir 2>/dev/null
+	unset preserve_dir
+fi
+
 echo ''
 
 [ "$PM_DEL_BUILD_ONLY" = doing_build_only_dep ] &&
