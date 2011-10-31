@@ -3763,14 +3763,14 @@ for file in $preserve_port_files; do
 					continue
 				fi ;;
 		esac
-		echo "$left $right" 
+		echo "$left $right"
 	done < $pdb/$new_port/+CONTENTS > $newcon
 	mv $newcon $pdb/$new_port/+CONTENTS
 	unset file oldmd5 newcon left right short_file
 done
 if [ -n "$preserve_dir" ]; then
 	rmdir $preserve_dir 2>/dev/null
-	unset preserve_dir
+	unset preserve_dir preserve_port_files
 fi
 
 echo ''
