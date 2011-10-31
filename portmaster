@@ -2291,8 +2291,9 @@ update_port () {
 		unset NO_DEP_UPDATES
 
 	if [ -z "$NO_ACTION" -o -n "$PM_FIRST_PASS" ]; then
-		($0 $ARGS $1) || fail "Update for $1 failed"
+		($0 $ARGS $1) || update_failed=update_failed
 		. $IPC_SAVE
+		[ -n "$update_failed" ] && fail "Update for $1 failed"
 	else
 		pm_v "===>>> Build canceled due to -n flag"
 	fi
@@ -2780,8 +2781,9 @@ multiport () {
 
 		numports=$(( $numports + 1 ))
 		init_term_printf "$port ${numports}/${numports}"
-		($0 $ARGS $port) || fail "Update for $port failed"
+		($0 $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE
+		[ -n "$update_failed" ] && fail "Update for $port failed"
 
 		case "$PM_NEEDS_UPDATE" in
 		*\ $origin\ *)	continue ;;	# Handle +IGNOREME in child
@@ -2821,8 +2823,9 @@ multiport () {
 
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
-		($0 $ARGS $port) || fail "Update for $port failed"
+		($0 $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE
+		[ -n "$update_failed" ] && fail "Update for $port failed"
 	done
 
 	if [ -n "$PM_URB" ]; then
