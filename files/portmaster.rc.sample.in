@@ -106,3 +106,9 @@
 #
 # Do not prompt the user for failed backup package creation
 # PM_IGNORE_FAILED_BACKUP_PACKAGE=pm_ignore_failed_backup_package
+#
+# List of files to preserve across upgrades, and the ports that install them.
+# You can convert category/portname to the right pattern for the _files variable
+# by using the following: echo category/portname | sed 's#[-+/\.]#_#g'
+# PM_PRESERVE_PORTS="dns/p5-Net-DNS"
+# dns_p5_Net_DNS_files="/usr/local/share/doc/p5-Net-DNS/TODO"
