@@ -154,8 +154,10 @@ parent_exit () {
 		/bin/unlink $f
 	done
 
-	[ -n "$PM_WRKDIRPREFIX" ] &&
+	if [ -n "$PM_WRKDIRPREFIX" ]; then
+		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
 		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
+	fi
 
 	case "$DISPLAY_LIST" in
 	*' '*)	if [ -n "$1" ]; then
