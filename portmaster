@@ -926,7 +926,7 @@ strip_to_iport () {
 	done
 }
 
-#userless with pkgng
+# useless with pkgng
 check_dependency_files () {
 	# Global: grep_deps
 	local origin iport ro_opd
@@ -1192,7 +1192,7 @@ read_distinfos () {
 				origin=$moved_npd
 			fi
 
-		origin="${pd}/${origin}"
+			origin="${pd}/${origin}"
 
 			if [ -s "${origin}/distinfo" ]; then
 				distinfo="${origin}/distinfo"
