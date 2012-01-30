@@ -292,7 +292,7 @@ pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { 
-	if [ -z "${use_pkgng}" ]; then
+	if [ -z "$use_pkgng" ]; then
 		$PM_SU_CMD /usr/sbin/pkg_delete $*;
 	else
 		$PM_SU_CMD /usr/local/sbin/pkg delete -y $*;
@@ -501,7 +501,7 @@ find_glob_dirs () {
 
 	pattern=`globstrip $1`
 
-	if [ -z "${use_pkgng}" ]; then
+	if [ -z "$use_pkgng" ]; then
 		glob_dirs=`find $pdb -maxdepth 1 -type d -name ${pattern}\*`
 	else
 		glob_dirs=`pkg query -g "%n-%v" ${pattern}\*`
@@ -520,9 +520,9 @@ find_glob_dirs () {
 origin_from_pdb () {
 	local o
 
-	if [ -z "${use_pkgng}" ]; then
-	o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
-		echo ${o#@comment ORIGIN:}; return 0; }
+	if [ -z "$use_pkgng" ]; then
+		o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
+			echo ${o#@comment ORIGIN:}; return 0; }
 	else
 		pkg query "%o" $1; return 0;
 	fi
@@ -832,7 +832,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		fi
 		unset INDEXFILE INDEXDIR
 
-		if [ -z "${use_pkgng}" ]; then
+		if [ -z "$use_pkgng" ]; then
 			pkg_version="pkg_version"
 		else
 			pkg_version="pkg version"
@@ -894,7 +894,7 @@ fi	# [ "$$" -eq "$PM_PARENT_PID" ]
 iport_from_origin () {
 	local sn dir
 
-	if [ -n "${use_pkgng}" ]; then
+	if [ -n "$use_pkgng" ]; then
 		pkg info -q ${1} || return 1
 		return
 	fi
@@ -1258,7 +1258,7 @@ ports_by_category () {
 	local pkg
 	pm_v "===>>> Sorting ports by category"
 
-	if [ -n "${use_pkgng}" ]; then
+	if [ -n "$use_pkgng" ]; then
 		pkg query -a "%n-%v %?d %?r" | while read pkg dep rdep; do
 			if [ $rdep -eq 0 ]; then
 				if [ $dep -eq 0 ]; then
@@ -1342,7 +1342,7 @@ parse_index () {
 update_required_by () {
 	# Global: grep_deps
 	local do_update
-	[ -n "${use_pkgng}" ] && /bin/unlink $grep_deps && unset grep_deps
+	[ -n "$use_pkgng" ] && /bin/unlink $grep_deps && unset grep_deps
 
 	if [ -e "$pdb/$1/+REQUIRED_BY" ]; then
 		sort $pdb/$1/+REQUIRED_BY | cmp -s $grep_deps - || do_update=do_update
@@ -1400,12 +1400,12 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 	for package in `find $PACKAGES -type f | sort`; do
 		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.${ext}} ; echo ''
 
-		if [ -n "$use_pkgng" ]; then
-			origin=`pkg query "%o" $package` || fail Empty origin in $package
-		else
+		if [ -z "$use_pkgng" ]; then
 			origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
 				fail Empty origin in $package
 			origin=${origin#@comment ORIGIN:}
+		else
+			origin=`pkg query "%o" $package` || fail Empty origin in $package
 		fi
 
 		if [ -z "$PM_INDEX" ]; then
@@ -1434,8 +1434,8 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 								pm_unlink_s $package ;;
 						esac
 					fi
-				unset port_ver
-				continue
+					unset port_ver
+					continue
 				fi
 				if [ ! -d "${pdb}/${pkg_dir}" ]; then
 					echo "	===>>> $pkg_dir is not installed"
@@ -1703,7 +1703,7 @@ check_for_updates () {
 				unset port_ver
 			fi
 		else
-			if [ -z "${use_pkgng}" ]; then
+			if [ -z "$use_pkgng" ]; then
 				pkg_version="pkg_version"
 			else
 				pkg_version="pkg version"
@@ -1788,7 +1788,7 @@ pm_pkg_create () {
 
 	pm_cd $pkgdir || fail "Cannot cd into $pkgdir to create a package"
 	local pkg_create
-	if [ -z "${use_pkgng}" ]; then
+	if [ -z "$use_pkgng" ]; then
 		pkg_create="pkg_create -b"
 	else
 		pkg_create="pkg create "
@@ -2144,10 +2144,10 @@ if [ -n "$EXPUNGE" ]; then
 	fi
 
 	origin=`origin_from_pdb $EXPUNGE`
-	if [ -n "${use_pkgng}" ]; then
-		deplist=`pkg query "%rn-%rv" $origin`
-	else
+	if [ -z "$use_pkgng" ]; then
 		deplist=`grep -l DEPORIGIN:$origin$ $pdb/*/+CONTENTS`
+	else
+		deplist=`pkg query "%rn-%rv" $origin`
 	fi
 	if [ -n "$deplist" ]; then
 		echo "===>>> Warning: Ports with dependencies on ${EXPUNGE}:"
@@ -2156,8 +2156,7 @@ if [ -n "$EXPUNGE" ]; then
 		done
 		get_answer_yn n "\n\t===>>> Delete this dependency data"
 		case "$?" in
-		0)	
-			[ -n "$use_pkgng" ] && exit 0
+		0)	[ -n "$use_pkgng" ] && exit 0
 			for f in $deplist; do
 				update_contents delete $f $origin
 			done ;;
@@ -2185,10 +2184,10 @@ if [ -n "$CLEAN_STALE" ]; then
 		case "$no_del_list" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport`
-		if [ -n "${use_pkgng}" ]; then
-			deplist=`pkg query "%rn-%rv" $origin`
-		else
+		if [ -z "$use_pkgng" ]; then
 			deplist=`grep -l DEPORIGIN:$origin$ $pdb/*/+CONTENTS`
+		else
+			deplist=`pkg query "%rn-%rv" $origin`
 		fi
 		if [ -n "$deplist" ]; then
 			echo ''
@@ -2361,7 +2360,7 @@ update_build_l () {
 			fail "No entry for $origin in $PM_INDEX"
 	fi
 
-	if [ -z "${use_pkgng}" ]; then
+	if [ -z "$use_pkgng" ]; then
 		pkg_version="pkg_version"
 	else
 		pkg_version="pkg version"
@@ -2581,7 +2580,7 @@ dependency_check () {
 				fail "Cannot cd to $d_port"
 			fi
 			for glob in $conflicts; do
-				if [ -z "${use_pkgng}" ]; then
+				if [ -z "$use_pkgng" ]; then
 					confl_p=`pkg_info -I $glob 2>/dev/null`
 				else
 					confl_p=`pkg query -g "%n-%v" $glob 2>/dev/null`
@@ -2718,7 +2717,7 @@ post_first_pass () {
 		done
 
 		for dep in $build_only_dl_g; do
-			if [ -n "${use_pkgng}" ]; then
+			if [ -n "$use_pkgng" ]; then
 				[ "`pkg query "%?r" $dep`" = "0" ] || temp_bodlg="$temp_bodlg $dep"
 				continue
 			fi
@@ -2758,7 +2757,7 @@ urb_update () {
 
 	#TODO
 	for origin in $PM_URB_ORIGINS; do
-		if [ -n "${use_pkgng}" ]; then
+		if [ -n "$use_pkgng" ]; then
 			for req_by in `pkg query "%rn-%rv" ${origin}`; do
 				PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 			done
@@ -2929,14 +2928,13 @@ multiport () {
 		*/*)	origin=$port ;;
 		*)	# If an installed version does not exist at this
 			# point it probably got updated as a dependency
-			if [ -n "$use_pkgng" ]; then
-				if ! pkg info -e $port; then
+			if [ -z "$use_pkgng" ]; then
+				if [ ! -d "$pdb/$port" ]; then
 					numports=$(( $numports - 1 ))
 					continue
 				fi
 			else
-
-				if [ ! -d "$pdb/$port" ]; then
+				if ! pkg info -e $port; then
 					numports=$(( $numports - 1 ))
 					continue
 				fi
@@ -3161,7 +3159,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	/*)	echo '' ; no_valid_port ;;
 	*/*)	portdir=$argv ;;
 	\.)	portdir=${PWD##*/ports/} ;; # Not always $pd, could be symlink
-	*)	if [ -z "${use_pkgng}" ]; then
+	*)	if [ -z "$use_pkgng" ]; then
 			[ -d "$pdb/$argv" ] && upg_port=$argv
 		else
 			pkg info -e $argv && upg_port=$argv
@@ -3199,7 +3197,7 @@ else
 
 	case "$arg2" in
 	*/*)	ro_opd=$arg2 ; ro_upg_port=`iport_from_origin $ro_opd` ;;
-	*)	if [ -z "${use_pkgng}" ]; then
+	*)	if [ -z "$use_pkgng" ]; then
 			if [ -d "$pdb/$arg2" ]; then
 				ro_upg_port=$arg2
 			else
@@ -3664,7 +3662,7 @@ notnewer () {
 		pm_v "===>>> Available package ($latest_pv) matches the current version"
 	elif [ -n "$latest_pv" -a -n "$PM_PACKAGES_NEWER" ]; then
 		if [ -n "$upg_port" ]; then
-			if [ -z "${use_pkgng}" ]; then
+			if [ -z "$use_pkgng" ]; then
 				pkg_version="pkg_version"
 			else
 				pkg_version="pkg version"
@@ -3685,7 +3683,7 @@ notnewer () {
 			pm_v "===>>> There is a package available ($latest_pv)"
 		fi
 	elif [ -n "$latest_pv" ]; then
-		if [ -z "${use_pkgng}" ]; then
+		if [ -z "$use_pkgng" ]; then
 			pkg_version="pkg_version"
 		else
 			pkg_version="pkg version"
@@ -3961,7 +3959,7 @@ if [ -n "$distfiles" ]; then
 fi
 
 # pkgng does not need this
-if [ -n "$use_package" -a -z "${use_pkgng}" ]; then
+if [ -n "$use_package" -a -z "$use_pkgng" ]; then
 	if grep -q DEPORIGIN $pdb/$new_port/+CONTENTS; then
 		echo "===>>> Updating dependencies for $new_port to match installed versions"
 		update_contents $pdb/$new_port/+CONTENTS
