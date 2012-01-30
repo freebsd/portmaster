@@ -3205,7 +3205,7 @@ else
 				unset glob_dirs
 			fi
 		else
-			if pkg -e $arg2; then
+			if pkg info -e $arg2; then
 				ro_upg_port=$arg2
 			else
 				find_glob_dirs $arg2 && ro_upg_port=${glob_dirs}
