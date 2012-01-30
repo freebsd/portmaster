@@ -3789,7 +3789,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		    grep -v ^$LOCALBASE_COMPAT > $ldconfig_out
 
 		unset temp
-		if [ -z "$usr_pkgng" ]; then
+		if [ -z "$use_pkgng" ]; then
 			pkglist="pkg_info -q -L"
 		else
 			pkglist="pkg info -q -l"
@@ -3892,7 +3892,7 @@ echo ''
 temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
 if [ -z "$temp" ] && [ -d "$LOCALBASE_COMPAT" ]; then
 	unset files
-	if [ -z "$usr_pkgng" ]; then
+	if [ -z "$use_pkgng" ]; then
 		pkglist="pkg_info -q -L"
 	else
 		pkglist="pkg info -q -l"
