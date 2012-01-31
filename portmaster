@@ -2194,16 +2194,21 @@ fi
 if [ -n "$CLEAN_STALE" ]; then
 	[ -z "$no_del_list" ] && export no_del_list=':'
 
-	for file in `find $pdb -type f -name \+REQUIRED_BY -empty` ; do
+	#TODO: will use pkg autoremove when it works
+	if [ -z "$use_pkgng" ]; then
+		find_stale_ports="find $pdb -type f -name \+REQUIRED_BY -empty"
+	else
+		find_stale_ports="pkg query -a \"%?r %n-%v\" | awk '/^0/ { print \$2 }'"
+	fi
+	for file in `eval $find_stale_ports` ; do
 		iport="${file%/+REQUIRED_BY}" ; iport=${iport#$pdb/}
 
 		case "$no_del_list" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport`
+		deplist=""
 		if [ -z "$use_pkgng" ]; then
 			deplist=`grep -l DEPORIGIN:$origin$ $pdb/*/+CONTENTS`
-		else
-			deplist=`pkg query "%rn-%rv" $origin`
 		fi
 		if [ -n "$deplist" ]; then
 			echo ''
@@ -2219,8 +2224,10 @@ if [ -n "$CLEAN_STALE" ]; then
 
 		if [ -z "$use_pkgng" ]; then
 			pkg_info $iport
+			pkg_delete="pkg_delete"
 		else
 			pkg info -f $iport
+			pkg_delete="pkg delete"
 		fi
 
 		get_answer_yn n "\t===>>> ${iport} is no longer depended on, delete"
@@ -2228,15 +2235,19 @@ if [ -n "$CLEAN_STALE" ]; then
 		0)	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
 			[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
 
-			echo "===>>> Running pkg_delete -f $iport"
-			pm_pkg_delete_s -f $iport || fail 'pkg_delete failed'
+			echo "===>>> Running $pkg_delete -f $iport"
+			pm_pkg_delete_s -f $iport || fail "$pkg_delete failed"
 
 			exec $0 -s $ARGS ;;
-		*)	get_answer_yn n "\t===>>> Delete this dependency data"
-			case "$?" in
-			0)	pm_unlink_s $file ;;
-			*)	no_del_list="${no_del_list}${iport}:" ;;
-			esac ;;
+		*)	if [ -z "$use_pkgng" ]; then
+				get_answer_yn n "\t===>>> Delete this dependency data"
+				case "$?" in
+				0)	pm_unlink_s $file ;;
+				*)	no_del_list="${no_del_list}${iport}:" ;;
+				esac
+			else
+				no_del_list="${no_del_list}${iport}:"
+			fi ;;
 		esac
 	done
 	exit 0
