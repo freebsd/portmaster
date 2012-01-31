@@ -685,9 +685,11 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 	o)	REPLACE_ORIGIN=oopt ;;
 	p)	fail 'The -p option has been deprecated' ;;
 	r)	PM_URB=ropt
-		#TODO
-		if [ -d "$pdb/$OPTARG" ]; then
+		if [ -z "$use_pkgng" -a -d "$pdb/$OPTARG" ]; then
 			glob_dirs=$OPTARG
+		#TODO: uncomment when ready (changes portmaster behaviour)
+		#elif [ -n "$use_pkgng" ] && pkg info -e $OPTARG; then
+		#	glob_dirs=`pkg query "%n-%v" $OPTARG`
 		else
 			find_glob_dirs $OPTARG
 			case $? in
