@@ -1403,19 +1403,14 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 	init_packages_var
 
 	echo "===>>> Checking for stale packages"
-	local ext
-	ext=tbz
-	[ -n "$use_pkgng" ] && ext=txz
 	for package in `find $PACKAGES -type f | sort`; do
-		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.${ext}} ; echo ''
+		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.*} ; echo ''
 
-		if [ -z "$use_pkgng" ]; then
-			origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
-				fail Empty origin in $package
-			origin=${origin#@comment ORIGIN:}
-		else
-			origin=`pkg query "%o" $package` || fail Empty origin in $package
-		fi
+		origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
+			origin=`tar -O -zxvf $package '+MANIFEST' 2>/dev/null | grep '^origin:'` ||
+			fail "Empty origin in $package"
+		origin=${origin#@comment ORIGIN:}
+		origin=${origin#origin: }
 
 		if [ -z "$PM_INDEX" ]; then
 			if [ -d "$pd/$origin" ]; then
@@ -1431,29 +1426,28 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		fi
 
 		if [ -n "$port_ver" ]; then
-			if [ "${port_ver}.${ext}" = "${package##*/}" ]; then
+			if [ "$port_ver" = "$pkg_dir" ]; then
 				echo "===>>> ${package##*/} is up to date"
-				if [ -n "$use_pkgng" ]; then
-					if pkg info -e ${pkg_dir}; then
+				if [ -z "$use_pkgng" ]; then
+					if [ ! -d "${pdb}/${pkg_dir}" ]; then
 						echo "	===>>> $pkg_dir is not installed"
 						echo "	===>>> Path: ${package}"
 						get_answer_yn y "\n\t===>>> Delete stale package: ${package##*/}"
 						case "$?" in
-							0)	echo "	===>>> Deleting $package"
-								pm_unlink_s $package ;;
+						0)	echo "	===>>> Deleting $package"
+							pm_unlink_s $package ;;
 						esac
 					fi
-					unset port_ver
-					continue
-				fi
-				if [ ! -d "${pdb}/${pkg_dir}" ]; then
-					echo "	===>>> $pkg_dir is not installed"
-					echo "	===>>> Path: ${package}"
-					get_answer_yn y "\n\t===>>> Delete stale package: ${package##*/}"
-					case "$?" in
-					0)	echo "	===>>> Deleting $package"
-						pm_unlink_s $package ;;
-					esac
+				else
+					if ! pkg info -e $pkg_dir; then
+						echo "	===>>> $pkg_dir is not installed"
+						echo "	===>>> Path: ${package}"
+						get_answer_yn y "\n\t===>>> Delete stale package: ${package##*/}"
+						case "$?" in
+						0)	echo "	===>>> Deleting $package"
+							pm_unlink_s $package ;;
+						esac
+					fi
 				fi
 				unset port_ver
 				continue
@@ -1464,10 +1458,18 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 
 			unset port_ver
 
-			if [ -d "${pdb}/${pkg_dir}" ]; then
-				echo "	===>>> ${package##*/} matches the installed version"
+			if [ -z "$use_pkgng" ]; then
+				if [ -d "${pdb}/${pkg_dir}" ]; then
+					echo "	===>>> ${package##*/} matches the installed version"
+				else
+					echo "	===>>> ${package##*/} is not installed"
+				fi
 			else
-				echo "	===>>> ${package##*/} is not installed"
+				if pkg info -e $pkg_dir; then
+					echo "	===>>> ${package##*/} matches the installed version"
+				else
+					echo "	===>>> ${package##*/} is not installed"
+				fi
 			fi
 		fi
 
