@@ -688,13 +688,14 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 	r)	PM_URB=ropt
 		if [ -z "$use_pkgng" -a -d "$pdb/$OPTARG" ]; then
 			glob_dirs=$OPTARG
-		#TODO: uncomment when ready (changes portmaster behaviour)
-		#elif [ -n "$use_pkgng" ] && pkg info -e $OPTARG; then
-		#	glob_dirs=`pkg query "%n-%v" $OPTARG`
 		else
 			find_glob_dirs $OPTARG
 			case $? in
-			1)	fail "$pdb/$OPTARG does not exist" ;;
+			1)	if [ -z "$use_pkgng" ]; then
+					fail "$pdb/$OPTARG does not exist"
+				else
+					fail "$OPTARG is not installed"
+				fi ;;
 			2)	fail 'The argument to -r must match only one port' ;;
 			esac
 		fi
