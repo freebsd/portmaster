@@ -2819,23 +2819,24 @@ urb_update () {
 	echo "===>>> Begin $verb ports that depend on $PM_URB_IPORTS"
 	echo ''
 
-	#TODO
 	for origin in $PM_URB_ORIGINS; do
-		if [ -n "$use_pkgng" ]; then
-			for req_by in `pkg query "%rn-%rv" ${origin}`; do
+		if [ -z "$use_pkgng" ]; then
+			for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
+				req_by="${req_by%/+CONTENTS}"
+				req_by="${req_by##*/}"
+
+				case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
+				case " $PM_URB_ORIGINS" in *" `origin_from_pdb $req_by` "*) continue ;; esac
+
 				PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 			done
-			continue
+		else
+			for req_by in `pkg query "%rn-%rv" ${origin}`; do
+				case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
+				case " $PM_URB_ORIGINS" in *" `origin_from_pdb $req_by` "*) continue ;; esac
+				PM_URB_LIST="${PM_URB_LIST} ${req_by}"
+			done
 		fi
-		for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
-			req_by="${req_by%/+CONTENTS}"
-			req_by="${req_by##*/}"
-
-			case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
-			case " $PM_URB_ORIGINS" in *" `origin_from_pdb $req_by` "*) continue ;; esac
-
-			PM_URB_LIST="${PM_URB_LIST} ${req_by}"
-		done
 	done
 
 	if [ -n "$PM_URB_LIST" ]; then
@@ -2847,7 +2848,11 @@ urb_update () {
 
 	for req_by in $PM_URB_LIST; do
 		# Probably not needed, but JIC
-		[ -d "$pdb/$req_by" ] || continue
+		if [ -z "$use_pkgng" ]; then
+			[ -d "$pdb/$req_by" ] || continue
+		else
+			pkg info -e $req_by || continue
+		fi
 
 		pm_v "===>>> $req_by depends on $PM_URB_IPORTS"
 
