@@ -1261,43 +1261,45 @@ read_distinfos_all () {
 }
 
 ports_by_category () {
-	local pkg
+	local pkg dep rdep
 	pm_v "===>>> Sorting ports by category"
 
-	if [ -n "$use_pkgng" ]; then
-		pkg query -a "%n-%v %?d %?r" | while read pkg dep rdep; do
-			if [ $rdep -eq 0 ]; then
-				if [ $dep -eq 0 ]; then
-					branches="$branches ${pkg}"
+	if [ -z "$use_pkgng" ]; then
+		for pkg in $pdb/*; do
+			if [ -s "$pkg/+REQUIRED_BY" ]; then
+				if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
+					branches="$branches ${pkg#$pdb/}"
 				else
-					trunks="$trunks ${pkg}"
+					trunks="$trunks ${pkg#$pdb/}"
 				fi
 			else
-				if [ $dep -eq 0 ]; then
-					leaves="$leaves ${pkg}"
+				if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
+					leaves="$leaves ${pkg#$pdb/}"
 				else
-					roots="$roots ${pkg}"
+					[ -d "$pkg" ] || continue
+					roots="$roots ${pkg#$pdb/}"
 				fi
 			fi
 		done
-		return
+	else
+		while read pkg dep rdep; do
+			if [ $rdep -eq 1 ]; then
+				if [ $dep -eq 1 ]; then
+					branches="$branches $pkg"
+				else
+					trunks="$trunks $pkg"
+				fi
+			else
+				if [ $dep -eq 1 ]; then
+					leaves="$leaves $pkg"
+				else
+					roots="$roots $pkg"
+				fi
+			fi
+		done << EOF
+`pkg query -a "%n-%v %?d %?r"`
+EOF
 	fi
-	for pkg in $pdb/*; do
-		if [ -s "$pkg/+REQUIRED_BY" ]; then
-			if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
-				branches="$branches ${pkg#$pdb/}"
-			else
-				trunks="$trunks ${pkg#$pdb/}"
-			fi
-		else
-			if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
-				leaves="$leaves ${pkg#$pdb/}"
-			else
-				[ -d "$pkg" ] || continue
-				roots="$roots ${pkg#$pdb/}"
-			fi
-		fi
-	done
 }
 
 delete_empty_dist_subdirs () {
