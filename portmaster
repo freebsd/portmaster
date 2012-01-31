@@ -946,6 +946,7 @@ strip_to_iport () {
 check_dependency_files () {
 	# Global: grep_deps
 	local origin iport ro_opd
+	[ -n "$use_pkgng" ] && return
 
 	origin=$1 ; iport=$2
 
@@ -1029,6 +1030,7 @@ get_answer_yn () {
 update_contents () {
 	local IFS delete contents origin n_port old_origin iport new_cont
 	local o_seen line d_missing d_origin d_iport prev_line answer
+	[ -n "$use_pkgng" ] && return
 
 # To prevent words in a line being treated individually
 IFS='
