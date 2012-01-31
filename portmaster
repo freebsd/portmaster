@@ -2138,15 +2138,20 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 fi
 
 if [ -n "$EXPUNGE" ]; then
-	if [ ! -d "$pdb/$EXPUNGE" ]; then
-		find_glob_dirs $EXPUNGE
-		case $? in
-		1)	fail "No such directory/port: $pdb/$EXPUNGE" ;;
-		2)	echo "===>>> $EXPUNGE matched multiple ports"
-			fail "The -e option works with only one port at a time" ;;
-		0)	EXPUNGE=${glob_dirs#$pdb/}
-			unset glob_dirs ;;
-		esac
+	if [ -z "$use_pkgng" ]; then
+		if [ ! -d "$pdb/$EXPUNGE" ]; then
+			find_glob_dirs $EXPUNGE
+			case $? in
+			1)	fail "No such directory/port: $pdb/$EXPUNGE" ;;
+			2)	echo "===>>> $EXPUNGE matched multiple ports"
+				fail "The -e option works with only one port at a time" ;;
+			0)	EXPUNGE=${glob_dirs#$pdb/}
+				unset glob_dirs ;;
+			esac
+		fi
+	else
+		pkg info -e $EXPUNGE || fail "No such port: $EXPUNGE"
+		EXPUNGE=`pkg query "%n-%v" $EXPUNGE`
 	fi
 
 	origin=`origin_from_pdb $EXPUNGE`
@@ -2173,8 +2178,13 @@ if [ -n "$EXPUNGE" ]; then
 	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $EXPUNGE; }
 	[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
 
-	echo "===>>> Running pkg_delete -f $EXPUNGE"
-	pm_pkg_delete_s -f $EXPUNGE || fail 'pkg_delete failed'
+	if [ -z "$use_pkgng" ]; then
+		pkg_delete="pkg_delete"
+	else
+		pkg_delete="pkg delete"
+	fi
+	echo "===>>> Running $pkg_delete -f $EXPUNGE"
+	pm_pkg_delete_s -f $EXPUNGE || fail "$pkg_delete failed"
 
 	echo '' ; echo "===>>> Running ${0##*/} -s $ARGS"
 	exec $0 -s $ARGS
