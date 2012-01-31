@@ -2778,12 +2778,13 @@ post_first_pass () {
 		done
 
 		for dep in $build_only_dl_g; do
-			if [ -n "$use_pkgng" ]; then
-				[ "`pkg query "%?r" $dep`" = "0" ] || temp_bodlg="$temp_bodlg $dep"
-				continue
+			if [ -z "$use_pkgng" ]; then
+				grep -q "@comment DEPORIGIN:${dep#$pd/}$" $pdb/*/+CONTENTS ||
+					temp_bodlg="$temp_bodlg $dep"
+			else
+				[ "`pkg query "%?r" ${dep#$pd/}`" = "1" ] ||
+					temp_bodlg="$temp_bodlg $dep"
 			fi
-			grep -q "@comment DEPORIGIN:${dep#$pd/}$" $pdb/*/+CONTENTS ||
-				temp_bodlg="$temp_bodlg $dep"
 		done
 
 		build_only_dl_g=" `uniquify_list $temp_bodlg` "
