@@ -3241,16 +3241,15 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	case "$argv" in
 	'')	echo '' ; no_valid_port ;;
 	$pd/*)	portdir=${argv#$pd/} ;;
-	$pdb/*)	upg_port=${argv#$pdb/} ;;
+	$pdb/*)	if [ -z "$use_pkgng" ]; then
+			upg_port=${argv#$pdb/}
+		else
+			echo '' ; no_valid_port
+		fi ;;
 	/*)	echo '' ; no_valid_port ;;
 	*/*)	portdir=$argv ;;
 	\.)	portdir=${PWD##*/ports/} ;; # Not always $pd, could be symlink
-	*)	if [ -z "$use_pkgng" ]; then
-			[ -d "$pdb/$argv" ] && upg_port=$argv
-		else
-			pkg info -e $argv && upg_port=`pkg query "%n-%v" $argv`
-		fi
-		;;
+	*)	[ -z "$use_pkgng" -a -d "$pdb/$argv" ] && upg_port=$argv ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
@@ -3283,29 +3282,29 @@ else
 
 	case "$arg2" in
 	*/*)	ro_opd=$arg2 ; ro_upg_port=`iport_from_origin $ro_opd` ;;
-	*)	if [ -z "$use_pkgng" ]; then
-			if [ -d "$pdb/$arg2" ]; then
-				ro_upg_port=$arg2
-			else
-				find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
-				unset glob_dirs
-			fi
+	*)	if [ -z "$use_pkgng" -a -d "$pdb/$arg2" ]; then
+			ro_upg_port=$arg2
 		else
-			if pkg info -e $arg2; then
-				ro_upg_port=$arg2
-			else
-				find_glob_dirs $arg2 && ro_upg_port=${glob_dirs}
-				unset glob_dirs
-			fi
+			find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
+			unset glob_dirs
 		fi
 		[ -n "$ro_upg_port" ] && ro_opd=`origin_from_pdb $ro_upg_port`
 	esac
 	unset arg2
 
 	if [ -z "$ro_upg_port" ]; then
-		if ! grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS; then
+		if [ -z "$use_pkgng" ]; then
+			grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS
+		else
+			pkg query -a "%do" | grep -q "^$ro_opd$"
+		fi
+		if [ "$?" -eq 1 ]; then
 			echo ''
-			echo "===>>> The second argument to -o can be a port in $pdb,"
+			if [ -z "$use_pkgng" ]; then
+				echo "===>>> The second argument to -o can be a port in $pdb,"
+			else
+				echo "===>>> The second argument to -o can be a package name,"
+			fi
 			echo "       or a port directory from $pd"
 			echo ''
 			echo "       $ro_opd does not seem to be installed,"
