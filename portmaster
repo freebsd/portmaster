@@ -297,7 +297,7 @@ pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 			 unset -v PM_URB_LIST;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
-pm_pkg_delete_s   () { 
+pm_pkg_delete_s   () {
 	if [ -z "$use_pkgng" ]; then
 		$PM_SU_CMD /usr/sbin/pkg_delete $*;
 	else
@@ -2819,7 +2819,7 @@ if [ -n "$PM_URB" ]; then
 
 urb_update () {
 	# Global: PM_URB_UP
-	local verb origin req_by
+	local verb origin req_by req_by_o
 
 	verb=checking ; [ -n "$1" ] && verb=updating
 
@@ -2840,11 +2840,13 @@ urb_update () {
 				PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 			done
 		else
-			for req_by in `pkg query "%rn-%rv" ${origin}`; do
+			while read req_by req_by_o; do
 				case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
-				case " $PM_URB_ORIGINS" in *" `origin_from_pdb $req_by` "*) continue ;; esac
+				case " $PM_URB_ORIGINS" in *" $req_by_o "*) continue ;; esac
 				PM_URB_LIST="${PM_URB_LIST} ${req_by}"
-			done
+			done << EOF
+`pkg query "%rn-%rv %ro" ${origin}`
+EOF
 		fi
 	done
 
