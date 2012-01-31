@@ -2903,8 +2903,8 @@ multiport () {
 				1)	if [ -z "$use_pkgng" ]; then
 						fail "$pdb/$port does not exist"
 					else
-						fail "$port is not installed" ;;
-					fi
+						fail "$port is not installed"
+					fi ;;
 				*)	local dir
 					for dir in $glob_dirs; do
 					worklist_temp="$worklist_temp ${dir#$pdb/}"
