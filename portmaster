@@ -3162,7 +3162,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	*)	if [ -z "$use_pkgng" ]; then
 			[ -d "$pdb/$argv" ] && upg_port=$argv
 		else
-			pkg info -e $argv && upg_port=$argv
+			pkg info -e $argv && upg_port=`pkg query "%n-%v" $argv`
 		fi
 		;;
 	esac
