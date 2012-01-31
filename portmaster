@@ -3339,7 +3339,8 @@ if [ -z "$PM_INDEX_ONLY" ] && [ ! -d "$pd/$portdir" ]; then
 fi
 [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ] && upg_port=`iport_from_origin ${portdir}`
 
-if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
+#TODO?
+if [ -z "$use_pkgng" -a -e "$pdb/$upg_port/+IGNOREME" ]; then
 	# Adding to CUR_DEPS means we will not get here in the build unless -G
 	if [ -z "$PM_BUILDING" ]; then
 		# Only need to prompt for this once if -ai
