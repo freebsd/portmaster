@@ -4100,7 +4100,7 @@ if [ -n "$distfiles" ]; then
 fi
 
 # pkgng does not need this
-if [ -n "$use_package" -a -z "$use_pkgng" ]; then
+if [ -z "$use_pkgng" -a -n "$use_package" ]; then
 	if grep -q DEPORIGIN $pdb/$new_port/+CONTENTS; then
 		echo "===>>> Updating dependencies for $new_port to match installed versions"
 		update_contents $pdb/$new_port/+CONTENTS
