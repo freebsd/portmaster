@@ -516,6 +516,7 @@ find_glob_dirs () {
 	# Match a newline in multiple responses from find
 	*'
 '*)		return 2 ;;
+	'')	;;
 	*)	return ;;
 	esac
 
