@@ -3922,29 +3922,32 @@ else
 	fi
 fi
 
-for file in $preserve_port_files; do
-	mv $file ${file}-new
-	mv ${preserve_dir}/${file##*/} $file
-	oldmd5="MD5:`md5 -q $file`"
+#TODO
+if [ -z "$use_pkgng" ]; then
+	for file in $preserve_port_files; do
+		mv $file ${file}-new
+		mv ${preserve_dir}/${file##*/} $file
+		oldmd5="MD5:`md5 -q $file`"
 
-	new_cont=`pm_mktemp contents`
-	while read left right; do
-		case "$left" in
-		@cwd)		short_file="${file#${right}/}" ;;
-		$short_file)	found_it=found_it ; continue;;
-		@comment)	if [ -n "$found_it" ]; then
-					echo -e "${short_file}-new\n$left $right"
-					echo -e "$short_file\n@comment $oldmd5"
-					unset found_it
-					continue
-				fi ;;
-		esac
-		echo "$left $right"
-	done < $pdb/$new_port/+CONTENTS > $new_cont
-	pm_install_s $new_cont $contents
-	pm_unlink $new_cont
-	unset file oldmd5 new_cont left right short_file
-done
+		new_cont=`pm_mktemp contents`
+		while read left right; do
+			case "$left" in
+			@cwd)		short_file="${file#${right}/}" ;;
+			$short_file)	found_it=found_it ; continue;;
+			@comment)	if [ -n "$found_it" ]; then
+						echo -e "${short_file}-new\n$left $right"
+						echo -e "$short_file\n@comment $oldmd5"
+						unset found_it
+						continue
+					fi ;;
+			esac
+			echo "$left $right"
+		done < $pdb/$new_port/+CONTENTS > $new_cont
+		pm_install_s $new_cont $contents
+		pm_unlink $new_cont
+		unset file oldmd5 new_cont left right short_file
+	done
+fi
 if [ -n "$preserve_dir" ]; then
 	rmdir $preserve_dir 2>/dev/null
 	unset preserve_dir preserve_port_files
