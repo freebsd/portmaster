@@ -219,10 +219,14 @@ parent_exit () {
 	if [ -n "$build_deps_il" ]; then
 		echo "===>>> Deleting installed build-only dependencies"
 		cd
-		for f in $build_deps_il; do
-			pm_v "       $f"
-			pm_pkg_delete_s -f $f
-		done
+		if [ -z "$use_pkgng" ]; then
+			for f in $build_deps_il; do
+				pm_v "       $f"
+				pm_pkg_delete_s -f $f
+			done
+		else
+			pm_pkg_delete_s -f $build_deps_il
+		fi
 		echo ''
 	fi
 
