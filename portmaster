@@ -2215,7 +2215,7 @@ if [ -n "$EXPUNGE" ]; then
 		done
 		get_answer_yn n "\n\t===>>> Delete this dependency data"
 		case "$?" in
-		0)	[ -n "$use_pkgng" ] && exit 0 #TODO
+		0)	[ -n "$use_pkgng" ] && exit 1 #TODO
 			for f in $deplist; do
 				update_contents delete $f $origin
 			done ;;
