@@ -130,6 +130,8 @@ parent_exit () {
 			if [ -n "$files" ]; then
 				pm_sv Deleting \'install complete\' flags
 				pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete
+				[ -n "$use_pkgng" ] &&
+					pm_find_s $pdb -type d -depth 1 -empty -exec rmdir '{}' \; 2>/dev/null
 			fi
 		fi
 		if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a -n "$NB_DELETE" ]; then
@@ -2315,7 +2317,7 @@ check_restart_and_udf () {
 	# to go out to the disk if we don't have to.
 	[ -z "$RESTART" ] && return 1
 
-	if [ ! -e "$pdb/${1}/PM_UPGRADE_DONE_FLAG" ]; then
+	if [ ! -e "$pdb/${1}/PM_UPGRADE_DONE_FLAG" ] || ( [ -n "$use_pkgng" ] && ! pkg info -e $1 ); then
 		return 1
 	else
 		already_done $1
@@ -4208,6 +4210,7 @@ CUR_DEPS="${CUR_DEPS}${new_port}:${portdir}:"
 
 [ -n "$PM_URB" -o -n "$PM_URB_UP" ] && PM_URB_DONE="${PM_URB_DONE}${new_port}:"
 [ -n "$PM_URB" -o -n "$PM_URB_UP" -o -n "$PM_FORCE" ] &&
+	pm_mkdir_s $pdb/$new_port &&
 	$PM_SU_CMD touch $pdb/$new_port/PM_UPGRADE_DONE_FLAG
 
 if [ -z "$DONT_SCRUB_DISTFILES" ]; then
