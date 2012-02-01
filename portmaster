@@ -2240,7 +2240,6 @@ fi
 if [ -n "$CLEAN_STALE" ]; then
 	[ -z "$no_del_list" ] && export no_del_list=':'
 
-	#TODO: to be replaced by pkg autoremove?
 	if [ -z "$use_pkgng" ]; then
 		find_stale_ports="find $pdb -type f -name \+REQUIRED_BY -empty"
 	else
@@ -3922,7 +3921,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then
 		# Delete any existing versions of the old port
-		upg_orphan=`pkg query "%a" $ro_upg_port`
+		np_orphan=`pkg query "%a" $ro_upg_port`
 		pm_sv "Running pkg_delete for $ro_upg_port"
 		pm_pkg_delete_s -f $ro_upg_port
 	fi
@@ -3941,7 +3940,8 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			unset preserve_port files
 		esac
 
-		upg_orphan=`pkg query "%a" $upg_port`
+		# orphan state of $ro_upg_port has precedence
+		: ${np_orphan:=`pkg query "%a" $upg_port`}
 		pm_sv "Running pkg_delete for $upg_port"
 		pm_pkg_delete_s -f $upg_port
 	fi
@@ -3987,21 +3987,21 @@ if [ -z "$use_package" ]; then
 		unset port_log_args
 	fi
 
-	if [ -z "$REPLACE_ORIGIN" -a "${upg_orphan:-1}" -eq 1 ]; then
+	if [ -z "$UPDATE_ALL" -a -z "$REPLACE_ORIGIN" -a -z "$PM_URB" -a "${np_orphan:-1}" -eq 1 ]; then
 		if [ -n "$PM_MULTI_PORTS" ]; then
 			case "$PM_MULTI_PORTS" in
-			*:${upg_port:-EMPTY}:*)	upg_orphan=0 ;;
-			*:${portdir}:*)		upg_orphan=0 ;;
+			*:${upg_port:-NONE}:*)	np_orphan=0 ;;
+			*:${portdir}:*)		np_orphan=0 ;;
 			esac
 		else
-			[ "$$" -eq "$PM_PARENT_PID" ] && upg_orphan=0
+			[ "$$" -eq "$PM_PARENT_PID" ] && np_orphan=0
 		fi
 	fi
-	[ "${upg_orphan:-1}" -eq 1 ] && upg_orphan_flag="-DINSTALLS_DEPENDS"
+	[ "${np_orphan:-1}" -eq 1 ] && np_orphan_flg="-DINSTALLS_DEPENDS"
 	# Defining NO_DEPENDS ensures that we will control the installation
 	# of the depends, not bsd.port.mk.
-	eval pm_make_s ${upg_orphan_flag:-""} -DNO_DEPENDS install $port_log_args || install_failed $new_port
-	unset upg_orphan ; unset upg_orphan_flag
+	eval pm_make_s -DNO_DEPENDS ${np_orphan_flg:-""} install $port_log_args || install_failed $new_port
+	unset np_orphan ; unset np_orphan_flg
 else
 	[ -n "$local_package" ] && ppd=${LOCAL_PACKAGEDIR}/All
 
