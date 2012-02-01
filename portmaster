@@ -2228,7 +2228,7 @@ fi
 if [ -n "$CLEAN_STALE" ]; then
 	[ -z "$no_del_list" ] && export no_del_list=':'
 
-	#TODO: will use pkg autoremove when it works
+	#TODO: to be replaced by pkg autoremove?
 	if [ -z "$use_pkgng" ]; then
 		find_stale_ports="find $pdb -type f -name \+REQUIRED_BY -empty"
 	else
