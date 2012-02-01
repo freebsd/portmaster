@@ -508,7 +508,7 @@ find_glob_dirs () {
 	pattern=`globstrip $1`
 
 	if [ -z "$use_pkgng" ]; then
-		glob_dirs=`find $pdb -maxdepth 1 -type d -name ${pattern}\*`
+		glob_dirs=`find $pdb -depth 1 -type d -name ${pattern}\*`
 	else
 		glob_dirs=`pkg query -g "%n-%v" ${pattern}\*`
 	fi
