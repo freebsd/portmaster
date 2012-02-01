@@ -531,20 +531,31 @@ origin_from_pdb () {
 		o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
 			echo ${o#@comment ORIGIN:}; return 0; }
 	else
-		pkg query "%o" $1; return 0;
+		pkg info -qo $1 2>/dev/null && return 0
 	fi
 
 	case "$1" in bsdpan-*) return 3 ;; esac
 
-	if [ -e "$pdb/$1/+IGNOREME" ]; then
+	if [ -e "$pdb/$1/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $1 ); then
 		if [ -n "$PM_VERBOSE" -o -n "$LIST_ORIGINS" ]; then
-			echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+			if [ -z "$use_pkgng" ]; then
+				echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+			else
+				# an error above doesn't necessarily mean there's
+				# a problem in +MANIFEST, so don't mention it
+				echo "	===>>> No origin available for $1" >&2
+			fi
 			echo "	===>>> $pdb/$1/+IGNOREME exists" >&2
 			echo '' >&2
 		fi
 		return 2
 	else
-		echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+		if [ -z "$use_pkgng" ]; then
+			echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
+		else
+			# same as above
+			echo "	===>>> No origin available for $1" >&2
+		fi
 		echo '' >&2
 	fi
 	return 1
@@ -686,7 +697,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 	o)	REPLACE_ORIGIN=oopt ;;
 	p)	fail 'The -p option has been deprecated' ;;
 	r)	PM_URB=ropt
-		if [ -z "$use_pkgng" -a -d "$pdb/$OPTARG" ]; then
+		if [ -d "$pdb/$OPTARG" ] && ( [ -z "$use_pkgng" ] || pkg info -e $OPTARG ); then
 			glob_dirs=$OPTARG
 		else
 			find_glob_dirs $OPTARG
@@ -1126,7 +1137,7 @@ find_moved_port () {
 	for l in `grep "^$sf|" $pd/MOVED`; do
 		case "$l" in
 		${sf}\|\|*) [ -n "$iport" ] || iport=`iport_from_origin $sf`
-			if [ -e "$pdb/$iport/+IGNOREME" ]; then
+			if [ -e "$pdb/$iport/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $iport ); then
 				if [ -n "$PM_VERBOSE" ]; then
 					echo ''
 					echo "	===>>> The $sf port has been deleted"
@@ -1161,7 +1172,7 @@ find_moved_port () {
 		echo ''
 
 		[ -n "$iport" ] || iport=`iport_from_origin $sf`
-		[ -e "$pdb/$iport/+IGNOREME" ] || return 1
+		[ -e "$pdb/$iport/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $iport ) || return 1
 	fi
 	return 0
 }
@@ -1703,7 +1714,7 @@ check_for_updates () {
 
 	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ] && [ -d "$pd/$origin" ]; then
 		if ! pm_cd $pd/$origin; then
-			if [ -z "$use_pkgng" -a -e "$pdb/$iport/+IGNOREME" ]; then
+			if [ -e "$pdb/$iport/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $iport ); then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
 				echo "	===>>> Continuing due to $pdb/$iport/+IGNOREME"
 				echo ''
@@ -1720,13 +1731,13 @@ check_for_updates () {
 
 		# If the port has moved and no +IGNOREME, we have to update it
 		if [ -n "$moved_npd" ]; then
-			if [ -n "$use_pkgng" -o ! -e "$pdb/$iport/+IGNOREME" ]; then
-				do_update=do_update_moved
-			else
+			if [ -e "$pdb/$iport/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $iport ); then
 				echo "	===>>> Continuing due to $pdb/$iport/+IGNOREME"
 				echo ''
 				CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
 				return 0
+			else
+				do_update=do_update_moved
 			fi
 		fi
 	fi
@@ -1772,8 +1783,9 @@ check_for_updates () {
 	if [ -n "$LIST_PLUS" ]; then
 		if [ -z "$moved_npd" ]; then
 			echo "	===>>> New version available: $port_ver"
-			[ -z "$use_pkgng" -a -e "$pdb/$iport/+IGNOREME" ] &&
+			if [ -e "$pdb/$iport/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $iport ); then
 				echo "	===>>> +IGNOREME file is present for $1"
+			fi
 			pm_cd_pd $origin && check_state
 			num_updates=$(( $num_updates + 1 ))
 		else
@@ -2173,7 +2185,7 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 fi
 
 if [ -n "$EXPUNGE" ]; then
-	if [ -n "$use_pkgng" -o ! -d "$pdb/$EXPUNGE" ]; then
+	if [ ! -d "$pdb/$EXPUNGE" ] || ( [ -n "$use_pkgng" ] && ! pkg info -e $EXPUNGE ); then
 		find_glob_dirs $EXPUNGE
 		case $? in
 		1)	if [ -z "$use_pkgng" ]; then
@@ -2321,7 +2333,7 @@ check_interactive () {
 	case "$INTERACTIVE_YES" in *:${1}:*) return 0 ;; esac
 	case "$INTERACTIVE_NO" in *:${1}:*) return 1 ;; esac
 
-	if [ -e "$pdb/$1/+IGNOREME" ]; then
+	if [ -e "$pdb/$1/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $1 ); then
 		echo ''
 		echo "===>>> +IGNOREME file is present for $1"
 		echo ''
@@ -2904,7 +2916,7 @@ multiport () {
 			else
 				fail "$pd/${port} does not exist"
 			fi ;;
-		*)	if [ -z "$use_pkgng" -a -d "$pdb/$port" ]; then
+		*)	if [ -d "$pdb/$port" ] && ( [ -z "$use_pkgng" ] || pkg info -e $port ); then
 				worklist_temp="$worklist_temp $port"
 			else
 				find_glob_dirs $port
@@ -3258,7 +3270,8 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	/*)	echo '' ; no_valid_port ;;
 	*/*)	portdir=$argv ;;
 	\.)	portdir=${PWD##*/ports/} ;; # Not always $pd, could be symlink
-	*)	[ -z "$use_pkgng" -a -d "$pdb/$argv" ] && upg_port=$argv ;;
+	*)	[ -d "$pdb/$argv" ] && ( [ -z "$use_pkgng" ] || pkg info -e $argv ) &&
+		upg_port=$argv ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
@@ -3291,7 +3304,7 @@ else
 
 	case "$arg2" in
 	*/*)	ro_opd=$arg2 ; ro_upg_port=`iport_from_origin $ro_opd` ;;
-	*)	if [ -z "$use_pkgng" -a -d "$pdb/$arg2" ]; then
+	*)	if [ -d "$pdb/$arg2" ] && ( [ -z "$use_pkgng" ] || pkg info -e $arg2 ); then
 			ro_upg_port=$arg2
 		else
 			find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
@@ -3348,8 +3361,7 @@ if [ -z "$PM_INDEX_ONLY" ] && [ ! -d "$pd/$portdir" ]; then
 fi
 [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ] && upg_port=`iport_from_origin ${portdir}`
 
-#TODO?
-if [ -z "$use_pkgng" -a -e "$pdb/$upg_port/+IGNOREME" ]; then
+if [ -e "$pdb/$upg_port/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $upg_port ); then
 	# Adding to CUR_DEPS means we will not get here in the build unless -G
 	if [ -z "$PM_BUILDING" ]; then
 		# Only need to prompt for this once if -ai
