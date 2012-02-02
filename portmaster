@@ -706,6 +706,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 		if [ -d "$pdb/$OPTARG" ] && ( [ -z "$use_pkgng" ] || pkg info -e $OPTARG ); then
 			glob_dirs=$OPTARG
 		else
+			case "$OPTARG" in */*) fail 'The argument to -r must be a package name, or a glob pattern' ;; esac
 			find_glob_dirs $OPTARG
 			case $? in
 			1)	if [ -z "$use_pkgng" ]; then
