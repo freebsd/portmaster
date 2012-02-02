@@ -131,7 +131,7 @@ parent_exit () {
 				pm_sv Deleting \'install complete\' flags
 				pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete
 				[ -n "$use_pkgng" ] &&
-					pm_find_s $pdb -type d -depth 1 -empty -exec rmdir '{}' \; 2>/dev/null
+					pm_find_s $pdb -type d -depth 1 -empty ! -path \*\.zfs/\* -delete 2>/dev/null
 			fi
 		fi
 		if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a -n "$NB_DELETE" ]; then
