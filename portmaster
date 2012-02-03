@@ -2599,6 +2599,18 @@ dependency_check () {
 		rundeps=`gen_dep_list run-depends-list`
 
 		for dep in $d_port_list; do
+			# if the port is already installed, do not mark
+			# it as a build-only dependency, or it will be
+			# installed by package and/or removed
+			if [ -z "$use_pkgng" ]; then
+				iport_from_origin ${dep#$pd/} >/dev/null &&
+					run_dl="$run_dl $dep" &&
+					continue
+			else
+				pkg info -e ${dep#$pd/} &&
+					run_dl="$run_dl $dep" &&
+					continue
+			fi
 			case "$rundeps" in
 			*" ${dep} "*|*${dep}*)
 				varname=`echo ${dep#$pd/} | sed 's#[-+/\.]#_#g'`
