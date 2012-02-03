@@ -796,7 +796,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
 		if [ -n "$use_pkgng" ]; then
-			unset PM_PACKAGES ; unset PM_PACKAGES_BUILD ; unset PM_PACKAGES_LOCAL ; unset PM_PACKAGES_NEWER ; unset PM_ALWAYS_FETCH ; unset PM_DELETE_PACKAGES
+			unset PM_PACKAGES PM_PACKAGES_BUILD PM_PACKAGES_LOCAL PM_PACKAGES_NEWER PM_ALWAYS_FETCH PM_DELETE_PACKAGES
 			echo "===>>> Package installation support cannot be used with pkgng yet,"
 			echo "       it will be disabled"
 			echo ''
