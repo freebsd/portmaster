@@ -3335,7 +3335,7 @@ else
 			fi
 			echo "       or a port directory from $pd"
 			echo ''
-			echo "       $ro_opd does not seem to be installed,"
+			echo "       $arg2 does not seem to be installed,"
 			echo '       or listed as a dependency'
 			echo '' ; no_valid_port
 		fi
