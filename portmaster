@@ -4004,11 +4004,11 @@ if [ -z "$use_package" ]; then
 			[ "$$" -eq "$PM_PARENT_PID" ] && np_orphan=0
 		fi
 	fi
-	[ "${np_orphan:-1}" -eq 1 ] && np_orphan_flg="-DINSTALLS_DEPENDS"
+	[ "${np_orphan:-1}" -eq 1 ] && PM_MAKE_ARGS="${PM_MAKE_ARGS} -DINSTALLS_DEPENDS"
+	unset np_orphan
 	# Defining NO_DEPENDS ensures that we will control the installation
 	# of the depends, not bsd.port.mk.
-	eval pm_make_s -DNO_DEPENDS ${np_orphan_flg:-""} install $port_log_args || install_failed $new_port
-	unset np_orphan ; unset np_orphan_flg
+	eval pm_make_s -DNO_DEPENDS install $port_log_args || install_failed $new_port
 else
 	[ -n "$local_package" ] && ppd=${LOCAL_PACKAGEDIR}/All
 
