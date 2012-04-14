@@ -2215,9 +2215,13 @@ if [ -n "$EXPUNGE" ]; then
 	fi
 	if [ -n "$deplist" ]; then
 		echo "===>>> Warning: Ports with dependencies on ${EXPUNGE}:"
-		for dep in $deplist; do
-			dep=${dep%/+CON*} ; echo "	${dep##*/}"
-		done
+		if [ -z "$use_pkgng" ]; then
+			for dep in $deplist; do
+				dep=${dep%/+CON*} ; echo "	${dep##*/}"
+			done
+		else
+			echo "$deplist" | sed 's/^/	/'
+		fi
 		get_answer_yn n "\n\t===>>> Delete this dependency data"
 		case "$?" in
 		0)	[ -n "$use_pkgng" ] && exit 1 #TODO
