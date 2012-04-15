@@ -1436,7 +1436,9 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 	for package in `find $PACKAGES -type f | sort`; do
 		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.*} ; echo ''
 
-		origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
+		[ -n "$use_pkgng" ] &&
+			origin=`pkg query -F $package "%o" 2>/dev/null` ||
+			origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
 			origin=`tar -O -zxvf $package '+MANIFEST' 2>/dev/null | grep '^origin:'` ||
 			fail "Empty origin in $package"
 		origin=${origin#@comment ORIGIN:}
