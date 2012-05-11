@@ -357,6 +357,10 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	[ -z "$port_dbdir" ] &&
 		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
 	[ -n "$port_dbdir" ] && export port_dbdir
+
+	# Detect if pkgng is being used
+	use_pkgng="`pm_make_b -V WITH_PKGNG`"
+	[ -n "$use_pkgng" ] && export use_pkgng
 fi
 
 usage () {
