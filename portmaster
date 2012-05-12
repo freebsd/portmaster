@@ -801,7 +801,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
 		if [ -n "$use_pkgng" ]; then
 			unset PM_PACKAGES PM_PACKAGES_BUILD PM_PACKAGES_LOCAL PM_PACKAGES_NEWER PM_ALWAYS_FETCH PM_DELETE_PACKAGES
-			echo "===>>> Package installation support cannot be used with pkg(8) yet,"
+			echo "===>>> Package installation support cannot be used with pkgng yet,"
 			echo "       it will be disabled"
 			echo ''
 		fi
