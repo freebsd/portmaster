@@ -49,13 +49,8 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	local svn
-
-	svn='$FreeBSD$'
-
-	svn="${svn#*/portmaster }" ; svn="${svn%% *}"
-
-	echo '' ; echo "===>>> Version $svn" ; return 0
+	echo '' ; echo "===>>> Version 3.11 (pkgng patch 1.0)"
+	#svn='$FreeBSD: user/dougb/portmaster/portmaster 228452 2011-12-13 06:51:56Z dougb $'
 }
 
 fail () {
