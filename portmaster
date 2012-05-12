@@ -166,14 +166,14 @@ parent_exit () {
 		fi
 
 		: ${PAGER:='less -e'}
-		( for f in $DISPLAY_LIST; do
-			echo "===>>> pkg-message for $f"
-			if [ -z "$use_pkgng" ]; then
+		( if [ -z "$use_pkgng" ]; then
+			for f in $DISPLAY_LIST; do
+				echo "===>>> pkg-message for $f"
 				cat $pdb/$f/+DISPLAY ; echo ''
-			else
-				pkg query "%M" $f
-			fi
-		done
+			done
+		else
+			pkg query "===>>> pkg-message for %n-%v\n%M" $DISPLAY_LIST
+		fi
 		echo "===>>> Done displaying pkg-message files" ; echo '' ) | $PAGER ;;
 	esac
 
