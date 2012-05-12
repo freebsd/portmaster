@@ -4221,6 +4221,11 @@ if [ -z $use_pkgng ]; then
 
 		update_required_by $new_port
 	fi
+else
+	if [ -n "$ro_opd" ]; then
+		echo "===>>> Updating dependency entry for $new_port in each dependent port"
+		pkg set -yo $ro_opd:$portdir -g "*"
+	fi
 fi
 
 if [ -n "$upg_port" ]; then
