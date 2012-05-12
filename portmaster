@@ -4106,7 +4106,7 @@ if [ -z "$temp" ] && [ -d "$LOCALBASE_COMPAT" ]; then
 
 	if [ -n "$files" ]; then
 		pm_sv Removing old shared libraries, and running ldconfig
-		pm_rm_s $files
+		pm_rm_s `make -V FILES:O:u FILES="$files"`
 		$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
 	fi
 	unset temp file files
