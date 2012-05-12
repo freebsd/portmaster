@@ -556,7 +556,7 @@ origin_from_pdb () {
 			if [ -z "$use_pkgng" ]; then
 				echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
 			else
-				# an error above doesn't necessarily mean there's
+				# An error above doesn't necessarily mean there's
 				# a problem in +MANIFEST, so don't mention it
 				echo "	===>>> No origin available for $1" >&2
 			fi
@@ -568,7 +568,7 @@ origin_from_pdb () {
 		if [ -z "$use_pkgng" ]; then
 			echo "	===>>> No ORIGIN in $pdb/$1/+CONTENTS" >&2
 		else
-			# same as above
+			# Same as above
 			echo "	===>>> No origin available for $1" >&2
 		fi
 		echo '' >&2
@@ -969,11 +969,11 @@ strip_to_iport () {
 	done
 }
 
-# useless with pkgng
+# Useless with pkgng
 check_dependency_files () {
+	[ -n "$use_pkgng" ] && return
 	# Global: grep_deps
 	local origin iport ro_opd
-	[ -n "$use_pkgng" ] && return
 
 	origin=$1 ; iport=$2
 
@@ -1053,11 +1053,11 @@ get_answer_yn () {
 	fi
 }
 
-# also useless with pkgng
+# Also useless with pkgng
 update_contents () {
+	[ -n "$use_pkgng" ] && return
 	local IFS delete contents origin n_port old_origin iport new_cont
 	local o_seen line d_missing d_origin d_iport prev_line answer
-	[ -n "$use_pkgng" ] && return
 
 # To prevent words in a line being treated individually
 IFS='
@@ -1386,11 +1386,11 @@ parse_index () {
 	esac
 }
 
-# useless with pkgng
+# Useless with pkgng
 update_required_by () {
+	[ -n "$use_pkgng" ] && /bin/unlink $grep_deps && unset grep_deps && return
 	# Global: grep_deps
 	local do_update
-	[ -n "$use_pkgng" ] && /bin/unlink $grep_deps && unset grep_deps && return
 
 	if [ -e "$pdb/$1/+REQUIRED_BY" ]; then
 		sort $pdb/$1/+REQUIRED_BY | cmp -s $grep_deps - || do_update=do_update
@@ -2617,7 +2617,7 @@ dependency_check () {
 		rundeps=`gen_dep_list run-depends-list`
 
 		for dep in $d_port_list; do
-			# if the port is already installed, do not mark
+			# If the port is already installed, do not mark
 			# it as a build-only dependency, or it will be
 			# installed by package and/or removed
 			if [ -z "$use_pkgng" ]; then
@@ -3977,7 +3977,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			unset preserve_port files
 		esac
 
-		# orphan state of $ro_upg_port has precedence
+		# Orphan state of $ro_upg_port has precedence
 		: ${np_orphan:=`pkg query "%a" $upg_port`}
 		pm_sv "Running pkg_delete for $upg_port"
 		pm_pkg_delete_s -f $upg_port
