@@ -3879,8 +3879,8 @@ if [ -n "$MAKE_PACKAGE" ]; then
 fi
 
 if [ -z "$use_package" -a -z "$DONT_POST_CLEAN" ]; then
-	pm_sv Running \'make clean\'
-	pm_make_s clean NOCLEANDEPENDS=ncd2
+	pm_sv Running \'make clean\' in the background
+	(pm_make_s clean NOCLEANDEPENDS=ncd2 >/dev/null)&
 	echo ''
 fi
 
