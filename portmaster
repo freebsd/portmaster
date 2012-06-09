@@ -2208,6 +2208,11 @@ check_fetch_only () {
 }
 
 term_printf () {
+	case "$1" in
+	'')	[ -n "$PM_MULTI_PORTS" ] && echo -e "\n===>>> ${PM_PARENT_PORT}" ;;
+	*\>\>*)	echo -e "\n===>>> ${PM_PARENT_PORT}${1}" ;;
+	esac
+
 	[ -n "$PM_NO_TERM_TITLE" ] && return
 	case "$TERM" in cons*) return ;; esac
 
@@ -2280,14 +2285,9 @@ update_port () {
 
 	[ -n "$PM_FIRST_PASS" ] && num_of_deps=$(( $num_of_deps + 1 ))
 
-	deps=" (${dep_of_deps}/${num_of_deps})"
+	deps="(${dep_of_deps}/${num_of_deps})"
 
-	if [ -n "$PM_DEPTH" ]; then
-		echo "	${PM_DEPTH}>> ${1#$pd/}"
-		term_printf " ${PM_DEPTH#* }>> ${1#$pd/}${deps}"
-	else
-		[ -n "$UPDATE_ALL" ] && term_printf " >> ${1#$pd/}${deps}"
-	fi
+	term_printf " ${PM_DEPTH#* }>> ${1#$pd/} ${deps}"
 
 	[ -n "$doing_dep_check" -o \( -n "$UPDATE_ALL" -a -n "$PM_FIRST_PASS" \) ] &&
 		unset NO_DEP_UPDATES
@@ -2302,15 +2302,14 @@ update_port () {
 
 	if [ -n "$UPDATE_ALL" ]; then
 		term_printf " (${num_of_deps})"
-		echo "===>>> Returning to update check of installed ports"
-		echo ''
+		echo -e "\n===>>> Returning to update check of installed ports\n"
 	elif [ -n "$PM_URB" ]; then
 		return 0
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
 		echo "===>>> Continuing initial dependency check for $portdir"
 	else
 		term_printf " ${PM_DEPTH#* }${deps}"
-		echo "===>>> Returning to dependency check for $portdir"
+		echo -e  "\n===>>> Returning to dependency check for $portdir"
 	fi
 	return 0
 } # update_port()
@@ -2527,17 +2526,15 @@ dependency_check () {
 		safe_exit
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
 		echo "===>>> Initial dependency check complete for $portdir"
-		case "$PM_DEPTH" in *\>\>*) echo "	$PM_DEPTH" ;; esac
 	else
 		echo "===>>> Dependency check complete for $portdir"
+		local deps ; deps="(${dep_of_deps}/${num_of_deps})"
 		case "$PM_DEPTH" in
-		*\>\>*)	echo "	$PM_DEPTH" ;;
+		*\>\>*)	term_printf " ${PM_DEPTH#* }${deps}" ; echo '' ;;
 		*)	if [ "$PM_PARENT_PORT" = All ]; then
-				local deps
-				deps=" (${dep_of_deps}/${num_of_deps})"
 				term_printf " >> ${upg_port:-$portdir}${deps}"
 			else
-				term_printf
+				term_printf ; echo ''		# multiport
 			fi ;;
 		esac
 	fi
@@ -2971,7 +2968,7 @@ all_first_pass () {
 
 		check_exclude $iport || continue
 
-		PM_DEPTH=
+		PM_DEPTH="$iport "
 		check_for_updates $iport $origin || fail 'Update failed'
 	done
 }
