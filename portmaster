@@ -212,7 +212,11 @@ parent_exit () {
 			else
 				local new_pm_log
 
-				new_pm_log=`pm_mktemp pm_log` && mv $new_pm_log $PM_LOG
+				if new_pm_log=`pm_mktemp pm_log` ; then
+					mv $new_pm_log $PM_LOG
+				else
+					fail 'mktemp failed for pm_log'
+				fi
 			fi
 			[ -n "$PM_LOG" ] && date >> $PM_LOG
 		fi
@@ -297,8 +301,14 @@ pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 		 unset -v PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
-pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
-		fail "mktemp for $1 failed"; }
+pm_mktemp () {
+	local f
+	if f=`/usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 2>/dev/null` ; then
+		echo $f
+	else
+		return 1
+	fi
+}
 pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 
 # Superuser versions for commands that need root privileges
@@ -804,7 +814,8 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 			if [ -n "$do_index_fetch" ] ||
 			    [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
-				dli=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-index`
+				dli=`/usr/bin/mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-index 2>/dev/null` ||
+					fail "Could not create a temporary directory for index in $TMPDIR"
 				if [ -n "$do_index_fetch" ]; then
 					ift="$FETCHINDEX ${dli}/${INDEXFILE}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2"
 					$ift || fail Could not perform $ift
@@ -933,7 +944,7 @@ check_dependency_files () {
 	*+*)	ro_opd=`echo $ro_opd | sed 's#\+#\\\\+#g'` ;; esac
 
 	# Always rely on the grep'ed dependencies instead of +REQUIRED_BY
-	grep_deps=`pm_mktemp grep-deps-${iport}`
+	grep_deps=`pm_mktemp grep-deps-${iport}` || fail "mktemp failed for grep-deps-${iport}"
 	egrep -l "DEPORIGIN:($origin|$ro_opd)$" $pdb/*/+CONTENTS |
 	    strip_to_iport | sort -u > $grep_deps
 
@@ -1013,7 +1024,7 @@ IFS='
 
 	contents=$1 ; origin=$2 ; n_port=$3 ; old_origin=$4
 	iport=${contents#$pdb/} ; iport=${iport%/+CONTENTS}
-	new_cont=`pm_mktemp contents-${iport}`
+	new_cont=`pm_mktemp contents-${iport}` || fail "mktemp failed for contents-${iport}"
 
 	if [ -z "$delete" ]; then o_seen=':'; else o_seen=":${origin}:"; fi
 
@@ -1311,7 +1322,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	[ -n "$DISTDIR" ] || fail 'There is no DISTDIR to clean'
 
 	# Set the file name here since we are usually called in a subshell
-	DI_FILES=`pm_mktemp DI-FILES`
+	DI_FILES=`pm_mktemp DI-FILES` || fail 'mktemp failed for DI-FILES'
 
 	if [ -z "$PM_THOROUGH" ]; then
 		read_distinfos
@@ -2869,7 +2880,7 @@ make_config () {
 
 if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	CUR_DEPS=':' ; DISPLAY_LIST='' ; INSTALLED_LIST=''
-	PM_DEPTH='' ; IPC_SAVE=`pm_mktemp IPC_SAVE`
+	PM_DEPTH='' ; IPC_SAVE=`pm_mktemp IPC_SAVE` || fail 'mktemp failed for IPC_SAVE'
 	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE
 
 	if [ -n "$LOCALBASE" ]; then
@@ -2945,7 +2956,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 
 	# Set the file name here so it's visible to the children
 	[ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" -a -z "$PM_PACKAGES" ] &&
-		export DI_FILES=`pm_mktemp DI-FILES`
+		export DI_FILES=`pm_mktemp DI-FILES` || fail 'mktemp failed for DI-FILES'
 
 	[ -n "$PM_URB" ] && multiport $PM_URB_IPORTS
 	[ $# -gt 1 -a -z "$REPLACE_ORIGIN" ] && multiport "$@"
@@ -3235,7 +3246,8 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 		for file in $distfiles; do
 			case "$file" in */*) file=`echo $file | sed s#/#_#g` ;; esac
 			if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1; then
-				pm_mktemp ${file}-${portdir#*/} >/dev/null
+				pm_mktemp ${file}-${portdir#*/} >/dev/null ||
+					fail "mktemp failed for ${file}-${portdir#*/}"
 			else
 				DONT_FETCH=dont_fetch
 				break
@@ -3244,7 +3256,8 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 
 		if [ -z "$DONT_FETCH" -a -n "$distfiles" ]; then
 			echo "===>>> Launching 'make checksum' for $portdir in background"
-			fetchlog=`pm_mktemp fetchlog-${portdir#*/}`
+			fetchlog=`pm_mktemp fetchlog-${portdir#*/}` ||
+				fail "mktemp failed for fetchlog-${portdir#*/}"
 			(pm_make -DBATCH checksum >> $fetchlog 2>&1 && {
 			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.*; exit 0; }
 			    allfiles=`pm_make -V ALLFILES`
@@ -3473,7 +3486,7 @@ fetch_package () {
 		dirlist=`echo ${TMPDIR}/f-${PM_PARENT_PID}-dl-${portdir%/*}\.*`
 		if [ ! -r "$dirlist" ]; then
 			pm_unlink $dirlist		# JIC
-			dirlist=`pm_mktemp dl-${portdir%/*}`
+			dirlist=`pm_mktemp dl-${portdir%/*}` || fail "mktemp failed for dl-${portdir%/*}"
 			fetch -q -o - ${sitepath} 2>/dev/null |
 			    sed -e "s#%2[cC]#,#g" -e "s#%2[bB]#+#g" > $dirlist
 		fi
@@ -3626,8 +3639,8 @@ if [ -z "$use_package" ]; then
 	unset count fl_read
 
 	if [ -n "$HIDE_BUILD" ]; then
-		port_log=`mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}` ||
-			fail "mktemp for $1 failed"
+		port_log=`/usr/bin/mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}` ||
+			fail "mktemp for port_log-${PM_PARENT_PID}-${portdir#*/} failed"
 		port_log_args=">> $port_log 2>&1"
 		echo "===>>> Logging build to $port_log"
 	fi
@@ -3649,7 +3662,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	[ -z "$NO_BACKUP" ] && pm_pkg_create $pbu $UPGRADE_PORT
 
 	if [ -n "$SAVE_SHARED" ]; then
-		ldconfig_out=`pm_mktemp ldconfig`
+		ldconfig_out=`pm_mktemp ldconfig` || fail 'mktemp for ldconfig failed'
 		ldconfig -r | sed 's#.* ##' |
 		    grep -v ^$LOCALBASE_COMPAT > $ldconfig_out
 
@@ -3687,7 +3700,8 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		*" $portdir "*)
 			preserve_port=`echo $portdir | sed 's#[-+/\.]#_#g'`
 			eval preserve_port_files="\$${preserve_port}_files"
-			preserve_dir=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port}`
+		preserve_dir=`/usr/bin/mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port} 2>/dev/null` ||
+				fail "Could not create a temporary directory for $preserve_port in $TMPDIR"
 			for file in $preserve_port_files; do
 				cp -p $file ${preserve_dir}/ ||
 				    fail "Cannot copy $file, which is in \$${preserve_port}_files"
@@ -3762,7 +3776,7 @@ for file in $preserve_port_files; do
 	mv ${preserve_dir}/${file##*/} $file
 	oldmd5="MD5:`md5 -q $file`"
 
-	new_cont=`pm_mktemp contents`
+	new_cont=`pm_mktemp contents` || fail 'mktemp failed for contents'
 	while read left right; do
 		case "$left" in
 		@cwd)		short_file="${file#${right}/}" ;;
@@ -3841,7 +3855,7 @@ if [ -n "$distfiles" ]; then
 		[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $portdir"
 	fi
 
-	dist_list_temp=`pm_mktemp dist_list`
+	dist_list_temp=`pm_mktemp dist_list` || fail 'mktemp failed for dist_list'
 	echo '# Added by portmaster' > $dist_list_temp
 	for file in $distfiles; do
 		size=`grep "^SIZE (${ds}${file})" $distinfo`
