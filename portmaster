@@ -118,7 +118,7 @@ kill_bad_children () {
 }
 
 parent_exit () {
-	local need_kbc files f DISCARD show_list
+	local need_kbc files f count DISCARD show_list
 
 	[ -s "$DI_FILES" ] && { grep -q '%%%%%%%%%%%%' $DI_FILES || need_kbc=need_kbc_dif; }
 
