@@ -3113,7 +3113,11 @@ else
 			find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
 			unset glob_dirs
 		fi
-		[ -n "$ro_upg_port" ] && ro_opd=`origin_from_pdb $ro_upg_port`
+		if [ -n "$ro_upg_port" ]; then
+			ro_opd=`origin_from_pdb $ro_upg_port`
+		else
+			ro_opd=$arg2
+		fi
 	esac
 	unset arg2
 
