@@ -294,7 +294,8 @@ safe_exit () {
 
 pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
-		builtin cd $pd/$1 2>/dev/null || return 1; }
+		builtin cd $pd/$1 2>/dev/null ||
+		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 		 unset -v PM_URB_LIST;
@@ -1662,11 +1663,7 @@ check_for_updates () {
 			echo "	===>>> New version available: $port_ver"
 			[ -e "$pdb/$iport/+IGNOREME" ] &&
 				echo "	===>>> +IGNOREME file is present for $1"
-			if pm_cd_pd $origin ; then
-				check_state
-			else
-				fail "Cannot cd to port directory: $pd/$origin"
-			fi
+			pm_cd_pd $origin && check_state
 			num_updates=$(( $num_updates + 1 ))
 		else
 			unset moved_npd
@@ -1734,7 +1731,7 @@ pm_pkg_create () {
 			if [ -z "$PM_INDEX_ONLY" ]; then
 				local latest_link
 
-				pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+				pm_cd_pd $portdir
 				latest_link=`pm_make -V LATEST_LINK`
 				cd ${1}/Latest
 				$PM_SU_CMD ln -sf ../All/$pkg ${latest_link}.tbz
@@ -1868,7 +1865,7 @@ set_distfiles_and_subdir () {
 	[ -z "$dist_list_files" ] && find_dl_distfiles $1
 
 	if [ -d "$pd/$1" ]; then
-		pm_cd_pd $1 || fail "Cannot cd to port directory: $pd/$1"
+		pm_cd_pd $1
 	else
 		return 1
 	fi
@@ -2370,7 +2367,7 @@ gen_dep_list () {
 	local list
 
 	if [ -z "$PM_INDEX_ONLY" ]; then
-		pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+		pm_cd_pd $portdir
 		list=`pm_make $* | sort -u`
 	else
 		local temp_list l
@@ -2873,7 +2870,7 @@ make_config () {
 	config_type=config-conditional
 	[ -n "$PM_FORCE_CONFIG" ] && config_type=config
 	pm_sv Running \'make $config_type\'
-	pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+	pm_cd_pd $portdir
 	pm_make_s $config_type
 }
 
@@ -2934,13 +2931,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		NO_DEP_UPDATES=no_dep_updates ; build_l=''
 		export NO_DEP_UPDATES build_l
 
-		if [ -z "$PM_INDEX_ONLY" ]; then
-			if pm_cd_pd Mk ; then
-				PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
-			else
-				fail "Cannot cd to port directory: $pd/Mk"
-			fi
-		fi
+		pm_cd_pd Mk && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
 	fi
 
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
@@ -3346,7 +3337,7 @@ fi	# [ -n "$PM_FIRST_PASS" ]
 
 [ -z "$PM_BUILDING" ] && export PM_BUILDING=pmbuildingmain
 
-pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+pm_cd_pd $portdir
 
 if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 	case "$build_only_dl_g" in
@@ -3373,7 +3364,7 @@ if [ -z "$NO_DEP_UPDATES" ]; then
 			dependency_check run-depends-list
 		fi
 	fi
-	pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+	pm_cd_pd $portdir
 elif [ "$$" -eq "$PM_PARENT_PID" ]; then
 	echo "===>>> All dependencies are up to date"
 	echo ''
@@ -3636,7 +3627,7 @@ if [ -z "$use_package" ]; then
 		fi
 	fi
 
-	pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+	pm_cd_pd $portdir
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; echo ''; }
 
@@ -3730,13 +3721,13 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		pm_pkg_delete_s -f $upg_port
 	fi
 
-	pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+	pm_cd_pd $portdir
 fi
 
 if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 	echo '' ; echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
-	pm_cd_pd $portdir || fail "Cannot cd to port directory: $pd/$portdir"
+	pm_cd_pd $portdir
 fi
 
 if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
