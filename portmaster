@@ -155,8 +155,20 @@ parent_exit () {
 	done
 
 	if [ -n "$PM_WRKDIRPREFIX" ]; then
+		count=0
+		while : ; do
+			pgrep -qf 'make clean NOCLEANDEPENDS=ncd' || break
+			count=$(( $count + 1 ))
+			if [ $count -eq 1 ]; then
+				echo "===>>> Waiting for background clean processes to finish"
+			elif [ $count -eq 10 ]; then
+				count=0
+			fi
+			sleep 2
+		done
+
 		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
-		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
+		find $PM_WRKDIRPREFIX -depth -mindepth 1 -type d -empty -delete 2>/dev/null
 	fi
 
 	case "$DISPLAY_LIST" in
@@ -3876,9 +3888,9 @@ if [ -n "$MAKE_PACKAGE" ]; then
 fi
 
 if [ -z "$use_package" -a -z "$DONT_POST_CLEAN" ]; then
-	pm_sv Running \'make clean\' in the background
+	pm_v "===>>> Running 'make clean' in the background"
 	(pm_make_s clean NOCLEANDEPENDS=ncd2 >/dev/null)&
-	echo ''
+	pm_v
 fi
 
 check_dependency_files $portdir $new_port
