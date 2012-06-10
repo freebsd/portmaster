@@ -155,12 +155,12 @@ parent_exit () {
 	done
 
 	if [ -n "$PM_WRKDIRPREFIX" ]; then
-		count=0
+		pm_v ; count=0
 		while : ; do
 			pgrep -qf 'make clean NOCLEANDEPENDS=ncd' || break
 			count=$(( $count + 1 ))
 			if [ $count -eq 1 ]; then
-				echo "===>>> Waiting for background clean processes to finish"
+				echo "===>>> Waiting for background 'make clean' processes to finish"
 			elif [ $count -eq 10 ]; then
 				count=0
 			fi
