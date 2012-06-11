@@ -59,7 +59,7 @@ version () {
 }
 
 fail () {
-	echo '' ; echo "===>>> $*" ; echo "===>>> Aborting update"
+	echo -e "\n===>>> $*" ; echo "===>>> Aborting update"
 	[ "$$" -eq "$PM_PARENT_PID" ] && trap_exit fail
 	safe_exit 1
 }
@@ -167,7 +167,7 @@ parent_exit () {
 			sleep 2
 		done
 
-		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
+		pm_v "===>>> Removing empty directories from WRKDIRPREFIX" ; pm_v
 		find $PM_WRKDIRPREFIX -depth -mindepth 1 -type d -empty -delete 2>/dev/null
 	fi
 
@@ -296,8 +296,8 @@ pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () {
-	pm_mktemp_file=`/usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 2>/dev/null` ||
-		fail "mktemp for $1 failed"
+	pm_mktemp_file=`/usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 2>&1` ||
+		fail "mktemp for $1 failed:\n       ${pm_mktemp_file#mktemp: }"
 }
 pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 
