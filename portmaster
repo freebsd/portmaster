@@ -897,7 +897,7 @@ iport_from_origin () {
 
 	if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/${sn}*/+CONTENTS 2>/dev/null`; then
 		if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/*/+CONTENTS 2>/dev/null`; then
-			dir=`pkg_info -q -O $1` || return 1
+			dir=`pkg_info -q -O $1` ; [ -n "$dir" ] || return 1
 		fi
 	fi
 
@@ -2351,6 +2351,15 @@ clean_build_only_list () {
 	done
 
 	build_only_dl_g=" `uniquify_list $temp_bodlg` "
+	unset temp_bodlg
+
+	# We do not want already installed ports to end up on this list
+	for dep in $build_only_dl_g; do
+		iport_from_origin ${dep#$pd/} >/dev/null && continue
+		temp_bodlg="$temp_bodlg $dep"
+	done
+
+	build_only_dl_g="$temp_bodlg "
 }
 
 gen_dep_list () {
