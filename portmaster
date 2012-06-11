@@ -2730,6 +2730,7 @@ multiport () {
 		esac
 	done
 
+	numports=0
 	for port in $worklist_temp; do
 		check_exclude $port || continue
 		check_interactive $port || continue
@@ -2752,6 +2753,8 @@ multiport () {
 				continue
 			fi
 		fi
+
+		numports=$(( $numports + 1 ))
 
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
@@ -2784,7 +2787,7 @@ multiport () {
 
 	[ -n "$PM_URB" ] && export PM_URB
 
-	numports=0
+	num=0
 	for port in $worklist; do
 		case "$port" in
 		*/*)	origin=$port ;;
@@ -2793,8 +2796,8 @@ multiport () {
 
 		case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
 
-		numports=$(( $numports + 1 ))
-		init_term_printf "$port ${numports}/${numports}"
+		num=$(( $num + 1 ))
+		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
