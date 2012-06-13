@@ -2323,7 +2323,6 @@ update_port () {
 	fi
 
 	if [ -n "$UPDATE_ALL" ]; then
-		term_printf " (${num_of_deps})"
 		echo -e "\n===>>> Returning to update check of installed ports\n"
 	elif [ -n "$PM_URB" ]; then
 		return 0
