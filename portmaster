@@ -2495,11 +2495,18 @@ dependency_check () {
 				confl_p=`pkg_info -I $glob 2>/dev/null`
 				if [ -n "$confl_p" ]; then
 					confl_p=${confl_p%% *}
+					d_port="$pd/`origin_from_pdb $confl_p`"
+
+					if [ "${d_port#$pd/}" = "$portdir" ]; then
+						echo -e "\n===>>> $origin seems to depend on $portdir"
+						echo '       which looks like a dependency loop'
+						fail "Try pkg_updating $portdir"
+					fi
+
 					echo ''
 					echo "===>>> The dependency for ${origin}"
 					echo "       seems to be handled by $confl_p"
 					echo ''
-					d_port="$pd/`origin_from_pdb $confl_p`"
 				fi
 			done
 		fi
