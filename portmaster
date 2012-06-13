@@ -73,6 +73,8 @@ trap_exit () {
 	fi
 
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
+		. $IPC_SAVE
+
 		local n=0
 		while ps -axo pid,ppid,command | grep -v egrep |
 		    egrep -q "(make -DBATCH checksum|/fetch |\[sh\])"; do
@@ -92,6 +94,14 @@ trap_exit () {
 			fi
 			[ -n "$logs" ] && echo ''
 		fi
+	else
+		# Signal the parent if a child trap'ed, or read the file if we are
+		# an intermediate process.
+		if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-TEAC\.* >/dev/null 2>&1; then
+			pm_mktemp TEAC		# Trap Exit Already Called
+		else
+			. $IPC_SAVE
+		fi
 	fi
 	safe_exit 1
 }
@@ -109,8 +119,9 @@ kill_bad_children () {
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill -9 $pid ;;
 			esac ;;
 		*)	[ $pgid -eq $mypgid ] || continue
+			[ $pid -eq $PM_PARENT_PID ] && continue
 			case "$command" in
-			*" $0 "*) [ $pid -ne $PM_PARENT_PID ] && pm_kill $pid ;;
+			*" $0 "*) pm_kill $pid ;;
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill $pid ;;
 			esac ;;
 		esac
@@ -248,8 +259,6 @@ safe_exit () {
 		parent_exit $1
 	else
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
-
-		[ -n "$1" ] && exit $1
 
 		# Save state for the parent process to read back in
 		if [ -z "$PM_FIRST_PASS" ]; then
@@ -2223,7 +2232,7 @@ check_fetch_only () {
 term_printf () {
 	case "$1" in
 	'')	[ -n "$PM_MULTI_PORTS" ] && echo -e "\n===>>> ${PM_PARENT_PORT}" ;;
-	*\>\>*)	echo -e "\n===>>> ${PM_PARENT_PORT}${1}" ;;
+	*\(*)	echo -e "\n===>>> ${PM_PARENT_PORT}${1}" ;;
 	esac
 
 	[ -n "$PM_NO_TERM_TITLE" ] && return
@@ -2755,7 +2764,6 @@ multiport () {
 		fi
 
 		numports=$(( $numports + 1 ))
-
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
 		PM_MULTI_PORTS="${PM_MULTI_PORTS}${port}:"
@@ -2807,6 +2815,8 @@ multiport () {
 		*)		numports=$(( $numports - 1 )) ;;
 		esac
 	done
+	numports=$num
+	PM_PARENT_PORT="Total parent ports: $numports Total dependencies:"
 
 	if [ -n "$PM_URB" ]; then
 		unset PM_URB ; PM_URB=pm_urb_post_first_pass
@@ -2963,8 +2973,6 @@ all_first_pass () {
 	local iport origin
 
 	for iport in "$@"; do
-		pm_v "===>>> $iport"
-
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport` || {
