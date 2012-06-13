@@ -165,7 +165,7 @@ parent_exit () {
 		/bin/unlink $f
 	done
 
-	if [ -n "$PM_WRKDIRPREFIX" ]; then
+	if [ -n "$PM_WRKDIRPREFIX" -a -z "$1" ]; then
 		pm_v ; count=0
 		while : ; do
 			pgrep -qf 'make clean NOCLEANDEPENDS=ncd' || break
@@ -2232,7 +2232,7 @@ check_fetch_only () {
 term_printf () {
 	case "$1" in
 	'')	[ -n "$PM_MULTI_PORTS" ] && echo -e "\n===>>> ${PM_PARENT_PORT}" ;;
-	*\(*)	echo -e "\n===>>> ${PM_PARENT_PORT}${1}" ;;
+	*\>\>*)	echo -e "\n===>>> ${PM_PARENT_PORT}${1}" ;;
 	esac
 
 	[ -n "$PM_NO_TERM_TITLE" ] && return
@@ -2323,6 +2323,8 @@ update_port () {
 	fi
 
 	if [ -n "$UPDATE_ALL" ]; then
+		# Fix terminal titlebar in case of a long delay between ports to update
+		term_printf " (${num_of_deps})"
 		echo -e "\n===>>> Returning to update check of installed ports\n"
 	elif [ -n "$PM_URB" ]; then
 		return 0
@@ -2572,7 +2574,7 @@ post_first_pass () {
 	local action
 
 	if [ ${num_of_deps:-0} -gt 0 ]; then
-		term_printf " (${num_of_deps})"
+		term_printf " >> (${num_of_deps})"
 
 		if [ -z "$PM_NO_CONFIRM" ]; then
 			local answer
@@ -2822,7 +2824,7 @@ multiport () {
 		esac
 	done
 	numports=$num
-	PM_PARENT_PORT="Total parent ports: $numports Total dependencies:"
+	PM_PARENT_PORT="Total ports: $numports"
 
 	if [ -n "$PM_URB" ]; then
 		unset PM_URB ; PM_URB=pm_urb_post_first_pass
