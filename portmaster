@@ -168,7 +168,7 @@ parent_exit () {
 	if [ -n "$PM_WRKDIRPREFIX" -a -z "$1" ]; then
 		pm_v ; count=0
 		while : ; do
-			pgrep -qf 'make clean NOCLEANDEPENDS=ncd' || break
+			ps axww | grep '[m]ake clean NOCLEANDEPENDS=ncd' >/dev/null || break
 			count=$(( $count + 1 ))
 			if [ $count -eq 1 ]; then
 				echo "===>>> Waiting for background 'make clean' processes to finish"
