@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (c) 2005-2011 Douglas Barton, All rights reserved
+# Copyright (c) 2005-2012 Douglas Barton, All rights reserved
 # Please see detailed copyright below
 
 trap trap_exit INT
@@ -49,12 +49,12 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.11 (pkgng patch 1.0)"
-	#svn='$FreeBSD: user/dougb/portmaster/portmaster 228452 2011-12-13 06:51:56Z dougb $'
+	echo '' ; echo "===>>> Version 3.12.1  (pkgng patch 1.1)"
+	#svn='$FreeBSD: user/dougb/portmaster/portmaster 237111 2012-06-15 05:57:40Z dougb $'
 }
 
 fail () {
-	echo '' ; echo "===>>> $*" ; echo "===>>> Aborting update"
+	echo -e "\n===>>> $*" ; echo "===>>> Aborting update"
 	[ "$$" -eq "$PM_PARENT_PID" ] && trap_exit fail
 	safe_exit 1
 }
@@ -68,6 +68,8 @@ trap_exit () {
 	fi
 
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
+		. $IPC_SAVE
+
 		local n=0
 		while ps -axo pid,ppid,command | grep -v egrep |
 		    egrep -q "(make -DBATCH checksum|/fetch |\[sh\])"; do
@@ -87,6 +89,14 @@ trap_exit () {
 			fi
 			[ -n "$logs" ] && echo ''
 		fi
+	else
+		# Signal the parent if a child trap'ed, or read the file if we are
+		# an intermediate process.
+		if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-TEAC\.* >/dev/null 2>&1; then
+			pm_mktemp TEAC		# Trap Exit Already Called
+		else
+			. $IPC_SAVE
+		fi
 	fi
 	safe_exit 1
 }
@@ -104,8 +114,9 @@ kill_bad_children () {
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill -9 $pid ;;
 			esac ;;
 		*)	[ $pgid -eq $mypgid ] || continue
+			[ $pid -eq $PM_PARENT_PID ] && continue
 			case "$command" in
-			*" $0 "*) [ $pid -ne $PM_PARENT_PID ] && pm_kill $pid ;;
+			*" $0 "*) pm_kill $pid ;;
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill $pid ;;
 			esac ;;
 		esac
@@ -113,7 +124,7 @@ kill_bad_children () {
 }
 
 parent_exit () {
-	local need_kbc files f DISCARD show_list
+	local need_kbc files f count DISCARD show_list
 
 	[ -s "$DI_FILES" ] && { grep -q '%%%%%%%%%%%%' $DI_FILES || need_kbc=need_kbc_dif; }
 
@@ -151,9 +162,21 @@ parent_exit () {
 		/bin/unlink $f
 	done
 
-	if [ -n "$PM_WRKDIRPREFIX" ]; then
-		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
-		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
+	if [ -n "$PM_WRKDIRPREFIX" -a -z "$1" ]; then
+		pm_v ; count=0
+		while : ; do
+			ps axww | grep '[m]ake clean NOCLEANDEPENDS=ncd' >/dev/null || break
+			count=$(( $count + 1 ))
+			if [ $count -eq 1 ]; then
+				echo "===>>> Waiting for background 'make clean' processes to finish"
+			elif [ $count -eq 10 ]; then
+				count=0
+			fi
+			sleep 2
+		done
+
+		pm_v "===>>> Removing empty directories from WRKDIRPREFIX" ; pm_v
+		find $PM_WRKDIRPREFIX -depth -mindepth 1 -type d -empty -delete 2>/dev/null
 	fi
 
 	case "$DISPLAY_LIST" in
@@ -200,9 +223,7 @@ parent_exit () {
 				echo "===>>> Warning: $PM_LOG exists, but is not a regular file"
 				unset PM_LOG
 			else
-				local new_pm_log
-
-				new_pm_log=`pm_mktemp pm_log` && mv $new_pm_log $PM_LOG
+				pm_mktemp pm_log ; mv $pm_mktemp_file $PM_LOG
 			fi
 			[ -n "$PM_LOG" ] && date >> $PM_LOG
 		fi
@@ -244,8 +265,6 @@ safe_exit () {
 		parent_exit $1
 	else
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
-
-		[ -n "$1" ] && exit $1
 
 		# Save state for the parent process to read back in
 		if [ -z "$PM_FIRST_PASS" ]; then
@@ -291,8 +310,10 @@ pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
 		 unset -v PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
-pm_mktemp () { /usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 ||
-		fail "mktemp for $1 failed"; }
+pm_mktemp () {
+	pm_mktemp_file=`/usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 2>&1` ||
+		fail "mktemp for $1 failed:\n       ${pm_mktemp_file#mktemp: }"
+}
 pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 
 # Superuser versions for commands that need root privileges
@@ -839,7 +860,8 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 			if [ -n "$do_index_fetch" ] ||
 			    [ ${index_time:-0} -ne `stat -f '%Um' ${PM_INDEX}.bz2 2>/dev/null` ]; then
-				dli=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-index`
+				dli=`/usr/bin/mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-index 2>/dev/null` ||
+					fail "Could not create a temporary directory for index in $TMPDIR"
 				if [ -n "$do_index_fetch" ]; then
 					ift="$FETCHINDEX ${dli}/${INDEXFILE}.bz2 ${MASTER_SITE_INDEX}${INDEXFILE}.bz2"
 					$ift || fail Could not perform $ift
@@ -940,7 +962,7 @@ iport_from_origin () {
 
 	if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/${sn}*/+CONTENTS 2>/dev/null`; then
 		if ! dir=`grep -l "@comment ORIGIN:${1}$" $pdb/*/+CONTENTS 2>/dev/null`; then
-			dir=`pkg_info -q -O $1` || return 1
+			dir=`pkg_info -q -O $1` ; [ -n "$dir" ] || return 1
 		fi
 	fi
 
@@ -979,7 +1001,7 @@ check_dependency_files () {
 	*+*)	ro_opd=`echo $ro_opd | sed 's#\+#\\\\+#g'` ;; esac
 
 	# Always rely on the grep'ed dependencies instead of +REQUIRED_BY
-	grep_deps=`pm_mktemp grep-deps-${iport}`
+	pm_mktemp grep-deps-${iport} ; grep_deps=$pm_mktemp_file
 	egrep -l "DEPORIGIN:($origin|$ro_opd)$" $pdb/*/+CONTENTS |
 	    strip_to_iport | sort -u > $grep_deps
 
@@ -1061,7 +1083,7 @@ IFS='
 
 	contents=$1 ; origin=$2 ; n_port=$3 ; old_origin=$4
 	iport=${contents#$pdb/} ; iport=${iport%/+CONTENTS}
-	new_cont=`pm_mktemp contents-${iport}`
+	pm_mktemp contents-${iport} ; new_cont=$pm_mktemp_file
 
 	if [ -z "$delete" ]; then o_seen=':'; else o_seen=":${origin}:"; fi
 
@@ -1408,7 +1430,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	[ -n "$DISTDIR" ] || fail 'There is no DISTDIR to clean'
 
 	# Set the file name here since we are usually called in a subshell
-	DI_FILES=`pm_mktemp DI-FILES`
+	pm_mktemp DI-FILES ; DI_FILES=$pm_mktemp_file
 
 	if [ -z "$PM_THOROUGH" ]; then
 		read_distinfos
@@ -2412,6 +2434,11 @@ check_fetch_only () {
 }
 
 term_printf () {
+	case "$1" in
+	'')	[ -n "$PM_MULTI_PORTS" ] && echo -e "\n===>>> ${PM_PARENT_PORT}" ;;
+	*\>\>*)	echo -e "\n===>>> ${PM_PARENT_PORT}${1}" ;;
+	esac
+
 	[ -n "$PM_NO_TERM_TITLE" ] && return
 	case "$TERM" in cons*) return ;; esac
 
@@ -2490,14 +2517,9 @@ update_port () {
 
 	[ -n "$PM_FIRST_PASS" ] && num_of_deps=$(( $num_of_deps + 1 ))
 
-	deps=" (${dep_of_deps}/${num_of_deps})"
+	deps="(${dep_of_deps}/${num_of_deps})"
 
-	if [ -n "$PM_DEPTH" ]; then
-		echo "	${PM_DEPTH}>> ${1#$pd/}"
-		term_printf " ${PM_DEPTH#* }>> ${1#$pd/}${deps}"
-	else
-		[ -n "$UPDATE_ALL" ] && term_printf " >> ${1#$pd/}${deps}"
-	fi
+	term_printf " ${PM_DEPTH#* }>> ${1#$pd/} ${deps}"
 
 	[ -n "$doing_dep_check" -o \( -n "$UPDATE_ALL" -a -n "$PM_FIRST_PASS" \) ] &&
 		unset NO_DEP_UPDATES
@@ -2511,16 +2533,16 @@ update_port () {
 	fi
 
 	if [ -n "$UPDATE_ALL" ]; then
+		# Fix terminal titlebar in case of a long delay between ports to update
 		term_printf " (${num_of_deps})"
-		echo "===>>> Returning to update check of installed ports"
-		echo ''
+		echo -e "\n===>>> Returning to update check of installed ports\n"
 	elif [ -n "$PM_URB" ]; then
 		return 0
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
 		echo "===>>> Continuing initial dependency check for $portdir"
 	else
 		term_printf " ${PM_DEPTH#* }${deps}"
-		echo "===>>> Returning to dependency check for $portdir"
+		echo -e  "\n===>>> Returning to dependency check for $portdir"
 	fi
 	return 0
 } # update_port()
@@ -2700,11 +2722,18 @@ dependency_check () {
 				fi
 				if [ -n "$confl_p" ]; then
 					confl_p=${confl_p%% *}
+					d_port="$pd/`origin_from_pdb $confl_p`"
+
+					if [ "${d_port#$pd/}" = "$portdir" ]; then
+						echo -e "\n===>>> $origin seems to depend on $portdir"
+						echo '       which looks like a dependency loop'
+						fail "Try pkg_updating $portdir"
+					fi
+
 					echo ''
 					echo "===>>> The dependency for ${origin}"
 					echo "       seems to be handled by $confl_p"
 					echo ''
-					d_port="$pd/`origin_from_pdb $confl_p`"
 				fi
 			done
 		fi
@@ -2753,17 +2782,15 @@ dependency_check () {
 		safe_exit
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
 		echo "===>>> Initial dependency check complete for $portdir"
-		case "$PM_DEPTH" in *\>\>*) echo "	$PM_DEPTH" ;; esac
 	else
 		echo "===>>> Dependency check complete for $portdir"
+		local deps ; deps="(${dep_of_deps}/${num_of_deps})"
 		case "$PM_DEPTH" in
-		*\>\>*)	echo "	$PM_DEPTH" ;;
+		*\>\>*)	term_printf " ${PM_DEPTH#* }${deps}" ; echo '' ;;
 		*)	if [ "$PM_PARENT_PORT" = All ]; then
-				local deps
-				deps=" (${dep_of_deps}/${num_of_deps})"
 				term_printf " >> ${upg_port:-$portdir}${deps}"
 			else
-				term_printf
+				term_printf ; echo ''		# multiport
 			fi ;;
 		esac
 	fi
@@ -2773,7 +2800,7 @@ post_first_pass () {
 	local action
 
 	if [ ${num_of_deps:-0} -gt 0 ]; then
-		term_printf " (${num_of_deps})"
+		term_printf " >> (${num_of_deps})"
 
 		if [ -z "$PM_NO_CONFIRM" ]; then
 			local answer
@@ -2833,12 +2860,13 @@ post_first_pass () {
 
 		for dep in $build_only_dl_g; do
 			if [ -z "$use_pkgng" ]; then
-				grep -q "@comment DEPORIGIN:${dep#$pd/}$" $pdb/*/+CONTENTS ||
-					temp_bodlg="$temp_bodlg $dep"
+				grep -q "@comment DEPORIGIN:${dep#$pd/}$" $pdb/*/+CONTENTS && continue
 			else
-				[ "`pkg query "%?r" ${dep#$pd/}`" = "1" ] ||
-					temp_bodlg="$temp_bodlg $dep"
+				[ "`pkg query "%?r" ${dep#$pd/}`" = "1" ] && continue
 			fi
+			[ -n "$PM_DEL_BUILD_ONLY" ] &&
+				iport_from_origin ${dep#$pd/} >/dev/null && continue
+			temp_bodlg="$temp_bodlg $dep"
 		done
 
 		build_only_dl_g=" `uniquify_list $temp_bodlg` "
@@ -2967,6 +2995,7 @@ multiport () {
 		esac
 	done
 
+	numports=0
 	for port in $worklist_temp; do
 		check_exclude $port || continue
 		check_interactive $port || continue
@@ -2990,6 +3019,7 @@ multiport () {
 			fi
 		fi
 
+		numports=$(( $numports + 1 ))
 		worklist="$worklist $port"
 		portlist="${portlist}\t${port}\n"
 		PM_MULTI_PORTS="${PM_MULTI_PORTS}${port}:"
@@ -3021,7 +3051,7 @@ multiport () {
 
 	[ -n "$PM_URB" ] && export PM_URB
 
-	numports=0
+	num=0
 	for port in $worklist; do
 		case "$port" in
 		*/*)	origin=$port ;;
@@ -3030,8 +3060,8 @@ multiport () {
 
 		case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
 
-		numports=$(( $numports + 1 ))
-		init_term_printf "$port ${numports}/${numports}"
+		num=$(( $num + 1 ))
+		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
@@ -3041,6 +3071,8 @@ multiport () {
 		*)		numports=$(( $numports - 1 )) ;;
 		esac
 	done
+	numports=$num
+	PM_PARENT_PORT="Total ports: $numports"
 
 	if [ -n "$PM_URB" ]; then
 		unset PM_URB ; PM_URB=pm_urb_post_first_pass
@@ -3116,7 +3148,7 @@ make_config () {
 
 if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	CUR_DEPS=':' ; DISPLAY_LIST='' ; INSTALLED_LIST=''
-	PM_DEPTH='' ; IPC_SAVE=`pm_mktemp IPC_SAVE`
+	PM_DEPTH='' ; pm_mktemp IPC_SAVE ; IPC_SAVE=$pm_mktemp_file
 	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE
 
 	if [ -n "$LOCALBASE" ]; then
@@ -3167,8 +3199,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 		NO_DEP_UPDATES=no_dep_updates ; build_l=''
 		export NO_DEP_UPDATES build_l
 
-		[ -z "$PM_INDEX_ONLY" ] &&
-			pm_cd_pd && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
+		pm_cd_pd Mk && PM_WRKDIRPREFIX=`pm_make_b -V WRKDIRPREFIX` && pm_cd -
 	fi
 
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
@@ -3191,8 +3222,9 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	fi
 
 	# Set the file name here so it's visible to the children
-	[ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" -a -z "$PM_PACKAGES" ] &&
-		export DI_FILES=`pm_mktemp DI-FILES`
+	if [ -z "$DONT_SCRUB_DISTFILES" -a -z "$FETCH_ONLY" -a -z "$PM_PACKAGES" ]; then
+		pm_mktemp DI-FILES ; DI_FILES=$pm_mktemp_file ; export DI_FILES
+	fi
 
 	[ -n "$PM_URB" ] && multiport $PM_URB_IPORTS
 	[ $# -gt 1 -a -z "$REPLACE_ORIGIN" ] && multiport "$@"
@@ -3204,8 +3236,6 @@ all_first_pass () {
 	local iport origin
 
 	for iport in "$@"; do
-		pm_v "===>>> $iport"
-
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport` || {
@@ -3227,7 +3257,7 @@ all_first_pass () {
 
 		check_exclude $iport || continue
 
-		PM_DEPTH=
+		PM_DEPTH="$iport "
 		check_for_updates $iport $origin || fail 'Update failed'
 	done
 }
@@ -3341,7 +3371,11 @@ else
 			find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
 			unset glob_dirs
 		fi
-		[ -n "$ro_upg_port" ] && ro_opd=`origin_from_pdb $ro_upg_port`
+		if [ -n "$ro_upg_port" ]; then
+			ro_opd=`origin_from_pdb $ro_upg_port`
+		else
+			ro_opd=$arg2
+		fi
 	esac
 	unset arg2
 
@@ -3505,7 +3539,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 
 		if [ -z "$DONT_FETCH" -a -n "$distfiles" ]; then
 			echo "===>>> Launching 'make checksum' for $portdir in background"
-			fetchlog=`pm_mktemp fetchlog-${portdir#*/}`
+			pm_mktemp fetchlog-${portdir#*/} ; fetchlog=$pm_mktemp_file
 			(pm_make -DBATCH checksum >> $fetchlog 2>&1 && {
 			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.*; exit 0; }
 			    allfiles=`pm_make -V ALLFILES`
@@ -3734,7 +3768,7 @@ fetch_package () {
 		dirlist=`echo ${TMPDIR}/f-${PM_PARENT_PID}-dl-${portdir%/*}\.*`
 		if [ ! -r "$dirlist" ]; then
 			pm_unlink $dirlist		# JIC
-			dirlist=`pm_mktemp dl-${portdir%/*}`
+			pm_mktemp dl-${portdir%/*} ; dirlist=$pm_mktemp_file
 			fetch -q -o - ${sitepath} 2>/dev/null |
 			    sed -e "s#%2[cC]#,#g" -e "s#%2[bB]#+#g" > $dirlist
 		fi
@@ -3897,8 +3931,8 @@ if [ -z "$use_package" ]; then
 	unset count fl_read
 
 	if [ -n "$HIDE_BUILD" ]; then
-		port_log=`mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}` ||
-			fail "mktemp for $1 failed"
+		port_log=`/usr/bin/mktemp -t port_log-${PM_PARENT_PID}-${portdir#*/}` ||
+			fail "mktemp for port_log-${PM_PARENT_PID}-${portdir#*/} failed"
 		port_log_args=">> $port_log 2>&1"
 		echo "===>>> Logging build to $port_log"
 	fi
@@ -3920,7 +3954,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	[ -z "$NO_BACKUP" ] && pm_pkg_create $pbu $UPGRADE_PORT
 
 	if [ -n "$SAVE_SHARED" ]; then
-		ldconfig_out=`pm_mktemp ldconfig`
+		pm_mktemp ldconfig ; ldconfig_out=$pm_mktemp_file
 		ldconfig -r | sed 's#.* ##' |
 		    grep -v ^$LOCALBASE_COMPAT > $ldconfig_out
 
@@ -3964,7 +3998,8 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		*" $portdir "*)
 			preserve_port=`echo $portdir | sed 's#[-+/\.]#_#g'`
 			eval preserve_port_files="\$${preserve_port}_files"
-			preserve_dir=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port}`
+		preserve_dir=`/usr/bin/mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port} 2>/dev/null` ||
+				fail "Could not create a temporary directory for $preserve_port in $TMPDIR"
 			for file in $preserve_port_files; do
 				cp -p $file ${preserve_dir}/ ||
 				    fail "Cannot copy $file, which is in \$${preserve_port}_files"
@@ -4048,14 +4083,13 @@ else
 	fi
 fi
 
-#TODO
 if [ -z "$use_pkgng" ]; then
 	for file in $preserve_port_files; do
 		mv $file ${file}-new
 		mv ${preserve_dir}/${file##*/} $file
 		oldmd5="MD5:`md5 -q $file`"
-
-		new_cont=`pm_mktemp contents`
+	
+		pm_mktemp contents ; new_cont=$pm_mktemp_file
 		while read left right; do
 			case "$left" in
 			@cwd)		short_file="${file#${right}/}" ;;
@@ -4140,7 +4174,7 @@ if [ -n "$distfiles" ]; then
 		[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $portdir"
 	fi
 
-	dist_list_temp=`pm_mktemp dist_list`
+	pm_mktemp dist_list ; dist_list_temp=$pm_mktemp_file
 	echo '# Added by portmaster' > $dist_list_temp
 	for file in $distfiles; do
 		size=`grep "^SIZE (${ds}${file})" $distinfo`
@@ -4188,9 +4222,9 @@ if [ -n "$MAKE_PACKAGE" ]; then
 fi
 
 if [ -z "$use_package" -a -z "$DONT_POST_CLEAN" ]; then
-	pm_sv Running \'make clean\'
-	pm_make_s clean NOCLEANDEPENDS=ncd2
-	echo ''
+	pm_v "===>>> Running 'make clean' in the background"
+	(pm_make_s clean NOCLEANDEPENDS=ncd2 >/dev/null)&
+	pm_v
 fi
 
 if [ -z $use_pkgng ]; then
@@ -4261,7 +4295,7 @@ safe_exit
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#  Copyright (c) 2005-2011 Douglas Barton
+#  Copyright (c) 2005-2012 Douglas Barton
 #  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
