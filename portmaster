@@ -2992,6 +2992,8 @@ all_first_pass () {
 	local iport origin
 
 	for iport in "$@"; do
+		pm_v "===>>> $iport"
+
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport` || {
