@@ -2992,7 +2992,7 @@ all_first_pass () {
 	local iport origin
 
 	for iport in "$@"; do
-		pm_v "===>>> $iport"
+		[ -z "$FETCH_ONLY" ] && pm_v "===>>> $iport"
 
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
@@ -3276,6 +3276,8 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 			if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1; then
 				pm_mktemp ${file}-${portdir#*/} >/dev/null
 			else
+				[ -n "$FETCH_ONLY" ] &&
+					echo "===>>> Skipping $file due to previous fetch for it"
 				DONT_FETCH=dont_fetch
 				break
 			fi
