@@ -3746,7 +3746,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 fi
 
 if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
-	echo '' ; echo "===>>> Starting check for runtime dependencies"
+	echo "===>>> Starting check for runtime dependencies"
 	dependency_check run-depends-list
 	pm_cd_pd $portdir
 fi
