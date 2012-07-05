@@ -144,7 +144,7 @@ parent_exit () {
 			fi
 		fi
 		if [ -z "$BACKUP" -a -z "$NO_BACKUP" -a -n "$NB_DELETE" ]; then
-			pm_sv 'Deleting safety packages for successful installs'
+			pm_sv 'Deleting safety packages for successful installs\n'
 			pm_cd $pbu || fail "Cannot cd to $pbu"
 			pm_rm_s $NB_DELETE
 		fi
@@ -166,7 +166,7 @@ parent_exit () {
 	done
 
 	if [ -n "$PM_WRKDIRPREFIX" -a -z "$1" ]; then
-		pm_v ; count=0
+		count=0
 		while : ; do
 			ps axww | grep '[m]ake clean NOCLEANDEPENDS=ncd' >/dev/null || break
 			count=$(( $count + 1 ))
@@ -225,7 +225,6 @@ parent_exit () {
 			fi
 			[ -n "$PM_LOG" ] && date >> $PM_LOG
 		fi
-		[ -n "$PM_SU_VERBOSE" ] && echo ''
 		case "$show_list" in
 		all)	echo "===>>> The following actions were performed:"
 			echo -e $INSTALLED_LIST
@@ -335,7 +334,7 @@ pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
 pm_unlink_s       () { [ -e "$1" ] && $PM_SU_CMD /bin/unlink $1; }
 
 pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
-pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo "===>>> SU $*"; }
+pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo -e "===>>> SU $*"; }
 
 # Do this here so we can have a reasonably good guess.
 # May be modified below.
@@ -1266,7 +1265,7 @@ delete_empty_dist_subdirs () {
 	# Get back to somewhere safe so we do not
 	# delete our CWD out from under ourselves
 	pm_cd $DISTDIR || fail "Cannot cd into $DISTDIR"
-	find -d $DISTDIR -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
+	find $DISTDIR -depth -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
 }
 
 init_packages_var () {
@@ -1343,8 +1342,8 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	echo "===>>> Checking for stale distfiles" ; echo ''
 	for df in `find $DISTDIR -type f | sort`; do
 		f=${df#$DISTDIR}
-		if ! grep -ql $f $DI_FILES; then
-			get_answer_yn n "\t===>>> Delete stale file: ${f}"
+		if ! grep -ql ^$f $DI_FILES; then
+			get_answer_yn n "\t===>>> Delete stale file: $f"
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
 				/bin/unlink $df ;;
@@ -1778,57 +1777,66 @@ pm_pkg_create () {
 
 find_dl_distfiles () {
 	# Global: dist_list dist_list_files
-	local file
 
 	# We need to define these for use in the deletion/update process.
-	if pm_cd $pd/$1; then
-		dist_list=`pm_make_b -V OPTIONSFILE`
-		dist_list="${dist_list%options}distfiles"
-
-		[ -s "$dist_list" ] || { unset dist_list ; return 0; }
-		[ -n "$DONT_SCRUB_DISTFILES" ] && return 0
-
-		# The grep is needed to allow for comments, etc.
-		for file in `grep ^DISTFILE $dist_list`; do
-			file=${file#DISTFILE:} ; file=${file%%:*}
-			dist_list_files="${dist_list_files}${file#*/} "
-		done
+	if [ -s "${pdb}/${upg_port}/distfiles" ]; then
+		dist_list="${pdb}/${upg_port}/distfiles"
 	else
-		# The port might have moved, etc.; so take a stab at it,
-		# but do not take a chance with a possibly wrong answer
-		dist_list="$port_dbdir/${1##*/}/distfiles"
-
-		[ -s "$dist_list" ] || { unset dist_list ; return 0; }
-		[ -n "$DONT_SCRUB_DISTFILES" ] && return 0
-
-		# Do not strip the subdir, we will use it in delete_all
-		for file in `grep ^DISTFILE $dist_list`; do
-			file=${file#DISTFILE:} ; file=${file%%:*}
-			dist_list_files="${dist_list_files}${file} "
-		done
+		# Old method, for now
+		if pm_cd $pd/$1; then
+			dist_list=`pm_make_b -V OPTIONSFILE`
+			dist_list="${dist_list%options}distfiles"
+		else
+			# The port might have moved, etc.; so take a stab at it,
+			# but do not take a chance with a possibly wrong answer
+			dist_list="$port_dbdir/${1##*/}/distfiles"
+		fi
 	fi
+
+	[ -s "$dist_list" ] || { unset dist_list ; return 0; }
+	[ -n "$DONT_SCRUB_DISTFILES" ] && return 0
+
+	local line
+	while read line; do
+		case "$line" in
+		DISTFILE*)	line=${line#DISTFILE:} ; line=${line%%:*}
+				dist_list_files="${dist_list_files}${line#*/} " ;;
+		esac
+	done < $dist_list
+
+	# Clean up after the old method
+	case "$dist_list" in
+	${port_dbdir}*)
+		pm_sv Deleting $dist_list
+		pm_unlink_s $dist_list
+
+		local dir=`find ${dist_list%/distfiles} -type d -empty 2>/dev/null`
+		if [ -d "$dir" ]; then
+			pm_sv Deleting empty $dir directory
+			pm_rmdir_s $dir
+		fi
+
+		unset dist_list ;;
+	esac
 }
 
-delete_dist_list () {
-	[ -n "$dist_list" ] || return 0
+check_di_files () {
+	# Global: distfiles_checked
 
-	local dir
-
-	pm_sv Deleting $dist_list
-	pm_unlink_s $dist_list
-
-	dir=`find ${dist_list%/distfiles} -type d -empty 2>/dev/null`
-	if [ -d "$dir" ]; then
-		pm_sv Deleting the $dir directory
-		pm_rmdir_s $dir
+	if [ -s "$DI_FILES" ]; then
+		if grep -ql ^${port_subdir}${1} $DI_FILES; then
+			distfiles_checked="${distfiles_checked}${1}:"
+			pm_v "===>>> Keeping distfile, valid for another port: $1"
+			return 0
+		fi
 	fi
+
+	return 1
 }
 
 find_and_delete_distfiles () {
-	# Global: port_subdir DISTDIR distfiles distfiles_checked delete_all
-	local ps file answer
-
-	ps=${port_subdir#$DISTDIR}
+	# Global: distfiles_checked
+	local file answer
 
 	for file in ${1}*; do
 		# This generally means the pattern did not match
@@ -1844,23 +1852,17 @@ find_and_delete_distfiles () {
 		case "$distfiles" in
 		*" ${file} "*)
 			distfiles_checked="${distfiles_checked}${file}:"
-			pm_v "===>>> Keeping current distfile: $file"
+			pm_v "===>>> Keeping current distfile: ${port_subdir}${file}"
 			continue ;;	# Do not delete current version
-		*)	if [ -s "$DI_FILES" ]; then
-				if grep -ql ${ps}$file $DI_FILES; then
-					distfiles_checked="${distfiles_checked}${file}:"
-					pm_v "===>>> Keeping current distfile: $file"
-					continue 	# Do not delete current version
-				fi
-			fi
+		*)	check_di_files $file && continue
 
 			if [ -n "$ALWAYS_SCRUB_DISTFILES" -o -n "$delete_all" ]; then
-				echo "===>>> Deleting stale distfile: $file"
+				echo "===>>> Deleting stale distfile: ${port_subdir}${file}"
 				pm_unlink $file
 				continue
 			fi
 
-			get_answer_g n y "\n===>>> Delete $file? y/n"
+			get_answer_g n y "\n===>>> Delete ${port_subdir}${file}? y/n"
 			case "$?" in
 			1)	pm_unlink $file ;;
 			0)	distfiles_checked="${distfiles_checked}${file}:" ;;
@@ -1869,9 +1871,27 @@ find_and_delete_distfiles () {
 	done
 }
 
-set_distfiles_and_subdir () {
-	# Global: dist_list_files distfiles port_subdir DISTDIR
+make_distfiles () {
+	# Global: distfiles
 
+	# Even if there are no distfiles there will be a space returned
+	distfiles=`pm_make -V ALLFILES` ; distfiles=${distfiles%% }
+	if [ -n "$distfiles" ]; then
+		distfiles=" $distfiles "
+	else
+		unset distfiles
+	fi
+}
+
+make_port_subdir () {
+	# Global: port_subdir full_port_subdir
+
+	port_subdir=`pm_make -V DIST_SUBDIR`
+	port_subdir="${port_subdir:+${port_subdir}/}"
+	full_port_subdir="${DISTDIR}${port_subdir}"
+}
+
+set_distfiles_and_subdir () {
 	[ -z "$dist_list_files" ] && find_dl_distfiles $1
 
 	if [ -d "$pd/$1" ]; then
@@ -1880,26 +1900,18 @@ set_distfiles_and_subdir () {
 		return 1
 	fi
 
-	if [ -z "$distfiles" ]; then
-		distfiles=`pm_make -V ALLFILES | sed -e 's# *$##g'`
-		[ -n "$distfile" ] && distfiles=" ${distfiles} "
-	fi
+	[ -n "$distfiles" ] || make_distfiles
+
 	# Ports may have no distfiles
 	[ -z "$dist_list_files" -a -z "$distfiles" ] && return 2
 
-	if [ -z "$port_subdir" ]; then
-		port_subdir=`pm_make -V DIST_SUBDIR`
-		if [ -n "$port_subdir" ]; then
-			port_subdir="${DISTDIR}${port_subdir}/"
-		else
-			port_subdir=$DISTDIR
-		fi
-	fi
-	if [ -d "$port_subdir" ]; then
-		pm_cd $port_subdir || fail "cd to $port_subdir failed!"
+	[ -n "$full_port_subdir" ] || make_port_subdir
+
+	if [ -d "$full_port_subdir" ]; then
+		pm_cd $full_port_subdir || fail "cd to $full_port_subdir failed!"
 	else
 		echo ''
-		echo "===>>> $port_subdir does not exist, therefore we"
+		echo "===>>> $full_port_subdir does not exist, therefore we"
 		echo '       will assume that all relevant distfiles are gone.'
 		echo ''
 		echo "       Try ${0##*/} [-y] --clean-distfiles for a full cleanup"
@@ -1910,13 +1922,13 @@ set_distfiles_and_subdir () {
 }
 
 delete_stale_distfiles () {
-	# Global: distfiles port_subdir distfiles_checked delete_all
+	# Global: distfiles_checked
 	local file answer
 
 	set_distfiles_and_subdir $1 || return 0
 	distfiles_checked=':'
 
-	# If these two match, it means that the distfiles in the +CONTENTS
+	# If these two match, it means that the distfiles in the
 	# file are the current set, so do not delete them.
 	if [ ! " $dist_list_files" = "$distfiles" ]; then
 		for file in $dist_list_files; do
@@ -1925,17 +1937,19 @@ delete_stale_distfiles () {
 			case "$distfiles" in
 			*" ${file} "*)
 				distfiles_checked="${distfiles_checked}${file}:"
-				pm_v "===>>> Keeping current distfile: $file"
+				pm_v "===>>> Keeping current distfile: ${port_subdir}${file}"
 				continue ;;	# Do not delete current version
 			esac
 
+			check_di_files $file && continue
+
 			if [ -n "$ALWAYS_SCRUB_DISTFILES" -o -n "$delete_all" ]; then
-				echo "===>>> Deleting stale distfile: $file"
+				echo "===>>> Deleting stale distfile: ${port_subdir}${file}"
 				pm_unlink $file
 				continue
 			fi
 
-			get_answer_g n y "\n===>>> Delete $file? y/n"
+			get_answer_g n y "\n===>>> Delete ${port_subdir}${file}? y/n"
 			case "$?" in
 			1)	pm_unlink $file ;;
 			0)	distfiles_checked="${distfiles_checked}${file}:" ;;
@@ -1944,7 +1958,7 @@ delete_stale_distfiles () {
 	fi
 
 	# Eventually we will hide this behind an "aggressive distfile purge"
-	# flag, but until the DISTFILE stuff is well populated in PORT_DBDIR,
+	# flag, but until the DISTFILE stuff is well populated
 	# keep doing it both ways.
 	for file in $distfiles $dist_list_files; do
 		find_and_delete_distfiles ${file%[-]*}-[0-9]
@@ -1972,16 +1986,16 @@ delete_all_distfiles () {
 
 			answer=y
 			if [ -z "$ALWAYS_SCRUB_DISTFILES" ]; then
-				echo "===>>> However, the list of files in $dist_list"
+				echo "===>>> However, the list of files from $dist_list"
 				get_answer_g n y "       should be current.  Delete the files on this list? y/n"
 				case "$?" in 0)	answer=n ;; esac
 			fi
 
 			case "$answer" in
 			[yY])	for f in $dist_list_files; do
-					if [ -f "${DISTDIR}${f}" ]; then
-						echo "       Deleting ${DISTDIR}${f}"
-						/bin/unlink ${DISTDIR}${f}
+					if [ -f "$f" ]; then
+						echo "       Deleting ${port_subdir}${f}"
+						/bin/unlink $f
 					fi
 				done ;;
 			esac
@@ -2094,7 +2108,7 @@ if [ -n "$EXPUNGE" ]; then
 	fi
 
 	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $EXPUNGE; }
-	[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
+	[ -z "$DONT_SCRUB_DISTFILES" ] && delete_all_distfiles $origin
 
 	echo "===>>> Running pkg_delete -f $EXPUNGE"
 	pm_pkg_delete_s -f $EXPUNGE || fail 'pkg_delete failed'
@@ -2126,12 +2140,12 @@ if [ -n "$CLEAN_STALE" ]; then
 			continue
 		fi
 
-		pkg_info $iport
+		echo '' ; pkg_info $iport
 
 		get_answer_yn n "\t===>>> ${iport} is no longer depended on, delete"
 		case "$?" in
 		0)	[ -n "$BACKUP" ] && { init_packages ; pm_pkg_create $pbu $iport; }
-			[ -z "$DONT_SCRUB_DISTFILES" ] && { delete_all_distfiles $origin; delete_dist_list; }
+			[ -z "$DONT_SCRUB_DISTFILES" ] && delete_all_distfiles $origin
 
 			echo "===>>> Running pkg_delete -f $iport"
 			pm_pkg_delete_s -f $iport || fail 'pkg_delete failed'
@@ -2566,7 +2580,7 @@ dependency_check () {
 	if [ -n "$SHOW_WORK" ]; then
 		safe_exit
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
-		echo "===>>> Initial dependency check complete for $portdir"
+		echo -e "===>>> Initial dependency check complete for $portdir\n"
 	else
 		echo "===>>> Dependency check complete for $portdir"
 		local deps ; deps="(${dep_of_deps}/${num_of_deps})"
@@ -3266,8 +3280,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 		# PATCHFILES may get added after the first pass, but we want to
 		# do as much of this as we can, as early as we can, and
 		# patch files are usually small anyway.
-		distfiles=`pm_make -V ALLFILES | sed -e 's# *$##g'`
-		[ -n "$distfiles" ] && distfiles=" ${distfiles} "
+		make_distfiles
 
 		# Make sure that different ports using the same distfiles
 		# do not clobber each other's fetchs
@@ -3728,6 +3741,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		pm_pkg_delete_s -f $upg_port
 	fi
 
+	echo ''
 	pm_cd_pd $portdir
 fi
 
@@ -3845,23 +3859,14 @@ fi
 unset temp
 
 # This will serve for *delete*distfiles() as well
-[ -z "$use_package" ] && distfiles=`pm_make -V ALLFILES | sed -e 's# *$##g'`
+[ -z "$use_package" ] && make_distfiles
 if [ -n "$distfiles" ]; then
-	distfiles=" ${distfiles} "
-
 	# Implement storage of distfile information in the way that
 	# it will (hopefully, soon?) be implemented in bsd.port.mk
 	# See http://www.freebsd.org/cgi/query-pr.cgi?pr=106483
-	dist_list=`pm_make_b -V OPTIONSFILE`
-	dist_list="${dist_list%options}distfiles"
-	if [ ! -d "${dist_list%/distfiles}" ]; then
-		pm_sv Creating ${dist_list%/distfiles}
-		pm_mkdir_s ${dist_list%/distfiles}
-	fi
+	dist_list="${pdb}/${new_port}/distfiles"
 
-	ds=`pm_make -V DIST_SUBDIR`
-	[ -n "$ds" ] && ds="${ds}/"
-	port_subdir="${DISTDIR}${ds}"		# Also for *delete*distfiles()
+	make_port_subdir
 
 	if [ -s distinfo ]; then
 		distinfo=distinfo
@@ -3873,18 +3878,25 @@ if [ -n "$distfiles" ]; then
 	pm_mktemp dist_list ; dist_list_temp=$pm_mktemp_file
 	echo '# Added by portmaster' > $dist_list_temp
 	for file in $distfiles; do
-		size=`grep "^SIZE (${ds}${file})" $distinfo`
-		sha256=`grep "^SHA256 (${ds}${file})" $distinfo`
-		echo "DISTFILE:${ds}${file}:SIZE=${size##* }:SHA256=${sha256##* }" \
-		    >> $dist_list_temp
+		while read line ; do
+			case "$line" in
+			SHA256\ \(${port_subdir}${file}\)*) sha256=${line##* } ;;
+			SIZE\ \(${port_subdir}${file}\)*)
+				[ -n "$sha256" ] || fail "$distinfo is out of order"
+				echo "DISTFILE:${port_subdir}${file}:SIZE=${line##* }:SHA256=${sha256}" \
+					>> $dist_list_temp ; break ;;
+			esac
+		done < $distinfo
+		unset sha256
+
 		# Make sure any new distfiles get added to the list
 		[ -n "$DI_FILES" -a ! "$$" -eq "$PM_PARENT_PID" ] &&
-			echo "${ds}$file" >> $DI_FILES
+			echo "${port_subdir}${file}" >> $DI_FILES
 	done
 
-	pm_sv Installing $dist_list
+	pm_sv "Installing $dist_list\n"
 	pm_install_s $dist_list_temp $dist_list
-	/bin/unlink $dist_list_temp ; unset ds dist_list_temp
+	/bin/unlink $dist_list_temp ; unset distinfo dist_list_temp file line
 fi
 
 if [ -n "$use_package" ]; then
@@ -3924,7 +3936,7 @@ fi
 
 check_dependency_files $portdir $new_port
 if [ -s "$grep_deps" ]; then
-	echo "===>>> Updating dependency entry for $new_port in each dependent port"; pm_v
+	echo -e "===>>> Updating dependency entry for $new_port in each dependent port\n"
 	while read d_port; do
 		pm_v "===>>> $d_port"
 		dp_cont=$pdb/$d_port/+CONTENTS
@@ -3942,7 +3954,7 @@ if [ -s "$grep_deps" ]; then
 	done < $grep_deps
 	unset d_port dp_cont do_update
 
-	update_required_by $new_port
+	update_required_by $new_port ; pm_v
 fi
 
 if [ -n "$upg_port" ]; then
@@ -3973,7 +3985,6 @@ if [ -z "$DONT_SCRUB_DISTFILES" ]; then
 	delete_stale_distfiles $portdir
 	if [ -n "$ro_opd" ]; then
 		delete_all_distfiles $ro_opd
-		delete_dist_list
 	fi
 fi
 
