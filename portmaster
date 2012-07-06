@@ -2361,7 +2361,7 @@ update_port () {
 	if [ -n "$UPDATE_ALL" ]; then
 		# Fix terminal titlebar in case of a long delay between ports to update
 		term_printf " (${num_of_deps})"
-		echo -e "\n===>>> Returning to update check of installed ports\n"
+		echo -e "===>>> Returning to update check of installed ports\n"
 	elif [ -n "$PM_URB" ]; then
 		return 0
 	elif [ -n "$PM_FIRST_PASS" -a -z "$PM_PACKAGES" ]; then
@@ -2443,7 +2443,7 @@ dependency_check () {
 	d_port_list=`gen_dep_list $1`
 
 	if [ -z "$d_port_list" ]; then
-		echo "===>>> No dependencies for $portdir"
+		echo -e "===>>> No dependencies for $portdir\n"
 		[ -n "$SHOW_WORK" ] && safe_exit
 		return 0
 	else
