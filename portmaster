@@ -73,7 +73,7 @@ trap_exit () {
 	fi
 
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
-		. $IPC_SAVE
+		[ -s "$IPC_SAVE" ] && . $IPC_SAVE
 
 		local n=0
 		while ps -axo pid,ppid,command | grep -v egrep |
@@ -100,7 +100,7 @@ trap_exit () {
 		if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-TEAC\.* >/dev/null 2>&1; then
 			pm_mktemp TEAC		# Trap Exit Already Called
 		else
-			. $IPC_SAVE
+			[ -s "$IPC_SAVE" ] && . $IPC_SAVE
 		fi
 	fi
 	safe_exit 1
@@ -165,7 +165,7 @@ parent_exit () {
 		/bin/unlink $f
 	done
 
-	if [ -n "$PM_WRKDIRPREFIX" -a -z "$1" ]; then
+	if [ -n "$PM_WRKDIRPREFIX" ] && [ -n "$PM_BUILDING" -a -z "$1" ]; then
 		count=0
 		while : ; do
 			ps axww | grep '[m]ake clean NOCLEANDEPENDS=ncd' >/dev/null || break
@@ -256,11 +256,11 @@ parent_exit () {
 }
 
 safe_exit () {
+	[ -n "$grep_deps" ] && pm_unlink $grep_deps
+
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		parent_exit $1
 	else
-		[ -n "$grep_deps" ] && pm_unlink $grep_deps
-
 		# Save state for the parent process to read back in
 		> $IPC_SAVE
 		if [ -z "$PM_FIRST_PASS" ]; then
@@ -1102,12 +1102,13 @@ IFS='
 	done
 	[ -n "$prev_line" ] && echo $prev_line >> $new_cont
 
-	cmp -s $contents $new_cont && { /bin/unlink $new_cont ; return; }
+	if ! cmp -s $contents $new_cont; then
+		check_regular_file $contents
+		pm_v "	===>>> Installing the new +CONTENTS file"
+		pm_install_s $new_cont $contents
+	fi
 
-	check_regular_file $contents
-	pm_v "	===>>> Installing the new +CONTENTS file"
-	pm_install_s $new_cont $contents
-	pm_unlink $new_cont
+	/bin/unlink $new_cont
 }
 
 find_moved_port () {
@@ -1310,7 +1311,7 @@ parse_index () {
 }
 
 update_required_by () {
-	# Global: grep_deps needws
+	# Global: needws
 	local do_update
 
 	if [ -e "$pdb/$1/+REQUIRED_BY" ]; then
@@ -3955,17 +3956,14 @@ if [ -s "$grep_deps" ]; then
 
 		if [ -n "$ro_opd" ] && grep -ql "DEPORIGIN:$ro_opd$" $dp_cont; then
 			update_contents $dp_cont $portdir $new_port $ro_opd
-			needws=needws
 		fi
 		# Do this one last so it can get deleted as a duplicate
 		# if ro_opd is present.
 		if grep -ql "DEPORIGIN:$portdir$" $dp_cont; then
 			update_contents $dp_cont $portdir $new_port
-			needws=needws
 		fi
 	done < $grep_deps
-	[ -n "$needws" ] && pm_v
-	unset d_port dp_cont do_update needws
+	unset d_port dp_cont ; pm_v
 
 	update_required_by $new_port
 	[ -n "$needws" ] && { pm_v; unset needws; }
