@@ -246,11 +246,10 @@ parent_exit () {
 		echo ''
 	fi
 
-	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
-	if [ -n "$1" -a -n "$PM_NEEDS_UPDATE" -a -n "$PM_BUILDING" -a -z "$FETCH_ONLY" ]; then
+	if [ -n "$1" -a -n "${PM_NEEDS_UPDATE# }" -a -n "$PM_BUILDING" -a -z "$FETCH_ONLY" ]; then
 		echo ''
 		echo "===>>> You can restart from the point of failure with this command line:"
-		echo "       ${0##*/} <flags> $PM_NEEDS_UPDATE"
+		echo "       ${0##*/} <flags>${PM_NEEDS_UPDATE}"
 		echo ''
 	fi
 }
@@ -270,11 +269,14 @@ safe_exit () {
 			[ -n "$PM_DEL_BUILD_ONLY" ] &&
 				echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
 
-			for i in $PM_NEEDS_UPDATE; do
-				[ "$i" = "$portdir" ] && continue
-				pnu_temp="${pnu_temp}${i} "
-			done
-			PM_NEEDS_UPDATE=" ${pnu_temp}"
+			# Do not remove a child from the list if we trapped or failed
+			if [ -z "$1" ]; then
+				for i in $PM_NEEDS_UPDATE; do
+					[ "$i" = "$portdir" ] && continue
+					pnu_temp="${pnu_temp}${i} "
+				done
+				PM_NEEDS_UPDATE=" ${pnu_temp}"
+			fi
 
 			[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && echo "NB_DELETE='$NB_DELETE'" >> $IPC_SAVE
 		else
@@ -335,7 +337,7 @@ pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
 pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
 pm_unlink_s       () { [ -e "$1" ] && $PM_SU_CMD /bin/unlink $1; }
 
-pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
+pm_v              () { [ -n "$PM_VERBOSE" ] && echo -e "$*"; }
 pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo -e "===>>> SU $*"; }
 
 # Do this here so we can have a reasonably good guess.
@@ -1244,25 +1246,34 @@ read_distinfos_all () {
 }
 
 ports_by_category () {
+	# Global: num_roots num_trunks num_branches num_leaves num_ports
 	local pkg
+
 	pm_v "===>>> Sorting ports by category"
 
+	num_roots=0; num_trunks=0; num_branches=0; num_leaves=0
 	for pkg in $pdb/*; do
 		if [ -s "$pkg/+REQUIRED_BY" ]; then
 			if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
 				branches="$branches ${pkg#$pdb/}"
+				num_branches=$(( $num_branches + 1 ))
 			else
 				trunks="$trunks ${pkg#$pdb/}"
+				num_trunks=$(( $num_trunks + 1 ))
 			fi
 		else
 			if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
 				leaves="$leaves ${pkg#$pdb/}"
+				num_leaves=$(( $num_leaves + 1 ))
 			else
 				[ -d "$pkg" ] || continue
 				roots="$roots ${pkg#$pdb/}"
+				num_roots=$(( $num_roots + 1 ))
 			fi
 		fi
 	done
+
+	num_ports=$(( $num_roots + $num_trunks + $num_branches + $num_leaves ))
 }
 
 delete_empty_dist_subdirs () {
@@ -1969,7 +1980,7 @@ delete_stale_distfiles () {
 		find_and_delete_distfiles ${file%[-]*}-[0-9]
 	done
 
-	pm_v "===>>> Distfile cleaning complete" ; pm_v
+	pm_v "===>>> Distfile cleaning complete\n"
 }
 
 delete_all_distfiles () {
@@ -2035,14 +2046,13 @@ delete_all_distfiles () {
 #=============== Begin code relevant only to getopts features ===============
 
 if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
-	ports_by_category
-	num_roots=0; num_trunks=0; num_branches=0; num_leaves=0; num_updates=0
+	ports_by_category ; pm_v
+	num_updates=0
 
-	pm_v ; echo "===>>> Root ports (No dependencies, not depended on)"
+	echo "===>>> Root ports (No dependencies, not depended on)"
 	for iport in $roots; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_roots=$(( $num_roots + 1 ))
 	done
 	echo "===>>> $num_roots root ports"
 	echo ''
@@ -2050,7 +2060,6 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	for iport in $trunks; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_trunks=$(( $num_trunks + 1 ))
 	done
 	echo "===>>> $num_trunks trunk ports"
 	echo ''
@@ -2058,7 +2067,6 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	for iport in $branches; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_branches=$(( $num_branches + 1 ))
 	done
 	echo "===>>> $num_branches branch ports"
 	echo ''
@@ -2066,11 +2074,9 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	for iport in $leaves; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_leaves=$(( $num_leaves + 1 ))
 	done
 	echo "===>>> $num_leaves leaf ports"
 	echo ''
-	num_ports=$(( $num_roots + $num_trunks + $num_branches + $num_leaves ))
 	echo "===>>> $num_ports total installed ports"
 
 	if [ "$num_updates" -gt 1 ]; then
@@ -2342,7 +2348,9 @@ update_port () {
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
-	[ -n "$PM_FIRST_PASS" ] && num_of_deps=$(( $num_of_deps + 1 ))
+	[ -n "$PM_FIRST_PASS" ] &&
+		[ ! \( -n "$PM_FORCE" -a -n "$FETCH_ONLY" -a -n "$UPDATE_ALL" \) ] &&
+			num_of_deps=$(( $num_of_deps + 1 ))
 
 	deps="(${dep_of_deps}/${num_of_deps})"
 
@@ -2847,7 +2855,11 @@ multiport () {
 		*)	origin=`origin_from_pdb $port` ;;
 		esac
 
-		case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
+		case "$PM_NEEDS_UPDATE" in
+		*\ $origin\ *) numports=$(( $numports - 1 ))
+			pm_v "===>>> $port already encountered as a dependency\n"
+			continue ;;
+		esac
 
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
@@ -2860,7 +2872,6 @@ multiport () {
 		*)		numports=$(( $numports - 1 )) ;;
 		esac
 	done
-	numports=$num
 	PM_PARENT_PORT="Total ports: $numports"
 
 	if [ -n "$PM_URB" ]; then
@@ -3047,38 +3058,37 @@ all_first_pass () {
 }
 	[ -n "$DI_FILES" ] && (read_distinfos)&
 
+	ports_by_category
+	[ -n "$FETCH_ONLY" -a -n "$PM_FORCE" ] && $num_of_deps=$num_ports
+	unset num_ports
+
 	init_term_printf All
 
-	ports_by_category
 	echo "===>>> Starting check of installed ports for available updates"
 
 	[ -n "$PM_BUILD_ONLY_LIST" ] && PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
-	if [ -n "$PM_FIRST_PASS" ]; then
-		[ -n "$FETCH_ONLY" ] && export ALL_FETCH=all_fetch
+	pm_v "\n===>>> Root ports: $num_roots" ; unset num_roots
+	all_first_pass $roots
 
-		pm_v ; pm_v "===>>> Root ports:"
-		all_first_pass $roots
+	pm_v "\n===>>> Trunk ports: $num_trunks" ; unset num_trunks
+	all_first_pass $trunks
 
-		pm_v ; pm_v "===>>> Trunk ports:"
-		all_first_pass $trunks
+	pm_v "\n===>>> Branch ports: $num_branches" ; unset num_branches
+	all_first_pass $branches
 
-		pm_v ; pm_v "===>>> Branch ports:"
-		all_first_pass $branches
+	pm_v "\n===>>> Leaf ports: $num_leaves" ; unset num_leaves
+	all_first_pass $leaves
 
-		pm_v ; pm_v "===>>> Leaf ports:"
-		all_first_pass $leaves
-
-		check_fetch_only
-		if [ -n "$NO_DEP_UPDATES" ]; then
-			echo '' ; echo "===>>> All ports are up to date" ; echo ''
-			safe_exit
-		fi
-
-		post_first_pass 'ports that need updating'
-
-		[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
+	check_fetch_only
+	if [ -n "$NO_DEP_UPDATES" ]; then
+		echo '' ; echo "===>>> All ports are up to date" ; echo ''
+		safe_exit
 	fi
+
+	post_first_pass 'ports that need updating'
+
+	[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
 
 	export PM_BUILDING=pmbuildingall
 
@@ -3178,7 +3188,7 @@ if [ -n "$upg_port" -a -z "$portdir" ]; then
 	case "$?" in
 	3)	echo ''; echo "===>>> BSDPAN ports cannot be upgraded with portmaster"
 		echo "       (${upg_port})"; echo ''; safe_exit 1 ;;
-	2)	pm_v "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present"; pm_v
+	2)	pm_v "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present\n"
 		safe_exit 1 ;;
 	*)	fail 'Cannot continue' ;;
 	esac ; }
@@ -3329,7 +3339,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 		TESTINT=`grep -l ^IS_INTERACTIVE Makefile` &&
 		    TESTINT=`pm_make_b -V IS_INTERACTIVE`
 	else
-		[ -n "$ALL_FETCH" ] && safe_exit
+		[ -n "$UPDATE_ALL" -a -n "$FETCH_ONLY" ] && safe_exit
 	fi
 	if [ -n "$TESTINT" ]; then
 		echo ''
