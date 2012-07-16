@@ -3905,14 +3905,16 @@ if [ -n "$distfiles" ]; then
 	for file in $distfiles; do
 		while read line ; do
 			case "$line" in
-			SHA256\ \(${port_subdir}${file}\)*) sha256=${line##* } ;;
+			SHA256\ \(${port_subdir}${file}\)*) sha256=${line##* }
+				[ -z "$size" ] && continue
+				echo "DISTFILE:${port_subdir}${file}:SIZE=${size}:SHA256=${sha256}" \
+					>> $pm_mktemp_file ; unset sha256 size ; break ;;
 			SIZE\ \(${port_subdir}${file}\)*)
-				[ -n "$sha256" ] || fail "$distinfo is out of order"
+				[ -z "$sha256" ] && { size=${line##* } ; continue; }
 				echo "DISTFILE:${port_subdir}${file}:SIZE=${line##* }:SHA256=${sha256}" \
-					>> $pm_mktemp_file ; break ;;
+					>> $pm_mktemp_file ; unset sha256 ; break ;;
 			esac
 		done < $distinfo
-		unset sha256
 
 		# Make sure any new distfiles get added to the list
 		[ -n "$DI_FILES" -a ! "$$" -eq "$PM_PARENT_PID" ] &&
