@@ -41,9 +41,7 @@ if [ -z "$PM_PARENT_PID" ]; then
 	my_environment=`set`
 
 	# If we are already root, unset this to avoid potential conflict
-	euid=`ps -o uid= $$`
-	[ $euid -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
-	unset euid
+	[ `ps -o uid= $$` -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
 fi
 
 #=============== Begin functions we always want to have ===============
@@ -91,8 +89,8 @@ trap_exit () {
 				echo ''
 				echo "===>>> Build/Install logs available:"
 				for file in $logs; do echo "	$file"; done
+				echo ''
 			fi
-			[ -n "$logs" ] && echo ''
 		fi
 	else
 		# Signal the parent if a child trap'ed, or read the file if we are
@@ -314,8 +312,7 @@ pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 		builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
-pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-		 unset -v PM_URB_LIST;
+pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () {
@@ -328,8 +325,7 @@ pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 
 pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
 pm_install_s      () { $PM_SU_CMD /usr/bin/install -p -o root -g wheel -m 644 $1 $2; }
-pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-			 unset -v PM_URB_LIST;
+pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () { $PM_SU_CMD /usr/sbin/pkg_delete $*; }
@@ -1167,11 +1163,12 @@ find_moved_port () {
 }
 
 read_distinfos () {
-	local pkg iport origin distinfo disc1 f disc2
+	local pkg iport origin distinfo s f discard
 
 	echo '############' > $DI_FILES		# Make the file > 0 bytes
 	echo "===>>> Gathering distinfo list for installed ports"
 	echo ''
+
 	for pkg in ${pdb}/*; do
 		[ -d $pkg ] || continue
 		iport=${pkg#$pdb/}
@@ -1195,10 +1192,11 @@ read_distinfos () {
 		fi
 
 		if [ -s "$distinfo" ]; then
-			grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
-				f=${f#(} ; f=${f%)}
-				echo $f >> $DI_FILES
-			done
+			while read s f discard; do
+				case "$s" in
+				SHA256) f=${f#(} ; echo ${f%)} >> $DI_FILES ;;
+				esac
+			done < $distinfo
 		fi
 	done
 
@@ -1209,7 +1207,7 @@ read_distinfos () {
 }
 
 read_distinfos_all () {
-	local origin distinfo disc1 f disc2
+	local origin distinfo s f discard
 
 	echo '############' > $DI_FILES		# Make the file > 0 bytes
 	echo "===>>> Gathering distinfo list for all ports"
@@ -1232,10 +1230,11 @@ read_distinfos_all () {
 		fi
 
 		if [ -s "$distinfo" ]; then
-			grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
-				f=${f#(} ; f=${f%)}
-				echo $f >> $DI_FILES
-			done
+			while read s f discard; do
+				case "$s" in
+				SHA256) f=${f#(} ; echo ${f%)} >> $DI_FILES ;;
+				esac
+			done < $distinfo
 		fi
 	done
 
@@ -1280,7 +1279,7 @@ delete_empty_dist_subdirs () {
 	# Get back to somewhere safe so we do not
 	# delete our CWD out from under ourselves
 	pm_cd $DISTDIR || fail "Cannot cd into $DISTDIR"
-	find $DISTDIR -depth -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
+	find $DISTDIR -depth -mindepth 1 -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
 }
 
 init_packages_var () {
@@ -2834,6 +2833,7 @@ multiport () {
 		echo "===>>> Working on:"
 		echo -e $portlist
 	fi
+	unset portlist
 
 	# First Pass
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
@@ -3207,7 +3207,7 @@ fi
 [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ] && upg_port=`iport_from_origin ${portdir}`
 
 if [ -e "$pdb/$upg_port/+IGNOREME" ]; then
-	# Adding to CUR_DEPS means we will not get here in the build unless -G
+	# Adding to CUR_DEPS means we will not get here in the build
 	if [ -z "$PM_BUILDING" ]; then
 		# Only need to prompt for this once if -ai
 		case "$INTERACTIVE_YES" in
@@ -3250,6 +3250,7 @@ else
 	new_port=`parse_index $portdir name` ||
 		fail "No entry for $portdir in $PM_INDEX"
 fi
+unset -f no_valid_port
 
 if [ -z "$PM_DEPTH" ]; then
 	PM_DEPTH="${upg_port:-$portdir} "
@@ -3330,7 +3331,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 			    pm_make -DBATCH checksum >> $fetchlog 2>&1
 			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.* )&
 		fi
-		unset master_sites distfiles file DONT_FETCH fetchlog allfiles
+		unset master_sites distfiles file DONT_FETCH fetchlog
 	elif [ -n "$FETCH_ONLY" ]; then
 		echo "===>>> No distfiles to fetch"
 	fi
@@ -3443,6 +3444,7 @@ if [ -n "$pm_package_time" ]; then
 	unset pm_package_time
 
 fetch_package () {
+	# Global: ppd FETCH_ARGS
 	local do_fetch
 
 	if [ -z "$ppd" ]; then
@@ -3644,6 +3646,7 @@ notnewer () {
 			fi ;;
 		esac
 	fi
+	unset ponly_err ; unset -f notnewer
 
 	if [ -n "$use_package" ]; then
 		new_port=$latest_pv
@@ -3671,7 +3674,7 @@ if [ -z "$use_package" ]; then
 
 	pm_cd_pd $portdir
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
-		fail 'make clean failed'; echo ''; }
+		fail 'make clean failed'; }
 
 	fl_read=`echo ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-${portdir#*/}.*`
 	count=0
