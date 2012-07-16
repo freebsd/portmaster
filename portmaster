@@ -1023,7 +1023,7 @@ get_answer_yn () {
 }
 
 update_contents () {
-	local IFS delete contents origin n_port old_origin iport new_cont
+	local IFS delete contents origin n_port old_origin iport
 	local o_seen line d_missing d_origin d_iport prev_line answer
 
 # To prevent words in a line being treated individually
@@ -1033,7 +1033,7 @@ IFS='
 
 	contents=$1 ; origin=$2 ; n_port=$3 ; old_origin=$4
 	iport=${contents#$pdb/} ; iport=${iport%/+CONTENTS}
-	pm_mktemp contents-${iport} ; new_cont=$pm_mktemp_file
+	pm_mktemp contents-${iport}
 
 	if [ -z "$delete" ]; then o_seen=':'; else o_seen=":${origin}:"; fi
 
@@ -1071,8 +1071,8 @@ IFS='
 
 			# Could be fixed or not, but if we get here write it
 			# so we can warn the user again later if we need to.
-			echo "@pkgdep $d_iport" >> $new_cont
-			echo "@comment DEPORIGIN:$d_origin" >> $new_cont
+			echo "@pkgdep $d_iport" >> $pm_mktemp_file
+			echo "@comment DEPORIGIN:$d_origin" >> $pm_mktemp_file
 			unset prev_line
 			continue
 		fi
@@ -1084,8 +1084,8 @@ IFS='
 			case "$o_seen" in *:${d_origin}:*) continue ;; esac
 			o_seen="${o_seen}${d_origin}:"
 
-			echo "@pkgdep $n_port" >> $new_cont
-			echo "@comment DEPORIGIN:$origin" >> $new_cont ;;
+			echo "@pkgdep $n_port" >> $pm_mktemp_file
+			echo "@comment DEPORIGIN:$origin" >> $pm_mktemp_file ;;
 		'@comment DEPORIGIN:'*)
 			d_origin=${line#*DEPORIGIN:}
 			case "$o_seen" in *:${d_origin}:*)
@@ -1095,18 +1095,18 @@ IFS='
 		@pkgdep*)	d_iport="${line#@pkgdep }"
 				[ -d "$pdb/$d_iport" ] || d_missing=dm2 ;;
 		esac
-		[ -n "$prev_line" ] && echo $prev_line >> $new_cont
+		[ -n "$prev_line" ] && echo $prev_line >> $pm_mktemp_file
 		prev_line=$line
 	done
-	[ -n "$prev_line" ] && echo $prev_line >> $new_cont
+	[ -n "$prev_line" ] && echo $prev_line >> $pm_mktemp_file
 
-	if ! cmp -s $contents $new_cont; then
+	if ! cmp -s $contents $pm_mktemp_file; then
 		check_regular_file $contents
 		pm_v "	===>>> Installing the new +CONTENTS file"
-		pm_install_s $new_cont $contents
+		pm_install_s $pm_mktemp_file $contents
 	fi
 
-	/bin/unlink $new_cont
+	/bin/unlink $pm_mktemp_file ; unset pm_mktemp_file
 }
 
 find_moved_port () {
@@ -3715,13 +3715,13 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	[ -z "$NO_BACKUP" ] && pm_pkg_create $pbu $UPGRADE_PORT
 
 	if [ -n "$SAVE_SHARED" ]; then
-		pm_mktemp ldconfig ; ldconfig_out=$pm_mktemp_file
+		pm_mktemp ldconfig
 		ldconfig -r | sed 's#.* ##' |
-		    grep -v ^$LOCALBASE_COMPAT > $ldconfig_out
+		    grep -v ^$LOCALBASE_COMPAT > $pm_mktemp_file
 
 		unset temp
 		for file in `pkg_info -q -L $UPGRADE_PORT |
-		    sort - $ldconfig_out | uniq -d`; do
+		    sort - $pm_mktemp_file | uniq -d`; do
 			temp="${temp}$file "
 		done
 		if [ -n "$temp" ]; then
@@ -3736,7 +3736,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
 		fi
 
-		/bin/unlink $ldconfig_out ; unset ldconfig_out temp file
+		/bin/unlink $pm_mktemp_file ; unset pm_mktemp_file temp file
 	fi
 
 	find_dl_distfiles $portdir
@@ -3830,7 +3830,7 @@ for file in $preserve_port_files; do
 	mv ${preserve_dir}/${file##*/} $file
 	oldmd5="MD5:`md5 -q $file`"
 
-	pm_mktemp contents ; new_cont=$pm_mktemp_file
+	pm_mktemp contents
 	while read left right; do
 		case "$left" in
 		@cwd)		short_file="${file#${right}/}" ;;
@@ -3843,10 +3843,10 @@ for file in $preserve_port_files; do
 				fi ;;
 		esac
 		echo "$left $right"
-	done < $pdb/$new_port/+CONTENTS > $new_cont
-	pm_install_s $new_cont $contents
-	pm_unlink $new_cont
-	unset file oldmd5 new_cont left right short_file
+	done < $pdb/$new_port/+CONTENTS > $pm_mktemp_file
+	pm_install_s $pm_mktemp_file $contents
+	pm_unlink $pm_mktemp_file
+	unset file oldmd5 pm_mktemp_file left right short_file
 done
 if [ -n "$preserve_dir" ]; then
 	rmdir $preserve_dir 2>/dev/null
@@ -3900,8 +3900,8 @@ if [ -n "$distfiles" ]; then
 		[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $portdir"
 	fi
 
-	pm_mktemp dist_list ; dist_list_temp=$pm_mktemp_file
-	echo '# Added by portmaster' > $dist_list_temp
+	pm_mktemp dist_list
+	echo '# Added by portmaster' > $pm_mktemp_file
 	for file in $distfiles; do
 		while read line ; do
 			case "$line" in
@@ -3909,7 +3909,7 @@ if [ -n "$distfiles" ]; then
 			SIZE\ \(${port_subdir}${file}\)*)
 				[ -n "$sha256" ] || fail "$distinfo is out of order"
 				echo "DISTFILE:${port_subdir}${file}:SIZE=${line##* }:SHA256=${sha256}" \
-					>> $dist_list_temp ; break ;;
+					>> $pm_mktemp_file ; break ;;
 			esac
 		done < $distinfo
 		unset sha256
@@ -3920,8 +3920,8 @@ if [ -n "$distfiles" ]; then
 	done
 
 	pm_sv "Installing $dist_list\n"
-	pm_install_s $dist_list_temp $dist_list
-	/bin/unlink $dist_list_temp ; unset distinfo dist_list_temp file line
+	pm_install_s $pm_mktemp_file $dist_list
+	/bin/unlink $pm_mktemp_file ; unset distinfo pm_mktemp_file file line
 fi
 
 if [ -n "$use_package" ]; then
