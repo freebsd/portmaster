@@ -41,16 +41,14 @@ if [ -z "$PM_PARENT_PID" ]; then
 	my_environment=`set`
 
 	# If we are already root, unset this to avoid potential conflict
-	euid=`ps -o uid= $$`
-	[ $euid -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
-	unset euid
+	[ `ps -o uid= $$` -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
 fi
 
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.13 (pkgng patch 1.2)"
-	#svn='$FreeBSD: user/dougb/portmaster/portmaster 238195 2012-07-07 10:13:20Z dougb $'
+	echo '' ; echo "===>>> Version 3.13.1 (pkgng patch 1.3)"
+	#svn='$FreeBSD: user/dougb/portmaster/portmaster 238532 2012-07-16 11:58:44Z dougb $'
 }
 
 fail () {
@@ -86,8 +84,8 @@ trap_exit () {
 				echo ''
 				echo "===>>> Build/Install logs available:"
 				for file in $logs; do echo "	$file"; done
+				echo ''
 			fi
-			[ -n "$logs" ] && echo ''
 		fi
 	else
 		# Signal the parent if a child trap'ed, or read the file if we are
@@ -252,11 +250,10 @@ parent_exit () {
 		echo ''
 	fi
 
-	PM_NEEDS_UPDATE=${PM_NEEDS_UPDATE# }
-	if [ -n "$1" -a -n "$PM_NEEDS_UPDATE" -a -n "$PM_BUILDING" -a -z "$FETCH_ONLY" ]; then
+	if [ -n "$1" -a -n "${PM_NEEDS_UPDATE# }" -a -n "$PM_BUILDING" -a -z "$FETCH_ONLY" ]; then
 		echo ''
 		echo "===>>> You can restart from the point of failure with this command line:"
-		echo "       ${0##*/} <flags> $PM_NEEDS_UPDATE"
+		echo "       ${0##*/} <flags>${PM_NEEDS_UPDATE}"
 		echo ''
 	fi
 }
@@ -276,11 +273,14 @@ safe_exit () {
 			[ -n "$PM_DEL_BUILD_ONLY" ] &&
 				echo "build_deps_il='$build_deps_il'" >> $IPC_SAVE
 
-			for i in $PM_NEEDS_UPDATE; do
-				[ "$i" = "$portdir" ] && continue
-				pnu_temp="${pnu_temp}${i} "
-			done
-			PM_NEEDS_UPDATE=" ${pnu_temp}"
+			# Do not remove a child from the list if we trapped or failed
+			if [ -z "$1" ]; then
+				for i in $PM_NEEDS_UPDATE; do
+					[ "$i" = "$portdir" ] && continue
+					pnu_temp="${pnu_temp}${i} "
+				done
+				PM_NEEDS_UPDATE=" ${pnu_temp}"
+			fi
 
 			[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && echo "NB_DELETE='$NB_DELETE'" >> $IPC_SAVE
 		else
@@ -318,8 +318,7 @@ pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 		builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
 pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
-pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-		 unset -v PM_URB_LIST;
+pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
 pm_mktemp () {
@@ -332,8 +331,7 @@ pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
 
 pm_find_s         () { $PM_SU_CMD /usr/bin/find $*; }
 pm_install_s      () { $PM_SU_CMD /usr/bin/install -p -o root -g wheel -m 644 $1 $2; }
-pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l;
-			 unset -v PM_URB_LIST;
+pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () {
@@ -347,7 +345,7 @@ pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
 pm_rmdir_s        () { $PM_SU_CMD /bin/rmdir $*; }
 pm_unlink_s       () { [ -e "$1" ] && $PM_SU_CMD /bin/unlink $1; }
 
-pm_v              () { [ -n "$PM_VERBOSE" ] && echo "$*"; }
+pm_v              () { [ -n "$PM_VERBOSE" ] && echo -e "$*"; }
 pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo -e "===>>> SU $*"; }
 
 # Do this here so we can have a reasonably good guess.
@@ -1082,10 +1080,10 @@ get_answer_yn () {
 	fi
 }
 
-# Also useless with pkgng
+# redundant with pkgng
 update_contents () {
 	[ -n "$use_pkgng" ] && return
-	local IFS delete contents origin n_port old_origin iport new_cont
+	local IFS delete contents origin n_port old_origin iport
 	local o_seen line d_missing d_origin d_iport prev_line answer
 
 # To prevent words in a line being treated individually
@@ -1095,7 +1093,7 @@ IFS='
 
 	contents=$1 ; origin=$2 ; n_port=$3 ; old_origin=$4
 	iport=${contents#$pdb/} ; iport=${iport%/+CONTENTS}
-	pm_mktemp contents-${iport} ; new_cont=$pm_mktemp_file
+	pm_mktemp contents-${iport}
 
 	if [ -z "$delete" ]; then o_seen=':'; else o_seen=":${origin}:"; fi
 
@@ -1133,8 +1131,8 @@ IFS='
 
 			# Could be fixed or not, but if we get here write it
 			# so we can warn the user again later if we need to.
-			echo "@pkgdep $d_iport" >> $new_cont
-			echo "@comment DEPORIGIN:$d_origin" >> $new_cont
+			echo "@pkgdep $d_iport" >> $pm_mktemp_file
+			echo "@comment DEPORIGIN:$d_origin" >> $pm_mktemp_file
 			unset prev_line
 			continue
 		fi
@@ -1146,8 +1144,8 @@ IFS='
 			case "$o_seen" in *:${d_origin}:*) continue ;; esac
 			o_seen="${o_seen}${d_origin}:"
 
-			echo "@pkgdep $n_port" >> $new_cont
-			echo "@comment DEPORIGIN:$origin" >> $new_cont ;;
+			echo "@pkgdep $n_port" >> $pm_mktemp_file
+			echo "@comment DEPORIGIN:$origin" >> $pm_mktemp_file ;;
 		'@comment DEPORIGIN:'*)
 			d_origin=${line#*DEPORIGIN:}
 			case "$o_seen" in *:${d_origin}:*)
@@ -1157,18 +1155,18 @@ IFS='
 		@pkgdep*)	d_iport="${line#@pkgdep }"
 				[ -d "$pdb/$d_iport" ] || d_missing=dm2 ;;
 		esac
-		[ -n "$prev_line" ] && echo $prev_line >> $new_cont
+		[ -n "$prev_line" ] && echo $prev_line >> $pm_mktemp_file
 		prev_line=$line
 	done
-	[ -n "$prev_line" ] && echo $prev_line >> $new_cont
+	[ -n "$prev_line" ] && echo $prev_line >> $pm_mktemp_file
 
-	if ! cmp -s $contents $new_cont; then
+	if ! cmp -s $contents $pm_mktemp_file; then
 		check_regular_file $contents
 		pm_v "	===>>> Installing the new +CONTENTS file"
-		pm_install_s $new_cont $contents
+		pm_install_s $pm_mktemp_file $contents
 	fi
 
-	/bin/unlink $new_cont
+	/bin/unlink $pm_mktemp_file ; unset pm_mktemp_file
 }
 
 find_moved_port () {
@@ -1224,68 +1222,55 @@ find_moved_port () {
 	return 0
 }
 
-read_distinfos () {
-	local pkg iport origin distinfo disc1 f disc2
-
-	echo '############' > $DI_FILES		# Make the file > 0 bytes
-	echo "===>>> Gathering distinfo list for installed ports"
-	echo ''
+all_pkgs_by_origin () {
 	if [ -z "$use_pkgng" ]; then
-		for pkg in ${pdb}/*; do
+		local pkg iport origin
+
+		for pkg in ${pdb}/* ; do
 			[ -d $pkg ] || continue
 			iport=${pkg#$pdb/}
 
 			origin=`origin_from_pdb $iport` || continue
-
-			if [ ! -d "$pd/$origin" ]; then
-				find_moved_port $origin $iport nonfatal >/dev/null
-				[ -n "$moved_npd" ] || continue
-				origin=$moved_npd
-			fi
-
-			origin="${pd}/${origin}"
-
-			if [ -s "${origin}/distinfo" ]; then
-				distinfo="${origin}/distinfo"
-			else
-				pm_cd $origin || continue
-				distinfo=`pm_make -V DISTINFO_FILE`
-				[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
-			fi
-
-			if [ -s "$distinfo" ]; then
-				grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
-					f=${f#(} ; f=${f%)}
-					echo $f >> $DI_FILES
-				done
-			fi
+			echo $iport $origin
 		done
 	else
-		pkg query -a "%n-%v %o" | while read pkg origin; do
-			if [ ! -d "$pd/${origin}" ]; then
-				find_moved_port $origin $pkg nonfatal >/dev/null
-				[ -n "$moved_npd" ] || continue
-				origin=$moved_npd
-			fi
-
-			origin="${pd}/${origin}"
-
-			if [ -s "${origin}/distinfo" ]; then
-				distinfo="${origin}/distinfo"
-			else
-				pm_cd $origin || continue
-				distinfo=`pm_make -V DISTINFO_FILE`
-				[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
-			fi
-
-			if [ -s "$distinfo" ]; then
-				grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
-					f=${f#(} ; f=${f%)}
-					echo $f >> $DI_FILES
-				done
-			fi
-		done
+		pkg query -a "%n-%v %o"
 	fi
+	return
+}
+
+read_distinfos () {
+	local iport origin distinfo s f discard
+
+	echo '############' > $DI_FILES		# Make the file > 0 bytes
+	echo "===>>> Gathering distinfo list for installed ports"
+	echo ''
+
+	all_pkgs_by_origin | while read iport origin; do
+		if [ ! -d "$pd/$origin" ]; then
+			find_moved_port $origin $iport nonfatal >/dev/null
+			[ -n "$moved_npd" ] || continue
+			origin=$moved_npd
+		fi
+
+		origin="${pd}/${origin}"
+
+		if [ -s "${origin}/distinfo" ]; then
+			distinfo="${origin}/distinfo"
+		else
+			pm_cd $origin || continue
+			distinfo=`pm_make -V DISTINFO_FILE`
+			[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
+		fi
+
+		if [ -s "$distinfo" ]; then
+			while read s f discard; do
+				case "$s" in
+				SHA256) f=${f#(} ; echo ${f%)} >> $DI_FILES ;;
+				esac
+			done < $distinfo
+		fi
+	done
 
 	# Tell safe_exit that we are done
 	pm_unlink ${DI_FILES}-e
@@ -1294,7 +1279,7 @@ read_distinfos () {
 }
 
 read_distinfos_all () {
-	local origin distinfo disc1 f disc2
+	local origin distinfo s f discard
 
 	echo '############' > $DI_FILES		# Make the file > 0 bytes
 	echo "===>>> Gathering distinfo list for all ports"
@@ -1317,10 +1302,11 @@ read_distinfos_all () {
 		fi
 
 		if [ -s "$distinfo" ]; then
-			grep '^SHA256 ' $distinfo | while read disc1 f disc2; do
-				f=${f#(} ; f=${f%)}
-				echo $f >> $DI_FILES
-			done
+			while read s f discard; do
+				case "$s" in
+				SHA256) f=${f#(} ; echo ${f%)} >> $DI_FILES ;;
+				esac
+			done < $distinfo
 		fi
 	done
 
@@ -1331,44 +1317,47 @@ read_distinfos_all () {
 }
 
 ports_by_category () {
-	local pkg dep rdep
+	# Global: num_roots num_trunks num_branches num_leaves num_ports
+	local pkg
+
 	pm_v "===>>> Sorting ports by category"
 
 	if [ -z "$use_pkgng" ]; then
+		num_roots=0; num_trunks=0; num_branches=0; num_leaves=0
 		for pkg in $pdb/*; do
 			if [ -s "$pkg/+REQUIRED_BY" ]; then
 				if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
 					branches="$branches ${pkg#$pdb/}"
+					num_branches=$(( $num_branches + 1 ))
 				else
 					trunks="$trunks ${pkg#$pdb/}"
+					num_trunks=$(( $num_trunks + 1 ))
 				fi
 			else
 				if grep -ql '^@pkgdep ' $pkg/+CONTENTS 2>/dev/null; then
 					leaves="$leaves ${pkg#$pdb/}"
+					num_leaves=$(( $num_leaves + 1 ))
 				else
 					[ -d "$pkg" ] || continue
 					roots="$roots ${pkg#$pdb/}"
+					num_roots=$(( $num_roots + 1 ))
 				fi
 			fi
 		done
+
+		num_ports=$(( $num_roots + $num_trunks + $num_branches + $num_leaves ))
 	else
-		while read pkg dep rdep; do
-			if [ $rdep -eq 1 ]; then
-				if [ $dep -eq 1 ]; then
-					branches="$branches $pkg"
-				else
-					trunks="$trunks $pkg"
-				fi
-			else
-				if [ $dep -eq 1 ]; then
-					leaves="$leaves $pkg"
-				else
-					roots="$roots $pkg"
-				fi
-			fi
-		done << EOF
-`pkg query -a "%n-%v %?d %?r"`
-EOF
+		roots=`   pkg query -e "%#d = 0 && %#r = 0" "%n-%v"`
+		trunks=`  pkg query -e "%#d = 0 && %#r > 0" "%n-%v"`
+		branches=`pkg query -e "%#d > 0 && %#r > 0" "%n-%v"`
+		leaves=`  pkg query -e "%#d > 0 && %#r = 0" "%n-%v"`
+
+		num_roots=$(echo    $(echo $roots    | wc -w))
+		num_trunks=$(echo   $(echo $trunks   | wc -w))
+		num_branches=$(echo $(echo $branches | wc -w))
+		num_leaves=$(echo   $(echo $leaves   | wc -w))
+
+		num_ports=$(echo $(pkg query -a "%n-%v" | wc -w))
 	fi
 }
 
@@ -1376,7 +1365,7 @@ delete_empty_dist_subdirs () {
 	# Get back to somewhere safe so we do not
 	# delete our CWD out from under ourselves
 	pm_cd $DISTDIR || fail "Cannot cd into $DISTDIR"
-	find $DISTDIR -depth -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
+	find $DISTDIR -depth -mindepth 1 -type d \( -empty -and ! -path \*\.zfs/\* \) -delete
 }
 
 init_packages_var () {
@@ -2137,7 +2126,7 @@ delete_stale_distfiles () {
 		find_and_delete_distfiles ${file%[-]*}-[0-9]
 	done
 
-	pm_v "===>>> Distfile cleaning complete" ; pm_v
+	pm_v "===>>> Distfile cleaning complete\n"
 }
 
 delete_all_distfiles () {
@@ -2203,14 +2192,13 @@ delete_all_distfiles () {
 #=============== Begin code relevant only to getopts features ===============
 
 if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
-	ports_by_category
-	num_roots=0; num_trunks=0; num_branches=0; num_leaves=0; num_updates=0
+	ports_by_category ; pm_v
+	num_updates=0
 
-	pm_v ; echo "===>>> Root ports (No dependencies, not depended on)"
+	echo "===>>> Root ports (No dependencies, not depended on)"
 	for iport in $roots; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_roots=$(( $num_roots + 1 ))
 	done
 	echo "===>>> $num_roots root ports"
 	echo ''
@@ -2218,7 +2206,6 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	for iport in $trunks; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_trunks=$(( $num_trunks + 1 ))
 	done
 	echo "===>>> $num_trunks trunk ports"
 	echo ''
@@ -2226,7 +2213,6 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	for iport in $branches; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_branches=$(( $num_branches + 1 ))
 	done
 	echo "===>>> $num_branches branch ports"
 	echo ''
@@ -2234,11 +2220,9 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 	for iport in $leaves; do
 		echo "===>>> $iport"
 		[ -n "$LIST_PLUS" ] && check_for_updates list $iport
-		num_leaves=$(( $num_leaves + 1 ))
 	done
 	echo "===>>> $num_leaves leaf ports"
 	echo ''
-	num_ports=$(( $num_roots + $num_trunks + $num_branches + $num_leaves ))
 	echo "===>>> $num_ports total installed ports"
 
 	if [ "$num_updates" -gt 1 ]; then
@@ -2552,7 +2536,9 @@ update_port () {
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
-	[ -n "$PM_FIRST_PASS" ] && num_of_deps=$(( $num_of_deps + 1 ))
+	[ -n "$PM_FIRST_PASS" ] &&
+		[ ! \( -n "$PM_FORCE" -a -n "$FETCH_ONLY" -a -n "$UPDATE_ALL" \) ] &&
+			num_of_deps=$(( $num_of_deps + 1 ))
 
 	deps="(${dep_of_deps}/${num_of_deps})"
 
@@ -3074,6 +3060,7 @@ multiport () {
 		echo "===>>> Working on:"
 		echo -e $portlist
 	fi
+	unset portlist
 
 	# First Pass
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
@@ -3095,7 +3082,11 @@ multiport () {
 		*)	origin=`origin_from_pdb $port` ;;
 		esac
 
-		case "$PM_NEEDS_UPDATE" in *\ $origin\ *) continue ;; esac
+		case "$PM_NEEDS_UPDATE" in
+		*\ $origin\ *) numports=$(( $numports - 1 ))
+			pm_v "===>>> $port already encountered as a dependency\n"
+			continue ;;
+		esac
 
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
@@ -3108,7 +3099,6 @@ multiport () {
 		*)		numports=$(( $numports - 1 )) ;;
 		esac
 	done
-	numports=$num
 	PM_PARENT_PORT="Total ports: $numports"
 
 	if [ -n "$PM_URB" ]; then
@@ -3302,38 +3292,37 @@ all_first_pass () {
 }
 	[ -n "$DI_FILES" ] && (read_distinfos)&
 
+	ports_by_category
+	[ -n "$FETCH_ONLY" -a -n "$PM_FORCE" ] && $num_of_deps=$num_ports
+	unset num_ports
+
 	init_term_printf All
 
-	ports_by_category
 	echo "===>>> Starting check of installed ports for available updates"
 
 	[ -n "$PM_BUILD_ONLY_LIST" ] && PM_BUILD_ONLY_LIST=pmp_doing_build_deps
 
-	if [ -n "$PM_FIRST_PASS" ]; then
-		[ -n "$FETCH_ONLY" ] && export ALL_FETCH=all_fetch
+	pm_v "\n===>>> Root ports: $num_roots" ; unset num_roots
+	all_first_pass $roots
 
-		pm_v ; pm_v "===>>> Root ports:"
-		all_first_pass $roots
+	pm_v "\n===>>> Trunk ports: $num_trunks" ; unset num_trunks
+	all_first_pass $trunks
 
-		pm_v ; pm_v "===>>> Trunk ports:"
-		all_first_pass $trunks
+	pm_v "\n===>>> Branch ports: $num_branches" ; unset num_branches
+	all_first_pass $branches
 
-		pm_v ; pm_v "===>>> Branch ports:"
-		all_first_pass $branches
+	pm_v "\n===>>> Leaf ports: $num_leaves" ; unset num_leaves
+	all_first_pass $leaves
 
-		pm_v ; pm_v "===>>> Leaf ports:"
-		all_first_pass $leaves
-
-		check_fetch_only
-		if [ -n "$NO_DEP_UPDATES" ]; then
-			echo '' ; echo "===>>> All ports are up to date" ; echo ''
-			safe_exit
-		fi
-
-		post_first_pass 'ports that need updating'
-
-		[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
+	check_fetch_only
+	if [ -n "$NO_DEP_UPDATES" ]; then
+		echo '' ; echo "===>>> All ports are up to date" ; echo ''
+		safe_exit
 	fi
+
+	post_first_pass 'ports that need updating'
+
+	[ -n "$PM_BUILD_ONLY_LIST" ] && clean_build_only_list
 
 	export PM_BUILDING=pmbuildingall
 
@@ -3447,7 +3436,7 @@ if [ -n "$upg_port" -a -z "$portdir" ]; then
 	case "$?" in
 	3)	echo ''; echo "===>>> BSDPAN ports cannot be upgraded with portmaster"
 		echo "       (${upg_port})"; echo ''; safe_exit 1 ;;
-	2)	pm_v "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present"; pm_v
+	2)	pm_v "	===>>> No ORIGIN for $upg_port, and +IGNOREME is present\n"
 		safe_exit 1 ;;
 	*)	fail 'Cannot continue' ;;
 	esac ; }
@@ -3466,7 +3455,7 @@ fi
 [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ] && upg_port=`iport_from_origin ${portdir}`
 
 if [ -e "$pdb/$upg_port/+IGNOREME" ] && ( [ -z "$use_pkgng" ] || pkg info -e $upg_port ); then
-	# Adding to CUR_DEPS means we will not get here in the build unless -G
+	# Adding to CUR_DEPS means we will not get here in the build
 	if [ -z "$PM_BUILDING" ]; then
 		# Only need to prompt for this once if -ai
 		case "$INTERACTIVE_YES" in
@@ -3509,6 +3498,7 @@ else
 	new_port=`parse_index $portdir name` ||
 		fail "No entry for $portdir in $PM_INDEX"
 fi
+unset -f no_valid_port
 
 if [ -z "$PM_DEPTH" ]; then
 	PM_DEPTH="${upg_port:-$portdir} "
@@ -3589,7 +3579,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 			    pm_make -DBATCH checksum >> $fetchlog 2>&1
 			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.* )&
 		fi
-		unset master_sites distfiles file DONT_FETCH fetchlog allfiles
+		unset master_sites distfiles file DONT_FETCH fetchlog
 	elif [ -n "$FETCH_ONLY" ]; then
 		echo "===>>> No distfiles to fetch"
 	fi
@@ -3598,7 +3588,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 		TESTINT=`grep -l ^IS_INTERACTIVE Makefile` &&
 		    TESTINT=`pm_make_b -V IS_INTERACTIVE`
 	else
-		[ -n "$ALL_FETCH" ] && safe_exit
+		[ -n "$UPDATE_ALL" -a -n "$FETCH_ONLY" ] && safe_exit
 	fi
 	if [ -n "$TESTINT" ]; then
 		echo ''
@@ -3702,6 +3692,7 @@ if [ -n "$pm_package_time" ]; then
 	unset pm_package_time
 
 fetch_package () {
+	# Global: ppd FETCH_ARGS
 	local do_fetch
 
 	if [ -z "$ppd" ]; then
@@ -3913,6 +3904,7 @@ notnewer () {
 			fi ;;
 		esac
 	fi
+	unset ponly_err ; unset -f notnewer
 
 	if [ -n "$use_package" ]; then
 		new_port=$latest_pv
@@ -3940,7 +3932,7 @@ if [ -z "$use_package" ]; then
 
 	pm_cd_pd $portdir
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
-		fail 'make clean failed'; echo ''; }
+		fail 'make clean failed'; }
 
 	fl_read=`echo ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-${portdir#*/}.*`
 	count=0
@@ -3981,9 +3973,9 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	[ -z "$NO_BACKUP" ] && pm_pkg_create $pbu $UPGRADE_PORT
 
 	if [ -n "$SAVE_SHARED" ]; then
-		pm_mktemp ldconfig ; ldconfig_out=$pm_mktemp_file
+		pm_mktemp ldconfig
 		ldconfig -r | sed 's#.* ##' |
-		    grep -v ^$LOCALBASE_COMPAT > $ldconfig_out
+		    grep -v ^$LOCALBASE_COMPAT > $pm_mktemp_file
 
 		unset temp
 		if [ -z "$use_pkgng" ]; then
@@ -3992,7 +3984,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			pkglist="pkg query %Fp"
 		fi
 		for file in `$pkglist $UPGRADE_PORT |
-		    sort - $ldconfig_out | uniq -d`; do
+		    sort - $pm_mktemp_file | uniq -d`; do
 			temp="${temp}$file "
 		done
 		if [ -n "$temp" ]; then
@@ -4007,7 +3999,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			$PM_SU_CMD /etc/rc.d/ldconfig start > /dev/null
 		fi
 
-		/bin/unlink $ldconfig_out ; unset ldconfig_out temp file
+		/bin/unlink $pm_mktemp_file ; unset pm_mktemp_file temp file
 	fi
 
 	find_dl_distfiles $portdir
@@ -4117,7 +4109,7 @@ if [ -z "$use_pkgng" ]; then
 		mv ${preserve_dir}/${file##*/} $file
 		oldmd5="MD5:`md5 -q $file`"
 	
-		pm_mktemp contents ; new_cont=$pm_mktemp_file
+		pm_mktemp contents
 		while read left right; do
 			case "$left" in
 			@cwd)		short_file="${file#${right}/}" ;;
@@ -4130,10 +4122,10 @@ if [ -z "$use_pkgng" ]; then
 					fi ;;
 			esac
 			echo "$left $right"
-		done < $pdb/$new_port/+CONTENTS > $new_cont
-		pm_install_s $new_cont $contents
-		pm_unlink $new_cont
-		unset file oldmd5 new_cont left right short_file
+		done < $pdb/$new_port/+CONTENTS > $pm_mktemp_file
+		pm_install_s $pm_mktemp_file $contents
+		pm_unlink $pm_mktemp_file
+		unset file oldmd5 pm_mktemp_file left right short_file
 	done
 fi
 if [ -n "$preserve_dir" ]; then
@@ -4193,19 +4185,21 @@ if [ -n "$distfiles" ]; then
 		[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $portdir"
 	fi
 
-	pm_mktemp dist_list ; dist_list_temp=$pm_mktemp_file
-	echo '# Added by portmaster' > $dist_list_temp
+	pm_mktemp dist_list
+	echo '# Added by portmaster' > $pm_mktemp_file
 	for file in $distfiles; do
 		while read line ; do
 			case "$line" in
-			SHA256\ \(${port_subdir}${file}\)*) sha256=${line##* } ;;
+			SHA256\ \(${port_subdir}${file}\)*) sha256=${line##* }
+				[ -z "$size" ] && continue
+				echo "DISTFILE:${port_subdir}${file}:SIZE=${size}:SHA256=${sha256}" \
+					>> $pm_mktemp_file ; unset sha256 size ; break ;;
 			SIZE\ \(${port_subdir}${file}\)*)
-				[ -n "$sha256" ] || fail "$distinfo is out of order"
+				[ -z "$sha256" ] && { size=${line##* } ; continue; }
 				echo "DISTFILE:${port_subdir}${file}:SIZE=${line##* }:SHA256=${sha256}" \
-					>> $dist_list_temp ; break ;;
+					>> $pm_mktemp_file ; unset sha256 ; break ;;
 			esac
 		done < $distinfo
-		unset sha256
 
 		# Make sure any new distfiles get added to the list
 		[ -n "$DI_FILES" -a ! "$$" -eq "$PM_PARENT_PID" ] &&
@@ -4213,8 +4207,9 @@ if [ -n "$distfiles" ]; then
 	done
 
 	pm_sv "Installing $dist_list\n"
-	pm_install_s $dist_list_temp $dist_list
-	/bin/unlink $dist_list_temp ; unset distinfo dist_list_temp file line
+	pm_mkdir_s ${dist_list%/*}
+	pm_install_s $pm_mktemp_file $dist_list
+	/bin/unlink $pm_mktemp_file ; unset distinfo pm_mktemp_file file line
 fi
 
 # pkgng does not need this
