@@ -2347,9 +2347,8 @@ update_port () {
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
-	[ -n "$PM_FIRST_PASS" ] &&
-		[ ! \( -n "$PM_FORCE" -a -n "$FETCH_ONLY" -a -n "$UPDATE_ALL" \) ] &&
-			num_of_deps=$(( $num_of_deps + 1 ))
+	[ -n "$PM_FIRST_PASS" ] && [ ! \( -n "$PM_FORCE" -a -n "$PM_ALL_FETCH" \) ] &&
+		num_of_deps=$(( $num_of_deps + 1 ))
 
 	deps="(${dep_of_deps}/${num_of_deps})"
 
@@ -3059,7 +3058,11 @@ all_first_pass () {
 	[ -n "$DI_FILES" ] && (read_distinfos)&
 
 	ports_by_category
-	[ -n "$FETCH_ONLY" -a -n "$PM_FORCE" ] && $num_of_deps=$num_ports
+	if [ -n "$FETCH_ONLY" ]; then
+		# UPDATE_ALL is not exported
+		export PM_ALL_FETCH=pm_all_fetch
+		[ -n "$PM_FORCE" ] && num_of_deps=$num_ports
+	fi
 	unset num_ports
 
 	init_term_printf All
@@ -3340,7 +3343,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 		TESTINT=`grep -l ^IS_INTERACTIVE Makefile` &&
 		    TESTINT=`pm_make_b -V IS_INTERACTIVE`
 	else
-		[ -n "$UPDATE_ALL" -a -n "$FETCH_ONLY" ] && safe_exit
+		[ -n "$PM_ALL_FETCH" ] && safe_exit
 	fi
 	if [ -n "$TESTINT" ]; then
 		echo ''
