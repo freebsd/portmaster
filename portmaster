@@ -2834,6 +2834,8 @@ multiport () {
 	fi
 	unset portlist
 
+	[ -n "$DI_FILES" ] && (read_distinfos)&
+
 	# First Pass
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
@@ -3302,7 +3304,7 @@ fi
 
 # Do these things first time through
 if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
-	# Do not start this in the background until we are sure we are going to build
+	# Do not start this in the background until we are sure we are going to proceed
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
 
 	# Handle the problem of manual fetching
