@@ -3118,12 +3118,18 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	[ -n "$portdir" ] && { argv=$portdir ; unset portdir; }
 	argv=${argv:-$1} ; argv=${argv%/} ; argv=`globstrip $argv`
 	case "$argv" in
-	'')	echo '' ; no_valid_port ;;
 	$pd/*)	portdir=${argv#$pd/} ;;
 	$pdb/*)	upg_port=${argv#$pdb/} ;;
 	/*)	echo '' ; no_valid_port ;;
 	*/*)	portdir=$argv ;;
-	\.)	portdir=${PWD##*/ports/} ;; # Not always $pd, could be symlink
+	\.|'')	portdir="$PWD"
+		while : ; do
+			case "$portdir" in
+			*/*/*)	portdir="${portdir#*/}" ;;
+			*/*)	break ;;
+			*)	echo '' ; no_valid_port ;;
+			esac
+		done ;;
 	*)	[ -d "$pdb/$argv" ] && upg_port=$argv ;;
 	esac
 
