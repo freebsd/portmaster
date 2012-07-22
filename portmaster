@@ -753,7 +753,7 @@ test_command_line () {
 }
 
 # Error checking for getopts
-[ -n "$PM_FORCE" -a "$INTERACTIVE_UPDATE" ] &&
+[ -n "$PM_FORCE" -a -n "$INTERACTIVE_UPDATE" ] &&
 	fail "The -f and -i options are mutually exclusive"
 if [ -n "$BACKUP" -a -n "$NO_BACKUP" ]; then
 	test_command_line NO_BACKUP BACKUP ||
@@ -2943,7 +2943,8 @@ make_config () {
 if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	CUR_DEPS=':' ; DISPLAY_LIST='' ; INSTALLED_LIST=''
 	PM_DEPTH='' ; pm_mktemp IPC_SAVE ; IPC_SAVE=$pm_mktemp_file
-	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE
+	PM_FIRST_PASS=pm_first_pass ; PM_NEEDS_UPDATE=' '	# Used with -F for multiport and -a
+	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE PM_FIRST_PASS PM_NEEDS_UPDATE
 
 	if [ -n "$LOCALBASE" ]; then
 		LOCALBASE_COMPAT="$LOCALBASE/lib/compat/pkg"
@@ -2985,9 +2986,6 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 			fi
 		fi
 	fi
-
-	PM_FIRST_PASS=pm_first_pass ; export PM_FIRST_PASS
-	PM_NEEDS_UPDATE=' ' ; export PM_NEEDS_UPDATE	# Used with -F for multiport and -a
 
 	if [ -z "$FETCH_ONLY" ]; then
 		NO_DEP_UPDATES=no_dep_updates ; build_l=''
