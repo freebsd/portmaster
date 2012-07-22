@@ -967,7 +967,7 @@ check_dependency_files () {
 			check_regular_file $pdb/$iport/+REQUIRED_BY
 			$PM_SU_CMD truncate -s0 $pdb/$iport/+REQUIRED_BY
 		fi
-		/bin/unlink $grep_deps
+		/bin/unlink $grep_deps ; unset grep_deps
 	fi
 }
 
@@ -1806,9 +1806,9 @@ find_dl_distfiles () {
 			# but do not take a chance with a possibly wrong answer
 			dist_list="$port_dbdir/${1##*/}/distfiles"
 		fi
+		[ -s "$dist_list" ] || { unset dist_list ; return 0; }
 	fi
 
-	[ -s "$dist_list" ] || { unset dist_list ; return 0; }
 	[ -n "$DONT_SCRUB_DISTFILES" ] && return 0
 
 	local line
@@ -2289,8 +2289,21 @@ update_pm_nu () {
 	PM_NEEDS_UPDATE="${PM_NEEDS_UPDATE}${1} "
 }
 
+find_new_port () {
+	# Global: new_port
+
+	[ -n "$new_port" ] && return
+
+	if pm_cd_pd $1; then
+		new_port=`pm_make -V PKGNAME`
+	else
+		new_port=`parse_index $1 name` ||
+			fail "No entry for $1 in $PM_INDEX"
+	fi
+}
+
 update_build_l () {
-	local origin iport new_port
+	local origin iport
 
 	origin=$1 ; update_pm_nu $origin
 
@@ -2305,12 +2318,7 @@ update_build_l () {
 		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac
 	fi
 
-	if pm_cd_pd $origin; then
-		new_port=`pm_make -V PKGNAME`
-	else
-		new_port=`parse_index $origin name` ||
-			fail "No entry for $origin in $PM_INDEX"
-	fi
+	find_new_port $origin
 
 	case `pkg_version -t $iport $new_port 2>/dev/null` in
 	\<)	build_l="${build_l}\tUpgrade $iport to $new_port\n" ;;
@@ -3418,14 +3426,7 @@ if [ -n "$NO_ACTION" -a -z "$PM_FIRST_PASS" ]; then
 	safe_exit
 fi
 
-if [ -z "$new_port" ]; then
-	if [ -z "$PM_INDEX_ONLY" ]; then
-		new_port=`pm_make -V PKGNAME`
-	else
-		new_port=`parse_index $portdir name` ||
-			fail "No entry for $origin in $PM_INDEX"
-	fi
-fi
+find_new_port $portdir
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 	case `pm_make_b -V PT_NO_INSTALL_PACKAGE` in
