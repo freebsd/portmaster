@@ -2876,13 +2876,15 @@ multiport () {
 		*)		numports=$(( $numports - 1 )) ;;
 		esac
 	done
-	PM_PARENT_PORT="Total ports: $numports"
 
 	if [ -n "$PM_URB" ]; then
+		PM_PARENT_PORT="Checking -r ports"
 		unset PM_URB ; PM_URB=pm_urb_post_first_pass
 		PM_URB_DONE=":${udl_prime}" ; export PM_URB_DONE
 		urb_update
 	fi
+
+	PM_PARENT_PORT="Total ports: $numports"
 
 	check_fetch_only
 	post_first_pass multiple ports
@@ -3272,8 +3274,7 @@ else
 fi
 
 echo ''
-[ "$$" -eq "$PM_PARENT_PID" -a -n "$upg_port" ] &&
-	echo "===>>> Currently installed version: $upg_port"
+[ -n "$upg_port" ] && echo "===>>> Currently installed version: $upg_port"
 
 echo "===>>> Port directory: $pd/$portdir" ; echo ''
 
