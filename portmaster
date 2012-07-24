@@ -2179,7 +2179,6 @@ fi
 #=============== Begin functions for main ===============
 
 already_done () {
-	[ -n "$PM_VERBOSE" ] || return 0
 	echo "===>>> The update for $1 is already done" ; echo ''
 }
 
@@ -2609,6 +2608,9 @@ dependency_check () {
 		*\>\>*)	term_printf " ${PM_DEPTH#* }${deps}" ; echo '' ;;
 		*)	if [ "$PM_PARENT_PORT" = All ]; then
 				term_printf " >> ${upg_port:-$portdir}${deps}"
+			elif [ -n "$PM_URB_UP" ]; then
+				term_printf " >> ${upg_port:-$portdir} ${deps}"
+				echo ''
 			else
 				term_printf ; echo ''		# multiport
 			fi ;;
@@ -2708,12 +2710,12 @@ urb_update () {
 	# Global: PM_URB_UP
 	local verb origin req_by
 
-	verb=checking ; [ -n "$1" ] && verb=updating
+	verb=Checking ; [ -n "$1" ] && verb=Updating
 
 	export PM_URB_UP=pm_urb_up
-	echo ''
-	echo "===>>> Begin $verb ports that depend on $PM_URB_IPORTS"
-	echo ''
+
+	init_term_printf "$verb ports that depend on $PM_URB_IPORTS" ; echo ''
+	PM_PARENT_PORT="$verb dependent ports"
 
 	for origin in $PM_URB_ORIGINS; do
 		for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
@@ -2752,10 +2754,10 @@ urb_update () {
 		else
 			check_for_updates $req_by || fail 'Update failed'
 		fi
-		echo -e "\n===>>> Returning to check of ports depending on $PM_URB_IPORTS"
+		echo "===>>> Returning to list of ports depending on $PM_URB_IPORTS"
 	done
 	echo ''
-	echo "===>>> Done $verb ports that depend on $PM_URB_IPORTS"
+	echo "===>>> $verb done for ports that depend on $PM_URB_IPORTS"
 	echo ''
 	unset PM_URB_UP PM_URB_LIST PM_URB_DONE
 }
@@ -2878,7 +2880,6 @@ multiport () {
 	done
 
 	if [ -n "$PM_URB" ]; then
-		PM_PARENT_PORT="Checking -r ports"
 		unset PM_URB ; PM_URB=pm_urb_post_first_pass
 		PM_URB_DONE=":${udl_prime}" ; export PM_URB_DONE
 		urb_update
