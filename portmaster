@@ -47,8 +47,8 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.13.1 (pkgng patch 1.3)"
-	#svn='$FreeBSD: user/dougb/portmaster/portmaster 238532 2012-07-16 11:58:44Z dougb $'
+	echo '' ; echo "===>>> Version 3.13.13 (pkgng patch 1.4)"
+	#svn='$FreeBSD: user/dougb/portmaster/portmaster 238754 2012-07-24 20:15:41Z dougb $'
 }
 
 fail () {
@@ -794,7 +794,7 @@ test_command_line () {
 }
 
 # Error checking for getopts
-[ -n "$PM_FORCE" -a "$INTERACTIVE_UPDATE" ] &&
+[ -n "$PM_FORCE" -a -n "$INTERACTIVE_UPDATE" ] &&
 	fail "The -f and -i options are mutually exclusive"
 if [ -n "$BACKUP" -a -n "$NO_BACKUP" ]; then
 	test_command_line NO_BACKUP BACKUP ||
@@ -1025,7 +1025,7 @@ check_dependency_files () {
 			check_regular_file $pdb/$iport/+REQUIRED_BY
 			$PM_SU_CMD truncate -s0 $pdb/$iport/+REQUIRED_BY
 		fi
-		/bin/unlink $grep_deps
+		/bin/unlink $grep_deps ; unset grep_deps
 	fi
 }
 
@@ -1953,9 +1953,9 @@ find_dl_distfiles () {
 			# but do not take a chance with a possibly wrong answer
 			dist_list="$port_dbdir/${1##*/}/distfiles"
 		fi
+		[ -s "$dist_list" ] || { unset dist_list ; return 0; }
 	fi
 
-	[ -s "$dist_list" ] || { unset dist_list ; return 0; }
 	[ -n "$DONT_SCRUB_DISTFILES" ] && return 0
 
 	local line
@@ -2362,7 +2362,6 @@ fi
 #=============== Begin functions for main ===============
 
 already_done () {
-	[ -n "$PM_VERBOSE" ] || return 0
 	echo "===>>> The update for $1 is already done" ; echo ''
 }
 
@@ -2472,33 +2471,36 @@ update_pm_nu () {
 	PM_NEEDS_UPDATE="${PM_NEEDS_UPDATE}${1} "
 }
 
-update_build_l () {
-	local origin iport new_port
+find_new_port () {
+	# Global: new_port
 
-	case "$1" in
-	*/*)	origin=$1
-		update_pm_nu $origin
-		[ -n "$PM_NO_CONFIRM" ] && return
-		case "$build_l" in *\ $origin\\*) return ;; esac
-		iport=`iport_from_origin $origin`
-		if [ -z "$iport" ]; then
-			build_l="${build_l}\tInstall $origin\n"
-			return
-		fi ;;
-	*)	iport=$1
-		origin=`origin_from_pdb $1`
-		update_pm_nu $origin
-		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac ;;
-	esac
+	[ -n "$new_port" ] && return
+
+	if pm_cd_pd $1; then
+		new_port=`pm_make -V PKGNAME`
+	else
+		new_port=`parse_index $1 name` ||
+			fail "No entry for $1 in $PM_INDEX"
+	fi
+}
+
+update_build_l () {
+	local origin iport
+
+	origin=$1 ; update_pm_nu $origin
 
 	[ -n "$PM_NO_CONFIRM" ] && return
 
-	if [ -z "$PM_INDEX_ONLY" ]; then
-		pm_cd $pd/$origin && new_port=`pm_make -V PKGNAME`
+	if [ -z "$2" ]; then
+		case "$build_l" in *\ $origin\\*) return ;; esac
+		build_l="${build_l}\tInstall $origin\n"
+		return
 	else
-		new_port=`parse_index $origin name` ||
-			fail "No entry for $origin in $PM_INDEX"
+		iport=$2
+		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac
 	fi
+
+	find_new_port $origin
 
 	local pkg_version
 	if [ -z "$use_pkgng" ]; then
@@ -2536,9 +2538,8 @@ update_port () {
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
 
-	[ -n "$PM_FIRST_PASS" ] &&
-		[ ! \( -n "$PM_FORCE" -a -n "$FETCH_ONLY" -a -n "$UPDATE_ALL" \) ] &&
-			num_of_deps=$(( $num_of_deps + 1 ))
+	[ -n "$PM_FIRST_PASS" ] && [ ! \( -n "$PM_FORCE" -a -n "$PM_ALL_FETCH" \) ] &&
+		num_of_deps=$(( $num_of_deps + 1 ))
 
 	deps="(${dep_of_deps}/${num_of_deps})"
 
@@ -2812,6 +2813,9 @@ dependency_check () {
 		*\>\>*)	term_printf " ${PM_DEPTH#* }${deps}" ; echo '' ;;
 		*)	if [ "$PM_PARENT_PORT" = All ]; then
 				term_printf " >> ${upg_port:-$portdir}${deps}"
+			elif [ -n "$PM_URB_UP" ]; then
+				term_printf " >> ${upg_port:-$portdir} ${deps}"
+				echo ''
 			else
 				term_printf ; echo ''		# multiport
 			fi ;;
@@ -2915,12 +2919,12 @@ urb_update () {
 	# Global: PM_URB_UP
 	local verb origin req_by req_by_o
 
-	verb=checking ; [ -n "$1" ] && verb=updating
+	verb=Checking ; [ -n "$1" ] && verb=Updating
 
 	export PM_URB_UP=pm_urb_up
-	echo ''
-	echo "===>>> Begin $verb ports that depend on $PM_URB_IPORTS"
-	echo ''
+
+	init_term_printf "$verb ports that depend on $PM_URB_IPORTS" ; echo ''
+	PM_PARENT_PORT="$verb dependent ports"
 
 	for origin in $PM_URB_ORIGINS; do
 		if [ -z "$use_pkgng" ]; then
@@ -2973,10 +2977,10 @@ EOF
 		else
 			check_for_updates $req_by || fail 'Update failed'
 		fi
-		echo -e "\n===>>> Returning to check of ports depending on $PM_URB_IPORTS"
+		echo "===>>> Returning to list of ports depending on $PM_URB_IPORTS"
 	done
 	echo ''
-	echo "===>>> Done $verb ports that depend on $PM_URB_IPORTS"
+	echo "===>>> $verb done for ports that depend on $PM_URB_IPORTS"
 	echo ''
 	unset PM_URB_UP PM_URB_LIST PM_URB_DONE
 }
@@ -3062,6 +3066,8 @@ multiport () {
 	fi
 	unset portlist
 
+	[ -n "$DI_FILES" ] && (read_distinfos)&
+
 	# First Pass
 	if [ -n "$PM_BUILD_ONLY_LIST" ]; then
 		PM_BUILD_ONLY_LIST=pmp_doing_build_deps
@@ -3099,13 +3105,14 @@ multiport () {
 		*)		numports=$(( $numports - 1 )) ;;
 		esac
 	done
-	PM_PARENT_PORT="Total ports: $numports"
 
 	if [ -n "$PM_URB" ]; then
 		unset PM_URB ; PM_URB=pm_urb_post_first_pass
 		PM_URB_DONE=":${udl_prime}" ; export PM_URB_DONE
 		urb_update
 	fi
+
+	PM_PARENT_PORT="Total ports: $numports"
 
 	check_fetch_only
 	post_first_pass multiple ports
@@ -3176,7 +3183,8 @@ make_config () {
 if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	CUR_DEPS=':' ; DISPLAY_LIST='' ; INSTALLED_LIST=''
 	PM_DEPTH='' ; pm_mktemp IPC_SAVE ; IPC_SAVE=$pm_mktemp_file
-	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE
+	PM_FIRST_PASS=pm_first_pass ; PM_NEEDS_UPDATE=' '	# Used with -F for multiport and -a
+	export CUR_DEPS DISPLAY_LIST INSTALLED_LIST PM_DEPTH IPC_SAVE PM_FIRST_PASS PM_NEEDS_UPDATE
 
 	if [ -n "$LOCALBASE" ]; then
 		LOCALBASE_COMPAT="$LOCALBASE/lib/compat/pkg"
@@ -3218,9 +3226,6 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 			fi
 		fi
 	fi
-
-	PM_FIRST_PASS=pm_first_pass ; export PM_FIRST_PASS
-	PM_NEEDS_UPDATE=' ' ; export PM_NEEDS_UPDATE	# Used with -F for multiport and -a
 
 	if [ -z "$FETCH_ONLY" ]; then
 		NO_DEP_UPDATES=no_dep_updates ; build_l=''
@@ -3293,7 +3298,11 @@ all_first_pass () {
 	[ -n "$DI_FILES" ] && (read_distinfos)&
 
 	ports_by_category
-	[ -n "$FETCH_ONLY" -a -n "$PM_FORCE" ] && $num_of_deps=$num_ports
+	if [ -n "$FETCH_ONLY" ]; then
+		# UPDATE_ALL is not exported
+		export PM_ALL_FETCH=pm_all_fetch
+		[ -n "$PM_FORCE" ] && num_of_deps=$num_ports
+	fi
 	unset num_ports
 
 	init_term_printf All
@@ -3349,7 +3358,6 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	[ -n "$portdir" ] && { argv=$portdir ; unset portdir; }
 	argv=${argv:-$1} ; argv=${argv%/} ; argv=`globstrip $argv`
 	case "$argv" in
-	'')	echo '' ; no_valid_port ;;
 	$pd/*)	portdir=${argv#$pd/} ;;
 	$pdb/*)	if [ -z "$use_pkgng" ]; then
 			upg_port=${argv#$pdb/}
@@ -3358,9 +3366,17 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 		fi ;;
 	/*)	echo '' ; no_valid_port ;;
 	*/*)	portdir=$argv ;;
-	\.)	portdir=${PWD##*/ports/} ;; # Not always $pd, could be symlink
-	*)	[ -d "$pdb/$argv" ] && ( [ -z "$use_pkgng" ] || pkg info -e $argv ) &&
-		upg_port=$argv ;;
+	\.|'')	portdir="$PWD"
+		while : ; do
+			case "$portdir" in
+			*/*/*)	portdir="${portdir#*/}" ;;
+			*/*)	break ;;
+			*)	echo '' ; no_valid_port ;;
+			esac
+		done ;;
+	*)	[ -d "$pdb/$argv" ] && \
+			( [ -z "$use_pkgng" ] || pkg info -e $argv ) && \
+			upg_port=$argv ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
@@ -3508,8 +3524,7 @@ else
 fi
 
 echo ''
-[ "$$" -eq "$PM_PARENT_PID" -a -n "$upg_port" ] &&
-	echo "===>>> Currently installed version: $upg_port"
+[ -n "$upg_port" ] && echo "===>>> Currently installed version: $upg_port"
 
 echo "===>>> Port directory: $pd/$portdir" ; echo ''
 
@@ -3530,18 +3545,14 @@ if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 		fi
 	fi
 
-	if [ -n "$upg_port" ]; then
-		update_build_l $upg_port
-	else
-		update_build_l $portdir
-	fi
+	update_build_l $portdir $upg_port
 elif [ -n "$FETCH_ONLY" -a -n "$PM_PACKAGES" ]; then
 	update_pm_nu $portdir
 fi
 
 # Do these things first time through
 if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
-	# Do not start this in the background until we are sure we are going to build
+	# Do not start this in the background until we are sure we are going to proceed
 	[ "$$" -eq "$PM_PARENT_PID" -a -n "$DI_FILES" ] && (read_distinfos)&
 
 	# Handle the problem of manual fetching
@@ -3588,7 +3599,7 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 		TESTINT=`grep -l ^IS_INTERACTIVE Makefile` &&
 		    TESTINT=`pm_make_b -V IS_INTERACTIVE`
 	else
-		[ -n "$UPDATE_ALL" -a -n "$FETCH_ONLY" ] && safe_exit
+		[ -n "$PM_ALL_FETCH" ] && safe_exit
 	fi
 	if [ -n "$TESTINT" ]; then
 		echo ''
@@ -3666,14 +3677,7 @@ if [ -n "$NO_ACTION" -a -z "$PM_FIRST_PASS" ]; then
 	safe_exit
 fi
 
-if [ -z "$new_port" ]; then
-	if [ -z "$PM_INDEX_ONLY" ]; then
-		new_port=`pm_make -V PKGNAME`
-	else
-		new_port=`parse_index $portdir name` ||
-			fail "No entry for $origin in $PM_INDEX"
-	fi
-fi
+find_new_port $portdir
 
 if [ -n "$PM_PACKAGES" -o "$PM_PACKAGES_BUILD" = doing_build_only_dep ]; then
 	case `pm_make_b -V PT_NO_INSTALL_PACKAGE` in
