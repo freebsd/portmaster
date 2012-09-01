@@ -47,7 +47,7 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.13.13 (pkgng patch 1.4)"
+	echo '' ; echo "===>>> Version 3.13.13 (pkgng patch 1.5)"
 	#svn='$FreeBSD: user/dougb/portmaster/portmaster 238754 2012-07-24 20:15:41Z dougb $'
 }
 
@@ -4030,8 +4030,10 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			unset preserve_port files
 		esac
 
-		# Orphan state of $ro_upg_port has precedence
-		: ${np_orphan:=`pkg query "%a" $upg_port`}
+		# If $ro_upg_port was non-automatic, keep its state
+		if [ "${np_orphan:-1}" -eq 1 ]; then
+			np_orphan=`pkg query "%a" $upg_port`
+		fi
 		pm_sv "Running pkg_delete for $upg_port"
 		pm_pkg_delete_s -f $upg_port
 	fi
@@ -4078,7 +4080,7 @@ if [ -z "$use_package" ]; then
 		unset port_log_args
 	fi
 
-	if [ -z "$UPDATE_ALL" -a -z "$REPLACE_ORIGIN" -a -z "$PM_URB" -a "${np_orphan:-1}" -eq 1 ]; then
+	if [ -z "$np_orphan" -a -z "$UPDATE_ALL" -a -z "$REPLACE_ORIGIN" -a -z "$PM_URB" ]; then
 		if [ -n "$PM_MULTI_PORTS" ]; then
 			case "$PM_MULTI_PORTS" in
 			*:${upg_port:-NONE}:*)	np_orphan=0 ;;
