@@ -47,8 +47,8 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.13.13 (pkgng patch 1.5)"
-	#svn='$FreeBSD: user/dougb/portmaster/portmaster 238754 2012-07-24 20:15:41Z dougb $'
+	echo '' ; echo "===>>> Version 3.14 (pkgng patch 1.6)"
+	#svn='$FreeBSD: user/dougb/portmaster/portmaster 241090 2012-10-01 08:32:05Z dougb $'
 }
 
 fail () {
@@ -242,10 +242,10 @@ parent_exit () {
 		if [ -z "$use_pkgng" ]; then
 			for f in $build_deps_il; do
 				pm_v "       $f"
-				pm_pkg_delete_s -f $f
+				pm_pkg_delete_s $f
 			done
 		else
-			pm_pkg_delete_s -f $build_deps_il
+			pm_pkg_delete_s $build_deps_il
 		fi
 		echo ''
 	fi
@@ -336,9 +336,12 @@ pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_UR
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () {
 	if [ -z "$use_pkgng" ]; then
-		$PM_SU_CMD /usr/sbin/pkg_delete $*;
+		$PM_SU_CMD /usr/sbin/pkg_delete -f $*;
 	else
-		$PM_SU_CMD /usr/local/sbin/pkg delete -y $*;
+		$PM_SU_CMD /usr/local/sbin/pkg delete -yf $*;
+		for d in $* ; do
+		    pm_rm_s -rf $pdb/$d
+		done
 	fi
 }
 pm_rm_s           () { $PM_SU_CMD /bin/rm $*; }
@@ -2297,7 +2300,7 @@ if [ -n "$EXPUNGE" ]; then
 		pkg_delete="pkg delete"
 	fi
 	echo "===>>> Running $pkg_delete -f $EXPUNGE"
-	pm_pkg_delete_s -f $EXPUNGE || fail "$pkg_delete failed"
+	pm_pkg_delete_s $EXPUNGE || fail "$pkg_delete failed"
 
 	echo '' ; echo "===>>> Running ${0##*/} -s $ARGS"
 	exec $0 -s $ARGS
@@ -2348,7 +2351,7 @@ if [ -n "$CLEAN_STALE" ]; then
 			[ -z "$DONT_SCRUB_DISTFILES" ] && delete_all_distfiles $origin
 
 			echo "===>>> Running $pkg_delete -f $iport"
-			pm_pkg_delete_s -f $iport || fail "$pkg_delete failed"
+			pm_pkg_delete_s $iport || fail "$pkg_delete failed"
 
 			exec $0 -s $ARGS ;;
 		*)	if [ -z "$use_pkgng" ]; then
@@ -4023,7 +4026,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		# Delete any existing versions of the old port
 		np_orphan=`pkg query "%a" $ro_upg_port`
 		pm_sv "Running pkg_delete for $ro_upg_port"
-		pm_pkg_delete_s -f $ro_upg_port
+		pm_pkg_delete_s $ro_upg_port
 	fi
 
 	# Could be empty if -o
@@ -4046,7 +4049,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			np_orphan=`pkg query "%a" $upg_port`
 		fi
 		pm_sv "Running pkg_delete for $upg_port"
-		pm_pkg_delete_s -f $upg_port
+		pm_pkg_delete_s $upg_port
 	fi
 
 	echo ''
