@@ -19,14 +19,6 @@ if [ -z "$PM_PARENT_PID" ]; then
 	[ -n "$CCACHE_PATH" -a -z "$NOCCACHE" ] && PATH="/usr/local/libexec/ccache:$PATH"
 	export PM_PARENT_PID TMPDIR UPGRADE_TOOL PATH
 
-	if [ -r /etc/portmaster.rc ]; then
-		echo '' ; echo "===>>> WARNING"
-		echo '       Your portmaster.rc is in /etc, however support for the file in this'
-		echo '       location has been removed.'
-		echo '' ; echo '       The proper location for this file is /usr/local/etc'
-		exit 1
-	fi
-
 	set -o allexport
 	# Read a global rc file first
 	[ -s /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
