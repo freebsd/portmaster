@@ -705,7 +705,7 @@ set -- $newopts
 unset var newopts
 
 # Save switches for potential child processes
-while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
@@ -752,7 +752,6 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 		unset glob_dirs ;;
 	s)	CLEAN_STALE=sopt ;;
 	t)	PM_THOROUGH=topt; ARGS="-t $ARGS" ;;
-	u)	fail 'The -u option has been deprecated' ;;
 	v)	PM_VERBOSE=vopt; ARGS="-v $ARGS" ;;
 	w)	SAVE_SHARED=wopt; ARGS="-w $ARGS" ;;
 	x)	case "$OPTARG" in
@@ -765,7 +764,6 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stuvwx:y' COMMAND_LINE_ARGUMENT ; do
 done
 shift $(( $OPTIND - 1 ))
 
-[ -n "$UNATTENDED" ] && fail 'The -u option has been deprecated'
 [ -n "$PM_YES" -a -n "$NO_ACTION" ] && fail 'The -y and -n options are mutually exclusive'
 
 [ -n "$PM_EXCL" ] && export PM_EXCL
