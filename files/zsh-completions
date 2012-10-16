@@ -61,7 +61,11 @@ _arguments -A "-*" : \
 
 case "$state" in
   pkgs)
-    array=("${PKG_DBDIR:-/var/db/pkg}"/*(/:t))
+    if [ -n "$(make -V WITH_PKGNG)" ]; then
+      array=($(pkg info -aq))
+    else
+      array=("${PKG_DBDIR:-/var/db/pkg}"/*(/:t))
+    fi
     _describe -t packages "installed ports" array
     ;;
   ports)
@@ -71,7 +75,11 @@ case "$state" in
     _tags packages ports
     while _tags; do
       if _requested packages; then
-        array=("${PKG_DBDIR:-/var/db/pkg}"/*(/:t))
+        if [ -n "$(make -V WITH_PKGNG)" ]; then
+          array=($(pkg info -aq))
+        else
+          array=("${PKG_DBDIR:-/var/db/pkg}"/*(/:t))
+        fi
         _describe -t packages "installed ports" array && ret=0
       fi
       if _requested ports; then
