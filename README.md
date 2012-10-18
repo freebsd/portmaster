@@ -18,3 +18,7 @@ Portmaster has the following features:
   * Options to list installed ports by category, and those with new versions
   * Packages can be used for installation either exclusively, if available,
     or only for build dependencies
+
+WWW: http://portmaster.github.com
+
+IRC: #portmaster @ Freenode
