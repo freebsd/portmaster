@@ -4304,7 +4304,7 @@ if [ "$$" -ne "$PM_PARENT_PID" -o -n "$PM_URB" ]; then
 fi
 
 INSTALLED_LIST="${INSTALLED_LIST}\t${ilist}\n"
-[ -z "$use_pkgng" -a -e "$pdb/$new_port/+DISPLAY" -o -n "$use_pkgng" -a -n "`pkg query "%M" $new_port`" ] &&
+[ -z "$use_pkgng" -a -e "$pdb/$new_port/+DISPLAY" ] || ( [ -n "$use_pkgng" ] && [ -n "`pkg query %M $new_port`" ] ) &&
 	DISPLAY_LIST="${DISPLAY_LIST}$new_port "
 CUR_DEPS="${CUR_DEPS}${new_port}:${portdir}:"
 
