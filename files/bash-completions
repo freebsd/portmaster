@@ -1,5 +1,15 @@
 # $FreeBSD$
 #
+_pkgs_list() {
+	local dbdir="$1"
+	shift 1 # the rest will be passed diretly to compgen
+	if [ -n "$(make -f /usr/share/mk/bsd.port.mk -V WITH_PKGNG)" ]; then
+		compgen -W "$(pkg info -aq)" $*
+	else
+		cd ${dbdir} && compgen -d $*
+	fi
+}
+
 _portmaster () {
 	local cur dbdir portsdir
 	cur=${COMP_WORDS[COMP_CWORD]}
@@ -22,7 +32,7 @@ _portmaster () {
 		--check-depends --check-port-dbdir --list-origins \
 		--help --version' -- $cur ) )
 		;;
-	*)	COMPREPLY=( $( compgen -d ${dbdir}/$cur ) )
+	*)	COMPREPLY=( $(_pkgs_list ${dbdir} "${cur}" ) )
 		COMPREPLY=( ${COMPREPLY[@]#${dbdir}/} )
 		COMPREPLY=( ${COMPREPLY[@]} $( compgen -d ${portsdir}/$cur ) )
 		COMPREPLY=( ${COMPREPLY[@]#/ports/} )
