@@ -98,6 +98,12 @@
 # PM_INDEX=pm_index
 # PM_INDEX_ONLY=pm_index_only
 #
+# If building as an unprivileged user and you have SU_CMD in make.conf(5).
+# Note: portmaster does not provide command as a single argument, i.e.
+# if your make.conf(5) specifies `SU_CMD=sudo -E sh -c`, then the correct
+# corresponding portmaster configuration is `PM_SU_CMD=sudo`.
+# PM_SU_CMD=sudo
+#
 #
 # The following options are available for the rc file only:
 #
