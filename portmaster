@@ -118,11 +118,11 @@ kill_bad_children () {
 }
 
 parent_exit () {
-	local files f DISCARD show_list
+	local need_kbc files f DISCARD show_list
 
-	[ -s "$DI_FILES" ] && { grep -q '%%%%%%%%%%%%' $DI_FILES || kill_bad_children; }
+	[ -s "$DI_FILES" ] && { grep -q '%%%%%%%%%%%%' $DI_FILES || need_kbc=need_kbc_dif; }
 
-	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && kill_bad_children
+	[ -n "$FETCH_ONLY" -a -z "$FETCH_ONLY_DONE" ] && need_kbc=need_kbc_fo
 
 	if [ -z "$1" ]; then
 		if [ -n "$PM_URB" -o -n "$PM_FORCE" ]; then
@@ -137,7 +137,11 @@ parent_exit () {
 			pm_cd $pbu || fail "Cannot cd to $pbu"
 			pm_rm_s $NB_DELETE
 		fi
+	else
+		need_kbc=need_kbc_ec
 	fi
+
+	[ -n "$need_kbc" ] && kill_bad_children
 
 	[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
 	if [ -d "$pbu" ]; then
@@ -150,8 +154,10 @@ parent_exit () {
 		/bin/unlink $f
 	done
 
-	[ -n "$PM_WRKDIRPREFIX" ] &&
+	if [ -n "$PM_WRKDIRPREFIX" ]; then
+		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
 		find -d $PM_WRKDIRPREFIX -mindepth 1 -type d -empty -delete 2>/dev/null
+	fi
 
 	case "$DISPLAY_LIST" in
 	*' '*)	if [ -n "$1" ]; then
@@ -2379,14 +2385,18 @@ update_port () {
 	if [ -n "$2" ]; then
 		echo "===>>> Launching child to update $1 to $2"
 	else
-		case "$1" in
-		*/*)	echo "===>>> Launching child to install ${1#$pd/}" ;;
-		*)	if [ -z "$FETCH_ONLY" ]; then
-				echo "===>>> Launching child to reinstall $1"
-			else
+		if [ -z "$FETCH_ONLY" ]; then
+			case "$1" in
+			*/*)	echo "===>>> Launching child to install ${1#$pd/}" ;;
+			*)	echo "===>>> Launching child to reinstall $1" ;;
+			esac
+		else
+			if [ "$PM_PACKAGES" != 'only' ]; then
 				echo "===>>> Launching child to check distfiles for $1"
-			fi ;;
-		esac
+			else
+				echo "===>>> Launching child to check package files for $1"
+			fi
+		fi
 	fi
 
 	dep_of_deps=$(( $dep_of_deps + 1 ))
@@ -2406,8 +2416,9 @@ update_port () {
 		unset NO_DEP_UPDATES
 
 	if [ -z "$NO_ACTION" -o -n "$PM_FIRST_PASS" ]; then
-		($0 $ARGS $1) || fail "Update for $1 failed"
+		($0 $ARGS $1) || update_failed=update_failed
 		. $IPC_SAVE
+		[ -n "$update_failed" ] && fail "Update for $1 failed"
 	else
 		pm_v "===>>> Build canceled due to -n flag"
 	fi
@@ -2574,8 +2585,11 @@ dependency_check () {
 
 			conflicts=''
 			if pm_cd $d_port; then
-				grep -ql ^CONFLICTS Makefile &&
+				if grep -ql ^CONFLICTS Makefile ; then
 					conflicts=`pm_make_b -V CONFLICTS`
+					conflicts="$conflicts `pm_make_b -V CONFLICTS_BUILD`"
+					conflicts="$conflicts `pm_make_b -V CONFLICTS_INSTALL`"
+				fi
 			else
 				fail "Cannot cd to $d_port"
 			fi
@@ -2685,7 +2699,9 @@ post_first_pass () {
 	[ "$PM_NEEDS_UPDATE" = ' ' ] && return
 
 	action=build
-	if [ "$PM_PACKAGES" = only ]; then
+	if [ -n "$FETCH_ONLY" ]; then
+		action='fetch'
+	elif [ "$PM_PACKAGES" = only ]; then
 		action=install
 	elif [ -n "$PM_PACKAGES" ]; then
 		action='build and/or install'
@@ -2766,6 +2782,10 @@ urb_update () {
 		for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
 			req_by="${req_by%/+CONTENTS}"
 			req_by="${req_by##*/}"
+
+			case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
+			case " $PM_URB_ORIGINS" in *" `origin_from_pdb $req_by` "*) continue ;; esac
+
 			PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 		done
 	done
@@ -2901,8 +2921,9 @@ multiport () {
 
 		numports=$(( $numports + 1 ))
 		init_term_printf "$port ${numports}/${numports}"
-		($0 $ARGS $port) || fail "Update for $port failed"
+		($0 $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE
+		[ -n "$update_failed" ] && fail "Update for $port failed"
 
 		case "$PM_NEEDS_UPDATE" in
 		*\ $origin\ *)	continue ;;	# Handle +IGNOREME in child
@@ -2949,8 +2970,9 @@ multiport () {
 
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
-		($0 $ARGS $port) || fail "Update for $port failed"
+		($0 $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE
+		[ -n "$update_failed" ] && fail "Update for $port failed"
 	done
 
 	if [ -n "$PM_URB" ]; then
@@ -2959,6 +2981,11 @@ multiport () {
 		urb_update urb_update_after_build
 	fi
 
+	if [ "$PM_PACKAGES" != 'only' ]; then
+		check_fetch_only
+	else
+		check_fetch_only Package
+	fi
 	safe_exit
 }
 
@@ -3821,6 +3848,18 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	# Could be empty if -o
 	if [ -n "$upg_port" ]; then
+		case " $PM_PRESERVE_PORTS " in
+		*" $portdir "*)
+			preserve_port=`echo $portdir | sed 's#[-+/\.]#_#g'`
+			eval preserve_port_files="\$${preserve_port}_files"
+			preserve_dir=`mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port}`
+			for file in $preserve_port_files; do
+				cp -p $file ${preserve_dir}/ ||
+				    fail "Cannot copy $file, which is in \$${preserve_port}_files"
+			done
+			unset preserve_port files
+		esac
+
 		pm_sv "Running pkg_delete for $upg_port"
 		pm_pkg_delete_s -f $upg_port
 	fi
@@ -3835,6 +3874,8 @@ if [ -z "$PM_THOROUGH" -a -z "$NO_DEP_UPDATES" ]; then
 fi
 
 if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
+	CUR_DEPS="${CUR_DEPS}${new_port}:${portdir}:"
+
 	if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		check_fetch_only Package
 	else
@@ -3880,6 +3921,35 @@ else
 		install_failed ${latest_pv}.tbz
 	fi
 fi
+
+for file in $preserve_port_files; do
+	mv $file ${file}-new
+	mv ${preserve_dir}/${file##*/} $file
+	oldmd5="MD5:`md5 -q $file`"
+
+	new_cont=`pm_mktemp contents`
+	while read left right; do
+		case "$left" in
+		@cwd)		short_file="${file#${right}/}" ;;
+		$short_file)	found_it=found_it ; continue;;
+		@comment)	if [ -n "$found_it" ]; then
+					echo -e "${short_file}-new\n$left $right"
+					echo -e "$short_file\n@comment $oldmd5"
+					unset found_it
+					continue
+				fi ;;
+		esac
+		echo "$left $right"
+	done < $pdb/$new_port/+CONTENTS > $new_cont
+	pm_install_s $new_cont $contents
+	pm_unlink $new_cont
+	unset file oldmd5 new_cont left right short_file
+done
+if [ -n "$preserve_dir" ]; then
+	rmdir $preserve_dir 2>/dev/null
+	unset preserve_dir preserve_port_files
+fi
+
 echo ''
 
 [ "$PM_DEL_BUILD_ONLY" = doing_build_only_dep ] &&
