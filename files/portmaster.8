@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 1, 2011
+.Dd September 1, 2011
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -82,6 +82,7 @@ and/or multiple globs from /var/db/pkg
 .Op Common Flags
 .Op Fl R
 .Fl r Ar name/glob of port in /var/db/pkg
+(can be specified more than once)
 .Nm
 .Fl l
 .Nm
@@ -466,6 +467,9 @@ but the newly installed port is now fooport-1.24 you can do
 .Nm
 .Fl R Fl r Ar fooport-1.24
 and it should pick up where you left off.
+The
+.Fl r
+option can be specified more than once.
 .It Fl R
 used with the
 .Fl r
