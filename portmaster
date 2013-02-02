@@ -1260,7 +1260,18 @@ read_distinfos () {
 		else
 			pm_cd $origin || continue
 			distinfo=`pm_make -V DISTINFO_FILE`
-			[ -n "$distinfo" ] || fail "No DISTINFO_FILE in $origin"
+
+			# Do not make this error fatal unless using
+			# --clean-distfiles. This will prevent accidentally
+			# killing other background processes when running
+			# in the background itself.
+			if [ -z "$distinfo" ]; then
+				if [ -z "$CLEAN_DISTFILES" ]; then
+					continue
+				else
+					fail "No DISTINFO_FILE in $origin"
+				fi
+			fi
 		fi
 
 		if [ -s "$distinfo" ]; then
