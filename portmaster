@@ -49,8 +49,8 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.12.1  (pkgng patch 1.1)"
-	#svn='$FreeBSD: user/dougb/portmaster/portmaster 237111 2012-06-15 05:57:40Z dougb $'
+	echo '' ; echo "===>>> Version 3.12.2  (pkgng patch 1.1)"
+	#svn='$FreeBSD: user/dougb/portmaster/portmaster 237588 2012-06-26 01:32:58Z dougb $'
 }
 
 fail () {
@@ -267,8 +267,8 @@ safe_exit () {
 		[ -n "$grep_deps" ] && pm_unlink $grep_deps
 
 		# Save state for the parent process to read back in
+		> $IPC_SAVE
 		if [ -z "$PM_FIRST_PASS" ]; then
-			> $IPC_SAVE
 			echo "DISPLAY_LIST='$DISPLAY_LIST'" >> $IPC_SAVE
 			echo "INSTALLED_LIST='$INSTALLED_LIST'" >> $IPC_SAVE
 
@@ -279,9 +279,21 @@ safe_exit () {
 				[ "$i" = "$portdir" ] && continue
 				pnu_temp="${pnu_temp}${i} "
 			done
-
 			PM_NEEDS_UPDATE=" ${pnu_temp}"
+
+			[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && echo "NB_DELETE='$NB_DELETE'" >> $IPC_SAVE
 		else
+			if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
+				echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
+				echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
+				rundep_list=`uniquify_list $rundep_list`
+				echo "rundep_list='$rundep_list'" >> $IPC_SAVE
+				for f in $rundep_list; do
+					eval echo "export $f=\'\$$f\'" >> $IPC_SAVE
+					eval echo "export ${f}_p=\'\$${f}_p\'" >> $IPC_SAVE
+				done
+			fi
+
 			# Do these here so +IGNOREME can modify them
 			echo "num_of_deps='$num_of_deps'" >> $IPC_SAVE
 			echo "build_l='$build_l'" >> $IPC_SAVE
@@ -290,7 +302,6 @@ safe_exit () {
 		echo "CUR_DEPS='$CUR_DEPS'" >> $IPC_SAVE
 		echo "dep_of_deps='$dep_of_deps'" >> $IPC_SAVE
 		echo "PM_NEEDS_UPDATE='$PM_NEEDS_UPDATE'" >> $IPC_SAVE
-		[ -z "$NO_BACKUP" -a -z "$BACKUP" ] && echo "NB_DELETE='$NB_DELETE'" >> $IPC_SAVE
 		if [ -n "$INTERACTIVE_UPDATE" ]; then
 			echo "INTERACTIVE_YES='$INTERACTIVE_YES'" >> $IPC_SAVE
 			echo "INTERACTIVE_NO='$INTERACTIVE_NO'" >> $IPC_SAVE
@@ -2526,7 +2537,7 @@ update_port () {
 
 	if [ -z "$NO_ACTION" -o -n "$PM_FIRST_PASS" ]; then
 		($0 $ARGS $1) || update_failed=update_failed
-		. $IPC_SAVE
+		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $1 failed"
 	else
 		pm_v "===>>> Build canceled due to -n flag"
@@ -3063,7 +3074,7 @@ multiport () {
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || update_failed=update_failed
-		. $IPC_SAVE
+		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
 
 		case "$PM_NEEDS_UPDATE" in
@@ -3114,7 +3125,7 @@ multiport () {
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
 		($0 $ARGS $port) || update_failed=update_failed
-		. $IPC_SAVE
+		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
 	done
 
@@ -3236,6 +3247,8 @@ all_first_pass () {
 	local iport origin
 
 	for iport in "$@"; do
+		[ -z "$FETCH_ONLY" ] && pm_v "===>>> $iport"
+
 		case "$CUR_DEPS" in *:${iport}:*) continue ;; esac
 
 		origin=`origin_from_pdb $iport` || {
@@ -3532,6 +3545,8 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 			if ! ls ${TMPDIR}/f-${PM_PARENT_PID}-${file}-* >/dev/null 2>&1; then
 				pm_mktemp ${file}-${portdir#*/} >/dev/null
 			else
+				[ -n "$FETCH_ONLY" ] &&
+					echo "===>>> Skipping $file due to previous fetch for it"
 				DONT_FETCH=dont_fetch
 				break
 			fi
@@ -3550,6 +3565,8 @@ if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTI
 			    rm -f ${TMPDIR}/f-${PM_PARENT_PID}-*-${portdir#*/}.* )&
 		fi
 		unset master_sites distfiles file DONT_FETCH fetchlog allfiles
+	elif [ -n "$FETCH_ONLY" ]; then
+		echo "===>>> No distfiles to fetch"
 	fi
 
 	if [ -z "$FETCH_ONLY" -a ! "$PM_PACKAGES" = only ]; then
@@ -3588,22 +3605,7 @@ if [ -n "$PM_FIRST_PASS" ]; then
 	[ -n "$PM_URB" -o -n "$PM_URB_UP" ] &&
 		PM_URB_DONE="${PM_URB_DONE}${upg_port}:"
 
-	if [ ! "$$" -eq "$PM_PARENT_PID" ]; then
-		# Save state for the parent process to read back in
-		> $IPC_SAVE
-		if [ "$PM_BUILD_ONLY_LIST" = pmp_doing_build_deps ]; then
-			echo "build_only_dl_g='$build_only_dl_g'" >> $IPC_SAVE
-			echo "run_dl_g='$run_dl_g'" >> $IPC_SAVE
-			rundep_list=`uniquify_list $rundep_list`
-			echo "rundep_list='$rundep_list'" >> $IPC_SAVE
-			for f in $rundep_list; do
-				eval echo "export $f=\'\$$f\'" >> $IPC_SAVE
-				eval echo "export ${f}_p=\'\$${f}_p\'" >> $IPC_SAVE
-			done
-		fi
-
-		safe_exit
-	fi
+	[ "$$" -eq "$PM_PARENT_PID" ] || safe_exit
 
 	check_fetch_only
 	post_first_pass $portdir
