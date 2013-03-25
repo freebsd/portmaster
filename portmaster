@@ -2307,7 +2307,7 @@ if [ -n "$CLEAN_STALE" ]; then
 	if [ -z "$use_pkgng" ]; then
 		find_stale_ports="find $pdb -type f -name \+REQUIRED_BY -empty"
 	else
-		find_stale_ports="pkg query -a \"%?r %n-%v\" | awk '/^0/ { print \$2 }'"
+		find_stale_ports="pkg query -ae '%a = 1' '%?r %n-%v' | awk '/^0/ { print \$2 }'"
 	fi
 	for file in `eval $find_stale_ports` ; do
 		iport="${file%/+REQUIRED_BY}" ; iport=${iport#$pdb/}
