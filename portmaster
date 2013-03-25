@@ -3375,6 +3375,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	\.|'')	portdir="$PWD"
 		while : ; do
 			case "$portdir" in
+			/)	echo ''; no_valid_port ;;
 			*/*/*)	portdir="${portdir#*/}" ;;
 			*/*)	break ;;
 			*)	echo '' ; no_valid_port ;;
