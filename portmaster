@@ -95,6 +95,7 @@ kill_bad_children () {
 	local mypgid pid ppid pgid command ; IFS=' '
 
 	mypgid=`ps -o pgid= -p $PM_PARENT_PID`
+	echo "===>>> Killing background jobs"
 
 	ps -axo pid,ppid,pgid,command | sed '1d' | while read pid ppid pgid command; do
 		[ "$pid" -gt 25 ] || continue
@@ -302,6 +303,7 @@ safe_exit () {
 		[ -n "$PM_URB" -o -n "$PM_URB_UP" ] && echo "PM_URB_DONE='$PM_URB_DONE'" >> $IPC_SAVE
 	fi
 
+	echo "===>>> Exiting"
 	exit ${1:-0}
 } # safe_exit()
 
