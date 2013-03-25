@@ -249,6 +249,7 @@ parent_exit () {
 		echo "       ${0##*/} <flags>${PM_NEEDS_UPDATE}"
 		echo ''
 	fi
+	echo "===>>> Exiting"
 }
 
 safe_exit () {
@@ -303,7 +304,6 @@ safe_exit () {
 		[ -n "$PM_URB" -o -n "$PM_URB_UP" ] && echo "PM_URB_DONE='$PM_URB_DONE'" >> $IPC_SAVE
 	fi
 
-	echo "===>>> Exiting"
 	exit ${1:-0}
 } # safe_exit()
 
