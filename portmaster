@@ -95,7 +95,9 @@ kill_bad_children () {
 	local mypgid pid ppid pgid command ; IFS=' '
 
 	mypgid=`ps -o pgid= -p $PM_PARENT_PID`
-	echo "===>>> Killing background jobs"
+
+        [ -z "$displayed_background_msg" ] && echo "===>>> Killing background jobs"
+        displayed_background_msg=1
 
 	ps -axo pid,ppid,pgid,command | sed '1d' | while read pid ppid pgid command; do
 		[ "$pid" -gt 25 ] || continue
