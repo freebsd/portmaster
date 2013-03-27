@@ -1017,7 +1017,7 @@ check_dependency_files () {
 
 	# Always rely on the grep'ed dependencies instead of +REQUIRED_BY
 	pm_mktemp grep-deps-${iport} ; grep_deps=$pm_mktemp_file
-	egrep -l "DEPORIGIN:($origin|$ro_opd)$" $pdb/*/+CONTENTS |
+	find $pdb -depth 2 -name +CONTENTS -exec egrep -l "DEPORIGIN:($origin|$ro_opd)$" {} + |
 	    strip_to_iport | sort -u > $grep_deps
 
 	if [ ! -s "$grep_deps" ]; then
@@ -2270,7 +2270,7 @@ if [ -n "$EXPUNGE" ]; then
 
 	origin=`origin_from_pdb $EXPUNGE`
 	if [ -z "$use_pkgng" ]; then
-		deplist=`grep -l DEPORIGIN:$origin$ $pdb/*/+CONTENTS`
+		deplist=`find $pdb -depth 2 -name +CONTENTS -exec grep -l DEPORIGIN:$origin$ {} +`
 	else
 		deplist=`pkg query "%rn-%rv" $origin`
 	fi
@@ -2325,7 +2325,7 @@ if [ -n "$CLEAN_STALE" ]; then
 		origin=`origin_from_pdb $iport`
 		deplist=""
 		if [ -z "$use_pkgng" ]; then
-			deplist=`grep -l DEPORIGIN:$origin$ $pdb/*/+CONTENTS`
+			deplist=`find $pdb -depth 2 -name +CONTENTS -exec grep -l DEPORIGIN:$origin$ {} +`
 		fi
 		if [ -n "$deplist" ]; then
 			echo ''
@@ -2903,7 +2903,7 @@ post_first_pass () {
 
 		for dep in $build_only_dl_g; do
 			if [ -z "$use_pkgng" ]; then
-				grep -q "@comment DEPORIGIN:${dep#$pd/}$" $pdb/*/+CONTENTS && continue
+				[ $(find $pdb -depth 2 -name +CONTENTS -exec grep -l "@comment DEPORIGIN:${dep#$pd/}$" {} +|wc -l) -gt 0 ] && continue
 			else
 				[ "`pkg query "%?r" ${dep#$pd/}`" = "1" ] && continue
 			fi
@@ -2944,7 +2944,7 @@ urb_update () {
 
 	for origin in $PM_URB_ORIGINS; do
 		if [ -z "$use_pkgng" ]; then
-			for req_by in `grep -l DEPORIGIN:${origin}$ $pdb/*/+CONTENTS`; do
+			for req_by in `find $pdb -depth 2 -name +CONTENTS -exec grep -l DEPORIGIN:${origin}$ {} +`; do
 				req_by="${req_by%/+CONTENTS}"
 				req_by="${req_by##*/}"
 
@@ -3442,7 +3442,7 @@ else
 
 	if [ -z "$ro_upg_port" ]; then
 		if [ -z "$use_pkgng" ]; then
-			grep -ql "DEPORIGIN:$ro_opd$" $pdb/*/+CONTENTS
+			[ $(find $pdb -depth 2 -name +CONTENTS -exec grep -l "DEPORIGIN:$ro_opd$" {} +|wc -l) -gt 0 ]
 		else
 			pkg query -a "%do" | grep -q "^$ro_opd$"
 		fi
