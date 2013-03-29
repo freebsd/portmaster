@@ -4028,7 +4028,9 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then
 		# Delete any existing versions of the old port
-		np_orphan=`pkg query "%a" $ro_upg_port`
+		if [ -n "$use_pkgng" ]; then
+			np_orphan=`pkg query "%a" $ro_upg_port`
+		fi
 		pm_sv "Running pkg_delete for $ro_upg_port"
 		pm_pkg_delete_s $ro_upg_port
 	fi
@@ -4049,7 +4051,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		esac
 
 		# If $ro_upg_port was non-automatic, keep its state
-		if [ "${np_orphan:-1}" -eq 1 ]; then
+		if [ -n "$use_pkgng" -a "${np_orphan:-1}" -eq 1 ]; then
 			np_orphan=`pkg query "%a" $upg_port`
 		fi
 		pm_sv "Running pkg_delete for $upg_port"
