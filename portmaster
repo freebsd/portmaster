@@ -1587,6 +1587,7 @@ fi	# [ -n "$CLEAN_PACKAGES" ]
 
 if [ -n "$CHECK_DEPENDS" ]; then
 	if [ -n "$use_pkgng" ]; then
+		# TODO
 		pkg check -adv
 		exit
 	fi
