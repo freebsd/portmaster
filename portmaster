@@ -15,17 +15,8 @@ if [ -z "$PM_PARENT_PID" ]; then
 
 	# /usr/local is needed in the path for make
 	PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-	[ -e /usr/X11R6 ] && [ ! -L /usr/X11R6 ] && PATH=$PATH:/usr/X11R6/bin
 	[ -n "$CCACHE_PATH" -a -z "$NOCCACHE" ] && PATH="/usr/local/libexec/ccache:$PATH"
 	export PM_PARENT_PID TMPDIR UPGRADE_TOOL PATH
-
-	if [ -r /etc/portmaster.rc ]; then
-		echo '' ; echo "===>>> WARNING"
-		echo '       Your portmaster.rc is in /etc, however support for the file in this'
-		echo '       location has been removed.'
-		echo '' ; echo '       The proper location for this file is /usr/local/etc'
-		exit 1
-	fi
 
 	set -o allexport
 	# Read a global rc file first
@@ -41,13 +32,13 @@ if [ -z "$PM_PARENT_PID" ]; then
 	my_environment=`set`
 
 	# If we are already root, unset this to avoid potential conflict
-	[ `ps -o uid= $$` -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
+	[ `id -g` -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
 fi
 
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.16"
+	echo '' ; echo "===>>> Version 3.16-git"
 	#svn='$FreeBSD: user/dougb/portmaster/portmaster 241090 2012-10-01 08:32:05Z dougb $'
 }
 
