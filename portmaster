@@ -33,7 +33,7 @@ if [ -z "$PM_PARENT_PID" ]; then
 	my_environment=`set`
 
 	# If we are already root, unset this to avoid potential conflict
-	[ `ps -o uid= $$` -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
+	[ `id -g` -eq 0 ] && unset PM_SU_CMD PM_SU_VERBOSE
 fi
 
 #=============== Begin functions we always want to have ===============
