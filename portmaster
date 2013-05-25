@@ -15,7 +15,6 @@ if [ -z "$PM_PARENT_PID" ]; then
 
 	# /usr/local is needed in the path for make
 	PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-	[ -e /usr/X11R6 ] && [ ! -L /usr/X11R6 ] && PATH=$PATH:/usr/X11R6/bin
 	[ -n "$CCACHE_PATH" -a -z "$NOCCACHE" ] && PATH="/usr/local/libexec/ccache:$PATH"
 	export PM_PARENT_PID TMPDIR UPGRADE_TOOL PATH
 
