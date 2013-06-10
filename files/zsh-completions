@@ -59,9 +59,16 @@ _arguments -A "-*" : \
   "--version[display the version number]" \
   '*:Packages and Ports:->pkgs_ports'
 
+if TMPDIR=/dev/null ASSUME_ALWAYS_YES=1 \
+  PACKAGESITE=file:///nonexistent \
+  pkg info pkg >/dev/null 2>&1; then
+    with_pkgng=1
+else
+    with_pkgng=0
+fi
 case "$state" in
   pkgs)
-    if [ -n "$(make -f /usr/share/mk/bsd.port.mk -V WITH_PKGNG)" ]; then
+    if [ $with_pkgng -eq 1 ]; then
       array=($(pkg info -aq))
     else
       array=("${PKG_DBDIR:-/var/db/pkg}"/*(/:t))
@@ -75,7 +82,7 @@ case "$state" in
     _tags packages ports
     while _tags; do
       if _requested packages; then
-        if [ -n "$(make -f /usr/share/mk/bsd.port.mk -V WITH_PKGNG)" ]; then
+        if [ $with_pkgng -eq 1 ]; then
           array=($(pkg info -aq))
         else
           array=("${PKG_DBDIR:-/var/db/pkg}"/*(/:t))

@@ -3,7 +3,9 @@
 _pkgs_list() {
 	local dbdir="$1"
 	shift 1 # the rest will be passed diretly to compgen
-	if [ -n "$(make -f /usr/share/mk/bsd.port.mk -V WITH_PKGNG)" ]; then
+	if TMPDIR=/dev/null ASSUME_ALWAYS_YES=1 \
+	    PACKAGESITE=file:///nonexistent \
+	    pkg info pkg >/dev/null 2>&1; then
 		compgen -W "$(pkg info -aq)" $*
 	else
 		cd ${dbdir} && compgen -d $*
