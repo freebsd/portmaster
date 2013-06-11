@@ -397,7 +397,6 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	[ -n "$port_dbdir" ] && export port_dbdir
 
 	# Detect if pkgng is being used
-	use_pkgng=
 	TMPDIR=/dev/null ASSUME_ALWAYS_YES=1 \
 	    PACKAGESITE=file:///nonexistent \
 	    pkg info pkg >/dev/null 2>&1 && use_pkgng=yes
