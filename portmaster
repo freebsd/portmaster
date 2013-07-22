@@ -1656,7 +1656,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 				echo "	===>>> $pd/$origin does not exist for $pkg"
 				continue
 			fi
-			unique_list="${unique_list}`make -V UNIQUENAME`:"
+			unique_list="${unique_list}`make -V UNIQUENAME -V OPTIONS_NAME | tr '\n' ':'`"
 		done
 	else
 		while read pkg origin; do
@@ -1670,7 +1670,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 				echo "	===>>> $pd/$origin does not exist for $pkg"
 				continue
 			fi
-			unique_list="${unique_list}`make -V UNIQUENAME`:"
+			unique_list="${unique_list}`make -V UNIQUENAME -V OPTIONS_NAME | tr '\n' ':'`"
 		done << EOF
 `pkg query -a "%n-%v %o"`
 EOF
