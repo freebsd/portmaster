@@ -399,7 +399,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	# Detect if pkgng is being used
 	TMPDIR=/dev/null ASSUME_ALWAYS_YES=1 \
 	    PACKAGESITE=file:///nonexistent \
-	    pkg info pkg >/dev/null 2>&1 && use_pkgng=yes
+	    pkg info -x 'pkg(-devel)?$' >/dev/null 2>&1 && use_pkgng=yes
 	[ -n "$use_pkgng" ] && export use_pkgng
 fi
 

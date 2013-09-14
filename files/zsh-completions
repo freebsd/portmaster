@@ -61,7 +61,7 @@ _arguments -A "-*" : \
 
 if TMPDIR=/dev/null ASSUME_ALWAYS_YES=1 \
   PACKAGESITE=file:///nonexistent \
-  pkg info pkg >/dev/null 2>&1; then
+  pkg info -x 'pkg(-devel)?$' >/dev/null 2>&1; then
     with_pkgng=1
 else
     with_pkgng=0
