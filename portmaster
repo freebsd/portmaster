@@ -27,15 +27,17 @@ if [ -z "$PM_PARENT_PID" ]; then
 		exit 1
 	fi
 
+	PM_RC_FILES=""
+
 	set -o allexport
 	# Read a global rc file first
-	[ -s /usr/local/etc/portmaster.rc ] && . /usr/local/etc/portmaster.rc
+	[ -s /usr/local/etc/portmaster.rc ] && { . /usr/local/etc/portmaster.rc; PM_RC_FILES="${PM_RC_FILES} /usr/local/etc/portmaster.rc"; }
 
 	# Allow the config file to be stored with the script
-	[ -s "${0%/*}/portmaster.rc" ] && . ${0%/*}/portmaster.rc
+	[ -s "${0%/*}/portmaster.rc" ] && { . ${0%/*}/portmaster.rc; PM_RC_FILES="${PM_RC_FILES} ${0%/*}/portmaster.rc"; }
 
 	# Read a local one next, and allow the command line to override
-	[ -s "$HOME/.portmasterrc" ] && . $HOME/.portmasterrc
+	[ -s "$HOME/.portmasterrc" ] && { . $HOME/.portmasterrc; PM_RC_FILES="${PM_RC_FILES} ${HOME}/.portmasterrc"; }
 	set +o allexport
 
 	my_environment=`set`
@@ -317,19 +319,21 @@ safe_exit () {
 	exit ${1:-0}
 } # safe_exit()
 
-pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
-pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
+pm_cd        () { builtin cd $1 2>/dev/null || return 1; }
+pm_cd_pd     () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 		builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
-pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
-pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
+pm_kill      () { /bin/kill $* >/dev/null 2>/dev/null; }
+pm_make_args () { /usr/bin/grep "^#make#${1}: " $PM_RC_FILES 2>/dev/null \
+		| /usr/bin/awk -F': ' '{print $NF}'; }
+pm_make      () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
-pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
-pm_mktemp () {
+pm_make_b    () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
+pm_mktemp    () {
 	pm_mktemp_file=`/usr/bin/mktemp -t f-${PM_PARENT_PID}-$1 2>&1` ||
 		fail "mktemp for $1 failed:\n       ${pm_mktemp_file#mktemp: }"
 }
-pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
+pm_unlink    () { [ -e "$1" ] && /bin/unlink $1; }
 
 # Superuser versions for commands that need root privileges
 
@@ -3981,6 +3985,11 @@ if [ -z "$use_package" ]; then
 	fi
 
 	[ -n "$PM_NO_MAKE_CONFIG" ] && PM_MAKE_ARGS="$PM_MAKE_ARGS -D_OPTIONS_OK"
+
+	if [ -z "${PM_MAKE_ARGS}" -a ! -z "${PM_RC_FILES}" ]; then
+		PM_MAKE_ARGS=`pm_make_args ${portdir}`
+		[ ! -z "${PM_MAKE_ARGS}" ] && echo "===>>> Building with make args: ${PM_MAKE_ARGS}"
+	fi
 
 	eval pm_make $port_log_args || fail "make failed for $portdir"
 else

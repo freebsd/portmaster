@@ -36,6 +36,9 @@
 # Arguments to pass to make (-m)
 # PM_MAKE_ARGS='-DFORCE_PKG_REGISTER'
 #
+# Port specific arguments to pass to make
+# #make#ports-mgmt/portmaster: WITH_PKGNG=yes
+#
 # Recurse through every dependency, and child dependencies (-t)
 #
 # NOTE:	USE OF THIS OPTION IN YOUR CONFIG FILE IS NOT RECOMMENDED
