@@ -581,7 +581,7 @@ origin_from_pdb () {
 		o=`grep -m1 '@comment ORIGIN:' $pdb/$1/+CONTENTS 2>/dev/null` && {
 			echo ${o#@comment ORIGIN:}; return 0; }
 	else
-		pkg info -qo $1 2>/dev/null && return 0
+		pkg query '%o' $1 2>/dev/null && return 0
 	fi
 
 	case "$1" in bsdpan-*) return 3 ;; esac
@@ -972,7 +972,7 @@ iport_from_origin () {
 	local sn dir
 
 	if [ -n "$use_pkgng" ]; then
-		pkg info -qO ${1} || return 1
+		pkg query '%n-%v' ${1} || return 1
 		return
 	fi
 	sn=${1#*/} ; sn=${sn%-*} ; sn=${sn%%[0-9]*}
