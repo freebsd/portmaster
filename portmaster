@@ -1717,8 +1717,8 @@ check_state () {
 	# Global: state
 	local state_set
 
-	if egrep -ql '^(FORBIDDEN|DEPRECATED|BROKEN|IGNORE)' Makefile; then
-		for state in FORBIDDEN DEPRECATED BROKEN IGNORE; do
+	if egrep -ql '^(FORBIDDEN|BROKEN|IGNORE)' Makefile; then
+		for state in FORBIDDEN BROKEN IGNORE; do
 			state_set=`pm_make -V $state`
 			if [ -n "$state_set" ]; then
 				echo "	===>>> This port is marked $state"
