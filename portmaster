@@ -1589,8 +1589,15 @@ fi	# [ -n "$CLEAN_PACKAGES" ]
 
 if [ -n "$CHECK_DEPENDS" ]; then
 	if [ -n "$use_pkgng" ]; then
-		# TODO
-		pkg check -adv
+		missing_deps=$(pkg check -dn)
+		pkg query "%o %do" | while read origin dep; do
+			for missing_dep in ${missing_deps}; do
+				if [ "${missing_dep}" = "${dep}" ]; then
+					echo "${origin} requires missing ${dep}"
+					break
+				fi
+			done
+		done
 		exit
 	fi
 	PM_VERBOSE=pmv_check_depends
