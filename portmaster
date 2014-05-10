@@ -107,7 +107,7 @@ kill_bad_children () {
         [ -z "$displayed_background_msg" ] && echo "===>>> Killing background jobs"
         displayed_background_msg=1
 
-	ps -axo pid,ppid,pgid,command | sed '1d' | while read pid ppid pgid command; do
+	while read pid ppid pgid command; do
 		[ "$pid" -gt 25 ] || continue
 		case "$ppid" in
 		1)	case "$command" in
@@ -121,7 +121,10 @@ kill_bad_children () {
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill $pid ;;
 			esac ;;
 		esac
-	done
+	done <<-EOF
+	$(ps -axo pid,ppid,pgid,command | sed '1d')
+	EOF
+
 }
 
 parent_exit () {
