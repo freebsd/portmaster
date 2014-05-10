@@ -1681,9 +1681,9 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 				continue
 			fi
 			unique_list="${unique_list}`make -V UNIQUENAME -V OPTIONS_NAME | tr '\n' ':'`"
-		done << EOF
-`pkg query -a "%n-%v %o"`
-EOF
+		done <<-EOF
+		$(pkg query -a "%n-%v %o")
+		EOF
 	fi
 
 	echo "===>>> Checking $port_dbdir"
@@ -2971,9 +2971,9 @@ urb_update () {
 				case " $PM_URB_IPORTS" in *" $req_by "*) continue ;; esac
 				case " $PM_URB_ORIGINS" in *" $req_by_o "*) continue ;; esac
 				PM_URB_LIST="${PM_URB_LIST} ${req_by}"
-			done << EOF
-`pkg query "%rn-%rv %ro" ${origin}`
-EOF
+			done <<-EOF
+			$(pkg query "%rn-%rv %ro" ${origin})
+			EOF
 		fi
 	done
 
