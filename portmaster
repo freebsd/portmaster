@@ -321,7 +321,7 @@ pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 		builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
-pm_kill   () { /bin/kill $* >/dev/null 2>/dev/null; }
+pm_kill   () { kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
 pm_make_b () { /usr/bin/make $PM_MAKE_ARGS BEFOREPORTMK=bpm $*; }
