@@ -104,9 +104,6 @@ kill_bad_children () {
 
 	mypgid=`ps -o pgid= -p $PM_PARENT_PID`
 
-        [ -z "$displayed_background_msg" ] && echo "===>>> Killing background jobs"
-        displayed_background_msg=1
-
 	while read pid ppid pgid command; do
 		[ "$pid" -gt 25 ] || continue
 		case "$ppid" in
@@ -262,7 +259,6 @@ parent_exit () {
 		echo "       ${0##*/} <flags>${PM_NEEDS_UPDATE}"
 		echo ''
 	fi
-	echo "===>>> Exiting"
 }
 
 safe_exit () {
