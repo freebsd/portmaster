@@ -1706,12 +1706,15 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 fi
 
 if [ -n "$LIST_ORIGINS" ]; then
-	ports_by_category
-
-	for iport in $roots $leaves; do
-		origin=`origin_from_pdb $iport` || continue
-		echo $origin
-	done
+	if [ -z "$use_pkgng" ]; then
+		ports_by_category
+		for iport in $roots $leaves; do
+			origin=`origin_from_pdb $iport` || continue
+			echo $origin
+		done
+	else
+		pkg query -e '%#r = 0' '%o'
+	fi
 
 	exit 0
 fi
