@@ -3992,7 +3992,12 @@ if [ -z "$use_package" ]; then
 
 	[ -n "$PM_NO_MAKE_CONFIG" ] && PM_MAKE_ARGS="$PM_MAKE_ARGS -D_OPTIONS_OK"
 
-	eval pm_make $port_log_args || fail "make failed for $portdir"
+	eval pm_make build $port_log_args || fail "make build failed for $portdir"
+
+	pm_sv Running make stage
+	# Defining NO_DEPENDS ensures that we will control the installation
+	# of the depends, not bsd.port.mk.
+	eval pm_make -DNO_DEPENDS stage $port_log_args || fail "make stage failed for $portdir"
 else
 	[ -z "$local_package" ] && {
 		fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"; }
