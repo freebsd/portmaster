@@ -3209,6 +3209,7 @@ make_config () {
 # INIT Parent
 
 if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
+	[ -f Makefile ] || pm_cd
 	CUR_DEPS=':' ; DISPLAY_LIST='' ; INSTALLED_LIST=''
 	PM_DEPTH='' ; pm_mktemp IPC_SAVE ; IPC_SAVE=$pm_mktemp_file
 	PM_FIRST_PASS=pm_first_pass ; PM_NEEDS_UPDATE=' '	# Used with -F for multiport and -a
