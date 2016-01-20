@@ -469,8 +469,9 @@ usage () {
 	echo '-w save old shared libraries before deinstall'
 	echo '[-R] -f always rebuild ports (overrides -i)'
 	echo '-i interactive update mode -- ask whether to rebuild ports'
-	echo '-D no cleaning of distfiles'
+	echo '-D no cleaning of distfiles (default, this option does nothing)'
 	echo '-d always clean distfiles'
+	echo '--prompt-clean-distfiles prompt to clean distfiles'
 	echo "-m <arguments for the 'make' command line>"
 	echo "-x <avoid building or updating ports that match this pattern>"
 	echo '   Can be specified more than once'
@@ -690,6 +691,7 @@ for var in "$@" ; do
 				export PM_INDEX PM_INDEX_ONLY ;;
 	--help)			usage 0 ;;
 	--version)		version ; exit 0 ;;
+	--prompt-clean-distfiles)	PROMPT_SCRUB_DISTFILES=prompt_clean_distfiles ;;
 	--clean-distfiles)	CLEAN_DISTFILES=clean_distfiles ;;
 	--clean-distfiles-all)	echo "===>>> The -all form is deprecated, please use -y instead"
 				CLEAN_DISTFILES=clean_distfiles ; PM_YES=yopt ;;
@@ -808,6 +810,14 @@ fi
 if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
 	test_command_line ALWAYS_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
 		fail "The -d and -D options are mutually exclusive"
+fi
+if [ -n "$PROMPT_SCRUB_DISTFILES" -a -n "$DONT_SCRUB_DISTFILES" ]; then
+	test_command_line PROMPT_SCRUB_DISTFILES DONT_SCRUB_DISTFILES ||
+		fail "The --prompt-clean-distfiles and -D options are mutually exclusive"
+fi
+if [ -n "$ALWAYS_SCRUB_DISTFILES" -a -n "$PROMPT_SCRUB_DISTFILES" ]; then
+	test_command_line ALWAYS_SCRUB_DISTFILES PROMPT_SCRUB_DISTFILES ||
+		fail "The -d and --prompt-clean-distfiles options are mutually exclusive"
 fi
 
 [ -n "$PM_NO_MAKE_CONFIG" -a -n "$PM_FORCE_CONFIG" ] && unset PM_NO_MAKE_CONFIG
@@ -937,12 +947,19 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 		if [ -n "$pd" ] && [ -d "$pd" ]; then
 			export pd
 		else
-			if [ -z "$DONT_SCRUB_DISTFILES" ]; then
+			if [ -n "$ALWAYS_SCRUB_DISTFILES" -o -n "$PROMPT_SCRUB_DISTFILES" ]; then
 				pm_v "===>>> There is no ports tree, so using -D option"
 				unset ALWAYS_SCRUB_DISTFILES
+				unset PROMPT_SCRUB_DISTFILES
 				DONT_SCRUB_DISTFILES=Dopt_es; ARGS="-D $ARGS"
 			fi
 		fi
+	fi
+
+	# set DONT_SCRUB_DISTFILES for convenience if neither
+	# ALWAYS_SCRUB_DISTFILES nor PROMPT_SCRUB_DISTFILES are set
+	if [ -z "$ALWAYS_SCRUB_DISTFILES" -a -z "$PROMPT_SCRUB_DISTFILES" ]; then
+		DONT_SCRUB_DISTFILES=Dopt_implicit; ARGS="-D $ARGS"
 	fi
 
 	if [ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
