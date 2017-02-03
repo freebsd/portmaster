@@ -1307,7 +1307,7 @@ read_distinfos_all () {
 
 	for origin in ${pd}/*/*; do
 		case "${origin#$pd/}" in
-		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS) continue ;; esac
+		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS|base/*) continue ;; esac
 
 		[ -d "$origin" ] || continue
 
