@@ -47,7 +47,7 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.17.9"
+	echo '' ; echo "===>>> Version 3.17.10"
 	#svn='$FreeBSD: user/dougb/portmaster/portmaster 241090 2012-10-01 08:32:05Z dougb $'
 }
 
