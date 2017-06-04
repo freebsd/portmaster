@@ -1914,9 +1914,9 @@ pm_pkg_create () {
 	pm_cd $pkgdir || fail "Cannot cd into $pkgdir to create a package"
 	local pkg_create
 	if [ -z "$use_pkgng" ]; then
-		pkg_create="pkg_create -b"
+		pkg_create="pkg_create ${PM_PKG_CREATE_OPTS} -b"
 	else
-		pkg_create="pkg create "
+		pkg_create="pkg create ${PM_PKG_CREATE_OPTS}"
 	fi
 	if $PM_SU_CMD $pkg_create $2; then
 		if [ "$1" = "$pbu" ]; then
