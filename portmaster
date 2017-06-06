@@ -838,12 +838,6 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	    fail 'The -[ar] options are not compatible with other updates'
 
 	if [ -n "$PM_PACKAGES" -o -n "$PM_PACKAGES_BUILD" ]; then
-		if [ -n "$use_pkgng" ]; then
-			unset PM_PACKAGES PM_PACKAGES_BUILD PM_PACKAGES_LOCAL PM_PACKAGES_NEWER PM_ALWAYS_FETCH PM_DELETE_PACKAGES
-			echo "===>>> Package installation support cannot be used with pkgng yet,"
-			echo "       it will be disabled"
-			echo ''
-		fi
 		[ `/sbin/sysctl -n kern.osreldate 2>/dev/null` -lt 600400 ] &&
 			fail Package installation support requires FreeBSD 6.4 or newer
 	fi
@@ -3802,15 +3796,16 @@ fetch_package () {
 	echo "===>>> Checking package repository for latest available version"
 
 	if [ -n "$LOCAL_PACKAGEDIR" ]; then
-		if [ -r "${LOCAL_PACKAGEDIR}/All/${new_port}.tbz" ]; then
-			local_package=${LOCAL_PACKAGEDIR}/All/${new_port}.tbz
+		pkgext=`pm_make -V PKG_SUFX`
+		if [ -r "${LOCAL_PACKAGEDIR}/All/${new_port}${pkgext}" ]; then
+			local_package=${LOCAL_PACKAGEDIR}/All/${new_port}${pkgext}
 			latest_pv=${local_package##*/}
 		fi
 		if [ -z "$latest_pv" -a -z "$PM_INDEX_ONLY" ]; then
 			s=`pm_make -V LATEST_LINK`
-			if [ -r "${LOCAL_PACKAGEDIR}/Latest/${s}.tbz" ]; then
-				local_package=${LOCAL_PACKAGEDIR}/Latest/${s}.tbz
-				latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}.tbz`
+			if [ -r "${LOCAL_PACKAGEDIR}/Latest/${s}${pkgext}" ]; then
+				local_package=${LOCAL_PACKAGEDIR}/Latest/${s}${pkgext}
+				latest_pv=`readlink ${LOCAL_PACKAGEDIR}/Latest/${s}${pkgext}`
 				latest_pv=${latest_pv##*/}
 			else
 				pm_v "===>>> No local package for ${new_port}, attempting fetch"
@@ -3874,6 +3869,7 @@ fetch_package () {
 	else
 		latest_pv=${latest_pv#*href=\"}
 		latest_pv=${latest_pv%%\.tbz*}
+		latest_pv=${latest_pv%%\.txz*}
 	fi
 
 notnewer () {
@@ -4138,13 +4134,24 @@ else
 	[ -n "$local_package" ] && ppd=${LOCAL_PACKAGEDIR}/All
 
 	echo "===>>> Installing package"
-	if $PM_SU_CMD pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz; then
-		if [ -n "$PM_DELETE_PACKAGES" ]; then
-			pm_v "===>>> Deleting ${latest_pv}.tbz"
-			pm_unlink_s ${ppd}/${latest_pv}.tbz
+	if [ -z "$use_pkgng" ]; then
+		if $PM_SU_CMD pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz; then
+			if [ -n "$PM_DELETE_PACKAGES" ]; then
+				pm_v "===>>> Deleting ${latest_pv}.tbz"
+				pm_unlink_s ${ppd}/${latest_pv}.tbz
+			fi
+		else
+			install_failed ${latest_pv}.tbz
 		fi
 	else
-		install_failed ${latest_pv}.tbz
+		if $PM_SU_CMD pkg add ${ppd}/${latest_pv}.txz; then
+			if [ -n "$PM_DELETE_PACKAGES" ]; then
+				pm_v "===>>> Deleting ${latest_pv}.txz"
+				pm_unlink_s ${ppd}/${latest_pv}.txz
+			fi
+		else
+			install_failed ${latest_pv}.txz
+		fi
 	fi
 fi
 
