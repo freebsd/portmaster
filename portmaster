@@ -1648,7 +1648,7 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 	unique_list=':'
 
 	echo "===>>> Building list of installed port names"; echo ''
-	all_pkgs_by_origin | while read pkg origin; do
+	while read pkg origin; do
 		if [ ! -d "$pd/$origin" ]; then
 			find_moved_port $origin $pkg nonfatal >/dev/null
 			[ -n "$moved_npd" ] || continue
@@ -1660,7 +1660,9 @@ if [ -n "$CHECK_PORT_DBDIR" ]; then
 			continue
 		fi
 		unique_list="${unique_list}`make -V UNIQUENAME -V OPTIONS_NAME | tr '\n' ':'`"
-	done
+	done <<-EOF
+	$(all_pkgs_by_origin)
+	EOF
 
 	echo "===>>> Checking $port_dbdir"
 
