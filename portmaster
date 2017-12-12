@@ -498,7 +498,7 @@ usage () {
 	echo '-n answer no to all user prompts for the features below'
 	echo '-y answer yes to all user prompts for the features below'
 	echo ''
-	echo '[-n|y] [-b] [-D|d] -e expunge one port via pkg_delete, and remove its distfiles'
+	echo '[-n|y] [-b] [-D|d] -e expunge one port via pkg delete, and remove its distfiles'
 	echo '[-n|y] [-b] [-D|d] -s clean out stale ports that used to be depended on'
 	echo ''
 	echo '[-t] [-n] --clean-distfiles offer to delete stale distfiles'
@@ -1553,7 +1553,7 @@ pm_pkg_create () {
 	fi
 
 	pm_cd $pkgdir || fail "Cannot cd into $pkgdir to create a package"
-	if $PM_SU_CMD pkg create ${PM_PKG_CREATE_OPTS} $2; then
+	if $PM_SU_CMD pkg create $2; then
 		if [ "$1" = "$pbu" ]; then
 			if [ -n "$BACKUP" ]; then
 				echo "	===>>> Package saved to $1" ; echo ''
@@ -1963,7 +1963,6 @@ if [ -n "$CLEAN_STALE" ]; then
 		fi
 
 		echo '' ; pkg info -f $iport
-		pkg_delete="pkg delete"
 
 		get_answer_yn n "\t===>>> ${iport} is no longer depended on, delete"
 		case "$?" in
@@ -2361,7 +2360,7 @@ dependency_check () {
 					if [ "${d_port#$pd/}" = "$portdir" ]; then
 						echo -e "\n===>>> $origin seems to depend on $portdir"
 						echo '       which looks like a dependency loop'
-						fail "Try pkg_updating $portdir"
+						fail "Try pkg updating $portdir"
 					fi
 
 					echo ''
@@ -3384,7 +3383,7 @@ fetch_package () {
 		fi
 		[ -z "$PM_PACKAGES_LOCAL" ] && echo "	${sitepath}"
 		echo ''
-		echo "       Check the pkg_add(1) man page for information"
+		echo "       Check the pkg-add(8) man page for information"
 		echo "       on setting the PACKAGESITE environment variable"
 		[ "$PM_PACKAGES" = only -a -z "$FETCH_ONLY" ] && fail $ponly_err
 		if [ -n "$FETCH_ONLY" ]; then
@@ -3546,8 +3545,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		    grep -v ^$LOCALBASE_COMPAT > $pm_mktemp_file
 
 		unset temp
-		pkglist="pkg query %Fp"
-		for file in `$pkglist $UPGRADE_PORT |
+		for file in `pkg query %Fp $UPGRADE_PORT |
 		    sort - $pm_mktemp_file | uniq -d`; do
 			temp="${temp}$file "
 		done
@@ -3571,7 +3569,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then
 		# Delete any existing versions of the old port
 		np_orphan=`pkg query "%a" $ro_upg_port`
-		pm_sv "Running pkg_delete for $ro_upg_port"
+		pm_sv "Running pkg delete for $ro_upg_port"
 		pm_pkg_delete_s $ro_upg_port
 	fi
 
@@ -3594,7 +3592,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		if [ "${np_orphan:-1}" -eq 1 ]; then
 			np_orphan=`pkg query "%a" $upg_port`
 		fi
-		pm_sv "Running pkg_delete for $upg_port"
+		pm_sv "Running pkg delete for $upg_port"
 		pm_pkg_delete_s $upg_port
 	fi
 
@@ -3659,7 +3657,7 @@ else
 	[ -n "$local_package" ] && ppd=${LOCAL_PACKAGEDIR}/All
 
 	echo "===>>> Installing package"
-	if $PM_SU_CMD pkg_add --no-deps --force ${ppd}/${latest_pv}.tbz; then
+	if $PM_SU_CMD pkg add --accept-missing --force ${ppd}/${latest_pv}.tbz; then
 		if [ -n "$PM_DELETE_PACKAGES" ]; then
 			pm_v "===>>> Deleting ${latest_pv}.tbz"
 			pm_unlink_s ${ppd}/${latest_pv}.tbz
@@ -3684,8 +3682,7 @@ echo ''
 temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
 if [ -z "$temp" ] && [ -d "$LOCALBASE_COMPAT" ]; then
 	unset files
-	pkglist="pkg query %Fp"
-	for file in `$pkglist $new_port`; do
+	for file in `pkg query %Fp $new_port`; do
 		[ -f "${LOCALBASE_COMPAT}/${file##*/}" ] &&
 			files="${files}${LOCALBASE_COMPAT}/${file##*/} "
 	done
