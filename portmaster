@@ -318,6 +318,9 @@ pm_mktemp () {
 		fail "mktemp for $1 failed:\n       ${pm_mktemp_file#mktemp: }"
 }
 pm_unlink () { [ -e "$1" ] && /bin/unlink $1; }
+pm_islocked	() { [ -n "$1" ] || return 1;
+			[ -e "$pdb/$1/+IGNOREME" ] && pkg info -e "$1" ||
+			[ `pkg query %k "$1"` -eq "1" ]; }
 
 # Superuser versions for commands that need root privileges
 
@@ -553,7 +556,7 @@ origin_from_pdb () {
 
 	case "$1" in bsdpan-*) return 3 ;; esac
 
-	if [ -e "$pdb/$1/+IGNOREME" ] && pkg info -e $1; then
+	if pm_islocked "$1"; then
 		if [ -n "$PM_VERBOSE" -o -n "$LIST_ORIGINS" ]; then
 			# An error above doesn't necessarily mean there's
 			# a problem in +MANIFEST, so don't mention it
@@ -985,7 +988,7 @@ find_moved_port () {
 	for l in `grep "^$sf|" $pd/MOVED`; do
 		case "$l" in
 		${sf}\|\|*) [ -n "$iport" ] || iport=`iport_from_origin $sf`
-			if [ -e "$pdb/$iport/+IGNOREME" ] && pkg info -e $iport; then
+			if pm_islocked $iport; then
 				if [ -n "$PM_VERBOSE" ]; then
 					echo ''
 					echo "	===>>> The $sf port has been deleted"
@@ -1020,7 +1023,7 @@ find_moved_port () {
 		echo ''
 
 		[ -n "$iport" ] || iport=`iport_from_origin $sf`
-		[ -e "$pdb/$iport/+IGNOREME" ] && pkg info -e $iport || return 1
+		pm_islocked $iport || return 1
 	fi
 	return 0
 }
@@ -1433,7 +1436,7 @@ check_for_updates () {
 
 	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ] && [ -d "$pd/$origin" ]; then
 		if ! pm_cd $pd/$origin; then
-			if [ -e "$pdb/$iport/+IGNOREME" ] && pkg info -e $iport; then
+			if pm_islocked "$iport"; then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
 				echo "	===>>> Continuing due to $pdb/$iport/+IGNOREME"
 				echo ''
@@ -1450,7 +1453,7 @@ check_for_updates () {
 
 		# If the port has moved and no +IGNOREME, we have to update it
 		if [ -n "$moved_npd" ]; then
-			if [ -e "$pdb/$iport/+IGNOREME" ] && pkg info -e $iport; then
+			if pm_islocked "$iport"; then
 				echo "	===>>> Continuing due to $pdb/$iport/+IGNOREME"
 				echo ''
 				CUR_DEPS="${CUR_DEPS}${iport}:${origin}:"
@@ -1496,7 +1499,7 @@ check_for_updates () {
 	if [ -n "$LIST_PLUS" ]; then
 		if [ -z "$moved_npd" ]; then
 			echo "	===>>> New version available: $port_ver"
-			if [ -e "$pdb/$iport/+IGNOREME" ] && pkg info -e $iport; then
+			if pm_islocked "$iport"; then
 				echo "	===>>> +IGNOREME file is present for $1"
 			fi
 			pm_cd_pd $origin && check_state
@@ -2012,9 +2015,9 @@ check_interactive () {
 	case "$INTERACTIVE_YES" in *:${1}:*) return 0 ;; esac
 	case "$INTERACTIVE_NO" in *:${1}:*) return 1 ;; esac
 
-	if [ -e "$pdb/$1/+IGNOREME" ] && pkg info -e $1; then
+	if pm_islocked $1; then
 		echo ''
-		echo "===>>> +IGNOREME file is present for $1"
+		echo "===>>> package is locked or +IGNOREME file is present for $1"
 		echo ''
 		get_answer_g n y "===>>> Update ${1}${update_to}? y/n"
 
@@ -3038,7 +3041,7 @@ if [ -z "$PM_INDEX_ONLY" ] && [ ! -d "$pd/$portdir" ]; then
 fi
 [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ] && upg_port=`iport_from_origin ${portdir}`
 
-if [ -e "$pdb/$upg_port/+IGNOREME" ] && pkg info -e $upg_port; then
+if pm_islocked "$upg_port"; then
 	# Adding to CUR_DEPS means we will not get here in the build
 	if [ -z "$PM_BUILDING" ]; then
 		# Only need to prompt for this once if -ai
