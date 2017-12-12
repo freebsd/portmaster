@@ -152,7 +152,7 @@ parent_exit () {
 	[ -n "$need_kbc" ] && kill_bad_children
 
 	[ -n "$pbu" ] && pbu=`find $pbu -type d -empty 2>/dev/null`
-	if [ -d "$pbu" ]; then
+	if pm_isdir "$pbu"; then
 		pm_sv 'Removing empty backup package directory'
 		pm_rmdir_s $pbu
 	fi
@@ -309,6 +309,8 @@ pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 		builtin cd $pd/$1 2>/dev/null ||
 		fail "Cannot cd to port directory: $pd/$1"; }
+pm_isdir	() { builtin test -d "$1"; }
+pm_isdir_pd	() { builtin test -d "$pd/$1"; }
 pm_kill   () { kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
@@ -348,7 +350,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -z "$pd" ]; then
 		if [ -z "$PORTSDIR" ]; then
 			pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
-			[ -z "$pd" ] && [ -d /usr/ports ] && pd=/usr/ports
+			[ -z "$pd" ] && pm_isdir /usr/ports && pd=/usr/ports
 		else
 			pd=$PORTSDIR
 		fi
@@ -361,14 +363,14 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 
 	if [ -z "$pdb" ]; then
 		if [ -z "$PKG_DBDIR" ]; then
-			[ -d /var/db/pkg ] && pdb=/var/db/pkg
+			pm_isdir /var/db/pkg && pdb=/var/db/pkg
 			[ -z "$pdb" ] &&
 				pdb=`pm_make -f/usr/share/mk/bsd.port.mk -V PKG_DBDIR 2>/dev/null`
 		else
 			pdb=$PKG_DBDIR
 		fi
 		if [ -z "$pdb" ]; then
-			if [ -d /var/db/pkg ]; then
+			if pm_isdir /var/db/pkg; then
 				pdb='/var/db/pkg'
 			else
 				fail 'The value of PKG_DBDIR cannot be empty'
@@ -377,7 +379,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 	export pdb
 
-	[ -z "$port_dbdir" ] && [ -d /var/db/ports ] && port_dbdir=/var/db/ports
+	[ -z "$port_dbdir" ] && pm_isdir /var/db/ports && port_dbdir=/var/db/ports
 	[ -z "$port_dbdir" ] &&
 		port_dbdir=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORT_DBDIR 2>/dev/null`
 	[ -n "$port_dbdir" ] && export port_dbdir
@@ -887,7 +889,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 			fail 'The value of PORTSDIR cannot be empty'
 		fi
 	else
-		if [ -n "$pd" ] && [ -d "$pd" ]; then
+		if [ -n "$pd" ] && pm_isdir "$pd" ]; then
 			export pd
 		else
 			if [ -z "$DONT_SCRUB_DISTFILES" ]; then
@@ -901,7 +903,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -z "$DISTDIR" -a "$PM_PACKAGES" != only -a -z "$CHECK_DEPENDS" -a \
 	    -z "$CHECK_PORT_DBDIR" -a -z "$LIST_ORIGINS" ]; then
 		if ! DISTDIR=`pm_make_b -f/usr/share/mk/bsd.port.mk -V DISTDIR 2>/dev/null`; then
-			if [ ! -d "$PWD" ]; then
+			if ! pm_isdir "$PWD"; then
 				echo ''
 				echo "===>>> Your current working directory no longer seems to exist"
 				fail 'Try: cd'
@@ -1042,7 +1044,7 @@ read_distinfos () {
 	echo ''
 
 	all_pkgs_by_origin | while read iport origin; do
-		if [ ! -d "$pd/$origin" ]; then
+		if ! pm_isdir_pd "$origin"; then
 			find_moved_port $origin $iport nonfatal >/dev/null
 			[ -n "$moved_npd" ] || continue
 			origin=$moved_npd
@@ -1096,7 +1098,7 @@ read_distinfos_all () {
 		case "${origin#$pd/}" in
 		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS|base/*) continue ;; esac
 
-		[ -d "$origin" ] || continue
+		pm_isdir "$origin" ] || continue
 
 		if [ -s "${origin}/distinfo" ]; then
 			distinfo="${origin}/distinfo"
@@ -1232,7 +1234,7 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		origin=${origin#origin: }
 
 		if [ -z "$PM_INDEX" ]; then
-			if [ -d "$pd/$origin" ]; then
+			if pm_isdir_pd "$origin"; then
 				pm_cd $pd/$origin && port_ver=`pm_make -V PKGNAME`
 				[ -n "$port_ver" ] || fail "Is $pd/$origin/Makefile missing?"
 			else
@@ -1320,14 +1322,14 @@ if [ -n "$CHECK_DEPENDS" ]; then
 fi
 
 if [ -n "$CHECK_PORT_DBDIR" ]; then
-	[ -d "$port_dbdir" ] ||
+	pm_isdir "$port_dbdir" ||
 		fail 'PORT_DBIR is empty, or the directory $port_dbdir does not exist'
 
 	unique_list=':'
 
 	echo "===>>> Building list of installed port names"; echo ''
 	while read pkg origin; do
-		if [ ! -d "$pd/$origin" ]; then
+		if ! pm_isdir_pd "$origin"; then
 			find_moved_port $origin $pkg nonfatal >/dev/null
 			[ -n "$moved_npd" ] || continue
 			origin=$moved_npd
@@ -1530,7 +1532,7 @@ init_packages () {
 
 	pbu=$PACKAGES/portmaster-backup
 
-	if [ ! -d "$pbu" ]; then
+	if ! pm_isdir "$pbu"; then
 		pm_sv Creating $pbu
 		pm_mkdir_s $pbu
 	fi
@@ -1641,7 +1643,7 @@ find_dl_distfiles () {
 		pm_unlink_s $dist_list
 
 		local dir=`find ${dist_list%/distfiles} -type d -empty 2>/dev/null`
-		if [ -d "$dir" ]; then
+		if pm_isdir "$dir"; then
 			pm_sv Deleting empty $dir directory
 			pm_rmdir_s $dir
 		fi
@@ -1724,7 +1726,7 @@ make_port_subdir () {
 set_distfiles_and_subdir () {
 	[ -z "$dist_list_files" ] && find_dl_distfiles $1
 
-	if [ -d "$pd/$1" ]; then
+	if pm_isdir_pd "$1"; then
 		pm_cd_pd $1
 	else
 		return 1
@@ -1737,7 +1739,7 @@ set_distfiles_and_subdir () {
 
 	[ -n "$full_port_subdir" ] || make_port_subdir
 
-	if [ -d "$full_port_subdir" ]; then
+	if pm_isdir "$full_port_subdir"; then
 		pm_cd $full_port_subdir || fail "cd to $full_port_subdir failed!"
 	else
 		echo ''
@@ -1905,7 +1907,7 @@ if [ -n "$LIST" -o -n "$LIST_PLUS" ]; then
 fi
 
 if [ -n "$EXPUNGE" ]; then
-	if [ ! -d "$pdb/$EXPUNGE" ] || ! pkg info -e $EXPUNGE; then
+	if ! pm_isdir "$pdb/$EXPUNGE" || ! pkg info -e $EXPUNGE; then
 		find_glob_dirs $EXPUNGE
 		case $? in
 		1)	fail "No such port: $EXPUNGE" ;;
@@ -2589,12 +2591,12 @@ multiport () {
 		port=${port#$pdb/}
 		case "$port" in
 		*/*)	port=${port#$pd/}
-			if [ -n "$PM_INDEX_ONLY" ] || [ -d "$pd/${port}" ]; then
+			if [ -n "$PM_INDEX_ONLY" ] || pm_isdir_pd "${port}"; then
 				worklist_temp="$worklist_temp $port"
 			else
 				fail "$pd/${port} does not exist"
 			fi ;;
-		*)	if [ -d "$pdb/$port" ] && pkg info -e $port; then
+		*)	if pm_isdir "$pdb/$port" && pkg info -e $port; then
 				worklist_temp="$worklist_temp $port"
 			else
 				find_glob_dirs $port
@@ -2776,7 +2778,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 			LOCALBASE_COMPAT="$PLB/lib/compat/pkg"
 		else
 			[ -n "$PM_INDEX" ] && PLB=`head -1 $PM_INDEX | cut -f 3 -d\| 2>/dev/null`
-			if [ -n "$PLB" ] && [ -d "$PLB" ]; then
+			if [ -n "$PLB" ] && pm_idsdir "$PLB"; then
 				LOCALBASE_COMPAT="${PLB}/lib/compat/pkg"
 			else
 				echo "===>>> Unable to determine the value of LOCALBASE"
@@ -2829,7 +2831,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 	if [ -n "$MAKE_PACKAGE" -a -z "$FETCH_ONLY" ]; then
 		init_packages_var
 
-		if [ ! -d "$PACKAGES" ]; then
+		if ! pm_isdir "$PACKAGES"; then
 			pm_sv Creating $PACKAGES
 			pm_mkdir_s $PACKAGES
 		fi
@@ -2953,7 +2955,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 			*)	echo '' ; no_valid_port ;;
 			esac
 		done ;;
-	*)	[ -d "$pdb/$argv" ] && \
+	*)	pm_isdir "$pdb/$argv" && \
 			pkg info -e $argv && \
 			upg_port=$argv ;;
 	esac
@@ -2971,7 +2973,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
 	if [ -z "$PM_INDEX_ONLY" ]; then
-		[ -d "$pd/$portdir" ] || missing=missing
+		pm_isdir_pd "$portdir" ] || missing=missing
 	else
 		parse_index $portdir name >/dev/null || missing=missing
 	fi
@@ -2988,7 +2990,7 @@ else
 
 	case "$arg2" in
 	*/*)	ro_opd=$arg2 ; ro_upg_port=`iport_from_origin $ro_opd` ;;
-	*)	if [ -d "$pdb/$arg2" ] && pkg info -e $arg2; then
+	*)	if pm_isdir "$pdb/$arg2" && pkg info -e $arg2; then
 			ro_upg_port=$arg2
 		else
 			find_glob_dirs $arg2 && ro_upg_port=${glob_dirs#$pdb/}
@@ -3031,10 +3033,10 @@ elif [ -z "$portdir" ]; then
 	no_valid_port
 fi
 
-if [ -z "$PM_INDEX_ONLY" ] && [ ! -d "$pd/$portdir" ]; then
+if [ -z "$PM_INDEX_ONLY" ] && ! pm_isdir_pd "$portdir"; then
 	find_moved_port $portdir $upg_port || no_valid_port
 	[ -n "$moved_npd" ] || no_valid_port
-	[ -d "$pd/$moved_npd" ] || no_valid_port
+	pm_isdir_pd "$moved_npd" ] || no_valid_port
 
 	[ "$$" -eq "$PM_PARENT_PID" ] && parent_exit
 	exec $0 $ARGS -o $moved_npd $upg_port
@@ -3276,7 +3278,7 @@ fetch_package () {
 		export ppd
 	fi
 
-	[ -d "$ppd" ] || { pm_sv Creating $ppd; pm_mkdir_s $ppd; }
+	pm_isdir "$ppd" ] || { pm_sv Creating $ppd; pm_mkdir_s $ppd; }
 
 	if [ -z "$FETCH_ARGS" ]; then
 		FETCH_ARGS=`pm_make -f/usr/share/mk/bsd.port.mk -V FETCH_ARGS 2>/dev/null`
@@ -3553,7 +3555,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 			temp="${temp}$file "
 		done
 		if [ -n "$temp" ]; then
-			if [ ! -d "$LOCALBASE_COMPAT" ]; then
+			if ! pm_isdir "$LOCALBASE_COMPAT"; then
 				pm_sv "Creating $LOCALBASE_COMPAT for -w"
 				pm_mkdir_s $LOCALBASE_COMPAT
 			fi
@@ -3683,7 +3685,7 @@ echo ''
 # Remove saved libs that match newly installed files
 
 temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
-if [ -z "$temp" ] && [ -d "$LOCALBASE_COMPAT" ]; then
+if [ -z "$temp" ] && pm_isdir "$LOCALBASE_COMPAT"; then
 	unset files
 	for file in `pkg query %Fp $new_port`; do
 		[ -f "${LOCALBASE_COMPAT}/${file##*/}" ] &&
@@ -3699,7 +3701,7 @@ if [ -z "$temp" ] && [ -d "$LOCALBASE_COMPAT" ]; then
 fi
 
 [ -z "$temp" ] && temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
-if [ -d "$temp" ]; then
+if pm_isdir "$temp"; then
 	pm_sv Deleting the empty $LOCALBASE_COMPAT
 	pm_rmdir_s $temp
 fi
