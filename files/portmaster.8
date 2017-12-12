@@ -243,7 +243,7 @@ If there is no
 .Fl B
 option specified when updating an existing port,
 a backup package will be created before
-.Xr pkg_delete 1
+.Xr pkg-delete 8
 is called.
 If you are using the
 .Fl b
@@ -495,7 +495,7 @@ answer no to all user prompts for the features below
 answer yes to all user prompts for the features below
 .It [-n|y] [-b] [-D|d] Fl e Ar name/glob of a single port directory in /var/db/pkg
 expunge a port using
-.Xr pkg_delete 1 ,
+.Xr pkg-delete 8 ,
 and optionally remove all distfiles.
 Calls
 .Fl s
@@ -575,7 +575,7 @@ and
 .Nm
 attempts to use both of these variables in the same
 way that
-.Xr pkg_add 1
+.Xr pkg-add 8
 does.
 .Pp
 The
@@ -630,7 +630,7 @@ writable by the unprivileged user.
 By default
 .Nm
 creates backup packages of installed ports before it runs
-.Xr pkg_delete 1
+.Xr pkg-delete 8
 during an update.
 If that package creation fails it is treated as a serious
 error and the user is prompted.
@@ -866,11 +866,13 @@ to avoid rebuilding ports already rebuilt on previous runs.
 However the first method (delete everything and reinstall) is preferred.
 .Sh SEE ALSO
 .Xr make 1 ,
-.Xr pkg_add 1 ,
-.Xr pkg_delete 1 ,
 .Xr su 1 ,
+.Xr pkg 7 ,
 .Xr ports 7 ,
 .Xr ldconfig 8 ,
+.Xr pkg 8 ,
+.Xr pkg-add 8 ,
+.Xr pkg-delete 8 ,
 .Xr sudo 8
 .Sh AUTHORS
 This
