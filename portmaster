@@ -1436,7 +1436,7 @@ check_for_updates () {
 		fi
 	fi
 
-	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ] && [ -d "$pd/$origin" ]; then
+	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ] && pm_isdir "$pd/$origin"; then
 		if ! pm_cd $pd/$origin; then
 			if pm_islocked "$iport"; then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
