@@ -3,15 +3,6 @@
 # Copyright (c) 2005-2012 Douglas Barton, All rights reserved
 # Please see detailed copyright below
 
-# <se> DEBUGGING ONLY!!!
-#TESTPAT="^py36-"
-
-#TRACE () {
-#	if [ -n "$BASH_SOURCE" ]; then
-#		echo "<><> ${BASH_LINENO[1]} <><> TRACE $@"
-#	fi
-#}
-
 trap trap_exit INT
 
 umask 022
@@ -1054,7 +1045,6 @@ find_moved_port () {
 			echo "	===>>> Reason: ${moved##*|}"
 			echo ''
 			find_moved_port $moved_npd ;;
-#			find_moved_port $moved_npd $iport ;; <se> is this required???
 		esac
 	done
 
@@ -1075,8 +1065,7 @@ find_moved_port () {
 }
 
 all_pkgs_by_origin () {
-#<se>	namesorigins=`pkg query -a "%n-%v %o"`
-	namesorigins=`pkg query -a "%n-%v %o" | grep "$TESTPAT"`
+	namesorigins=`pkg query -a "%n-%v %o"`
 	echo "$namesorigins"
 	return
 }
@@ -1175,18 +1164,17 @@ ports_by_category () {
 	local pkg
 
 	pm_v "===>>> Sorting ports by category"
-# <se>
-	roots=`   pkg query -e "%#d = 0 && %#r = 0" "%n-%v"|grep "$TESTPAT"`
-	trunks=`  pkg query -e "%#d = 0 && %#r > 0" "%n-%v"|grep "$TESTPAT"`
-	branches=`pkg query -e "%#d > 0 && %#r > 0" "%n-%v"|grep "$TESTPAT"`
-	leaves=`  pkg query -e "%#d > 0 && %#r = 0" "%n-%v"|grep "$TESTPAT"`
+	roots=`   pkg query -e "%#d = 0 && %#r = 0" "%n-%v"`
+	trunks=`  pkg query -e "%#d = 0 && %#r > 0" "%n-%v"`
+	branches=`pkg query -e "%#d > 0 && %#r > 0" "%n-%v"`
+	leaves=`  pkg query -e "%#d > 0 && %#r = 0" "%n-%v"`
 
 	num_roots=$(echo    $(echo $roots    | wc -w))
 	num_trunks=$(echo   $(echo $trunks   | wc -w))
 	num_branches=$(echo $(echo $branches | wc -w))
 	num_leaves=$(echo   $(echo $leaves   | wc -w))
 
-	num_ports=$(echo $(pkg query -a "%n-%v" | grep "$TESTPAT" | wc -w))
+	num_ports=$(echo $(pkg query -a "%n-%v" | wc -w))
 }
 
 delete_empty_dist_subdirs () {
@@ -1460,7 +1448,7 @@ check_force_multi () {
 check_for_updates () {
 	# Global: num_updates
 	local nf iport originflavor flavor origin port_ver do_update skip
-#set -x
+
 	[ "$1" = 'list' -o "$1" = 'multi' ] && { nf=nonfatal; shift; }
 
 	iport=$1
@@ -1515,7 +1503,7 @@ check_for_updates () {
 				return 0
 			else
 				do_update=do_update_moved
-				new_port= # <se> already set to wrong pkg name
+				new_port=""
 				find_new_port "$moved_npd" && port_ver=$new_port
 			fi
 		fi
@@ -1572,7 +1560,6 @@ check_for_updates () {
 	# No need for check_exclude here because it is already
 	# run in the places that call check_for_updates().
 	check_interactive $iport $port_ver || return 0
-#TRACE update_port "IPORT=$iport PORT_VER=$port_ver"
 	update_port $iport $port_ver || return 1
 	return 0
 }
@@ -2187,7 +2174,7 @@ update_build_l () {
 
 	if [ -z "$iport" ]; then
 		case "$build_l" in *\ $origin\\*) return ;; esac
-		build_l="${build_l}\tInstall $originflavor\n" # <se>
+		build_l="${build_l}\tInstall $originflavor\n"
 		return
 	else
 		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac
@@ -2236,8 +2223,6 @@ update_port () {
 		unset NO_DEP_UPDATES
 
 	if [ -z "$NO_ACTION" -o -n "$PM_FIRST_PASS" ]; then
-# <se>		(bash -x $0 $ARGS $*) || update_failed=update_failed
-#		($0 $ARGS $1) || update_failed=update_failed		
 		($0 $ARGS $*) || update_failed=update_failed		
 		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $1 failed"
@@ -2307,8 +2292,7 @@ gen_dep_list () {
 
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		pm_cd_pd $portdir
-#		list=`pm_make FLAVOR=$(flavor_part $portdir) $* | sort -u`
-		export_flavor $(flavor_part $portdir) # <se> required???
+		export_flavor $(flavor_part $portdir)
 		make_dep_list $*
 	else
 		local temp_list l
@@ -3029,7 +3013,6 @@ no_valid_port () {
 # Figure out what we are going to be working on
 if [ -z "$REPLACE_ORIGIN" ]; then
 	export_flavor $(flavor_part $portdir)
-# <se>	portdir=$(dir_part $portdir)
 	[ -n "$portdir" ] && { argv=$portdir ; unset portdir; }
 	argv=${argv:-$1} ; argv=${argv%/} ; argv=`globstrip $argv`
 	case "$argv" in
@@ -3064,7 +3047,6 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
 	export_flavor=$(flavor_part $portdir)
-# <se>	portdir=$(dir_part $portdir)
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		pm_isdir_pd "$portdir" ] || missing=missing
 	else
@@ -3077,9 +3059,7 @@ else
 		echo '' ; no_valid_port
 	fi
 
-	# <se> portdir may have been modified (MOVED) making its value invalid!!!
-	upg_port=`iport_from_origin $portdir` || upg_port=$opd # fail "Cannot find installed port '$portdir'"
-#TRACE "UPG_PORT=$upg_port"
+	upg_port=`iport_from_origin $portdir` || upg_port=$opd
 	arg2=${2#$pd/} ; arg2=${arg2#$pdb/} ; arg2=${arg2%/}
 
 	case "$arg2" in
@@ -3096,7 +3076,7 @@ else
 			ro_opd=$arg2
 		fi
 	esac
-	upg_port="${upg_port:-$ro_upg_port}" # <se>
+	upg_port="${upg_port:-$ro_upg_port}"
 	unset arg2
 
 	if [ -z "$ro_upg_port" ]; then
@@ -3137,9 +3117,6 @@ if [ -z "$PM_INDEX_ONLY" ] && ! pm_isdir_pd "$portdir"; then
 	pm_isdir_pd "$moved_npd" || no_valid_port
 
 	[ "$$" -eq "$PM_PARENT_PID" ] && parent_exit
-#echo "===>>> Reinstalling/Upgrading $upg_port moved to $moved_npd"
-#TRACE $0 $ARGS $flavor_option -o $moved_npd $upg_port
-##	exec bash -x $0 $ARGS $flavor_option -o $moved_npd $upg_port # <se> BASH
 	exec $0 $ARGS -o $moved_npd $upg_port
 	# NOT REACHED
 fi
@@ -3615,7 +3592,6 @@ if [ -z "$use_package" ]; then
 	fi
 
 	pm_cd_pd $portdir
-# <se>	export_flavor=$(flavor_part "$portdir")
 	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; }
 
@@ -3660,15 +3636,13 @@ else
 		fetch_package $latest_pv || fail "Fetch for ${latest_pv}.tbz failed"; }
 fi
 
-# <se> upg_port is not defined here when updating multiple packages!!! ???
 # Ignore if no old port exists, or -F
-#set -x
 if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 	UPGRADE_PORT="${ro_upg_port:-$upg_port}"
 	UPGRADE_PORT_VER=`echo $UPGRADE_PORT | sed 's#.*-\(.*\)#\1#'`
 	export UPGRADE_PORT UPGRADE_PORT_VER
 
-	# <se> the invocation of init_packages should be redundant, but pbu is not defined, without???
+	# the invocation of init_packages should be redundant, but pbu is not defined, without???
 	[ -z "$NO_BACKUP" ] && init_packages && pm_pkg_create "$pbu" $UPGRADE_PORT
 
 	if [ -n "$SAVE_SHARED" ]; then
@@ -3749,9 +3723,7 @@ if [ -n "$FETCH_ONLY" ]; then		# Only reached here if using packages
 fi
 
 install_failed () {
-#	local upg_port
-
-	upg_port="${ro_upg_port:-$upg_port}" # <se> cannot work if upg_port is local!
+	upg_port="${ro_upg_port:-$upg_port}"
 
 	if [ -z "$NO_BACKUP" -a -n "$upg_port" ]; then
 		echo ''
