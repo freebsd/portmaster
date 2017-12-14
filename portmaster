@@ -7,6 +7,10 @@ trap trap_exit INT
 
 umask 022
 
+progcmd="$0"			# actual invocation of this program for search in ps output
+progname="${0##*/}"		# program name in messages
+program="$(realpath $0)"	# full path to program for recursive calls
+
 # Initialize crucial values for the parent, and export them for the children
 if [ -z "$PM_PARENT_PID" ]; then
 	PM_PARENT_PID=$$
@@ -108,13 +112,13 @@ kill_bad_children () {
 		[ "$pid" -gt 25 ] || continue
 		case "$ppid" in
 		1)	case "$command" in
-			*" $0 "*) pm_kill $pid ;;
+			*" progcmd "*) pm_kill $pid ;;
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill -9 $pid ;;
 			esac ;;
 		*)	[ $pgid -eq $mypgid ] || continue
 			[ $pid -eq $PM_PARENT_PID ] && continue
 			case "$command" in
-			*" $0 "*) pm_kill $pid ;;
+			*" progcmd "*) pm_kill $pid ;;
 			*'make -DBATCH checksum'*|*'/fetch '*|\[sh\]) pm_kill $pid ;;
 			esac ;;
 		esac
@@ -240,10 +244,10 @@ parent_exit () {
 	fi
 
 	if [ -n "$1" -a -n "${PM_NEEDS_UPDATE# }" -a -n "$PM_BUILDING" -a -z "$FETCH_ONLY" ]; then
-		echo "${0##*/} <flags>${PM_NEEDS_UPDATE}" > ${TMPDIR}/portmasterfail.txt
+		echo "$progname <flags>${PM_NEEDS_UPDATE}" > ${TMPDIR}/portmasterfail.txt
 		echo ''
 		echo "===>>> You can restart from the point of failure with this command line:"
-		echo "       ${0##*/} <flags>${PM_NEEDS_UPDATE}"
+		echo "       $progname <flags>${PM_NEEDS_UPDATE}"
 		echo ''
 		echo "This command has been saved to ${TMPDIR}/portmasterfail.txt"
 		echo ''
@@ -410,42 +414,42 @@ usage () {
 	echo "    [--no-confirm] [--no-term-title] [--no-index-fetch]"
 	echo "    [--index|--index-first|--index-only] [-m <arguments for make>]"
 	echo "    [-x <glob pattern to exclude from building>]"
-	echo "${0##*/} [Common flags] <full name of port directory in $pdb>"
-	echo "${0##*/} [Common flags] <full path to $pd/foo/bar>"
-	echo "${0##*/} [Common flags] <glob pattern of directories in $pdb>"
-	echo "${0##*/} [Common flags] [--update-if-newer] Multiple full names/paths"
+	echo "$progname [Common flags] <full name of port directory in $pdb>"
+	echo "$progname [Common flags] <full path to $pd/foo/bar>"
+	echo "$progname [Common flags] <glob pattern of directories in $pdb>"
+	echo "$progname [Common flags] [--update-if-newer] Multiple full names/paths"
 	echo "         from $pdb|$pd and/or multiple globs from $pdb"
 	echo ''
-	echo "${0##*/} [Common flags] . [Use in $pd/foo/bar to build that port]"
+	echo "$progname [Common flags] . [Use in $pd/foo/bar to build that port]"
 	echo ''
-	echo "${0##*/} [Common flags] -a"
+	echo "$progname [Common flags] -a"
 	echo ''
-	echo "${0##*/} --show-work [-Gv] [-m <args>] <single port, as above>"
+	echo "$progname --show-work [-Gv] [-m <args>] <single port, as above>"
 	echo ''
-	echo "${0##*/} [Common flags] -o <new port dir in $pd> <installed port>"
-	echo "${0##*/} [Common flags] [-R] -r <name/glob of port directory in $pdb>"
+	echo "$progname [Common flags] -o <new port dir in $pd> <installed port>"
+	echo "$progname [Common flags] [-R] -r <name/glob of port directory in $pdb>"
 	echo '         (-r <port> can be specified multiple times)'
 	echo ''
-	echo "${0##*/} -l"
-	echo "${0##*/} [--index-only [-t]] -L"
+	echo "$progname -l"
+	echo "$progname [--index-only [-t]] -L"
 	echo ''
-	echo "${0##*/} --list-origins"
+	echo "$progname --list-origins"
 	echo ''
-	echo "${0##*/} [--force-config|-G] [-P|-PP] [-aftv] -F"
+	echo "$progname [--force-config|-G] [-P|-PP] [-aftv] -F"
 	echo ''
-	echo "${0##*/} [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
-	echo "${0##*/} [-n|y] [-b] [-D|d] -s"
+	echo "$progname [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
+	echo "$progname [-n|y] [-b] [-D|d] -s"
 	echo ''
-	echo "${0##*/} [-n|y] [-t] --clean-distfiles"
+	echo "$progname [-n|y] [-t] --clean-distfiles"
 	echo ''
-	echo "${0##*/} [-n|y] [--index|--index-only] --clean-packages"
+	echo "$progname [-n|y] [--index|--index-only] --clean-packages"
 	echo ''
-	echo "${0##*/} [-n|y] [--index|--index-only] [-v] --check-depends"
+	echo "$progname [-n|y] [--index|--index-only] [-v] --check-depends"
 	echo ''
-	echo "${0##*/} [-n|y] [-v] --check-port-dbdir"
+	echo "$progname [-n|y] [-v] --check-port-dbdir"
 	echo ''
-	echo "${0##*/} -h|--help"
-	echo "${0##*/} --version"
+	echo "$progname -h|--help"
+	echo "$progname --version"
 	echo ''
 	echo "--force-config run 'make config' for all ports (overrides -G)"
 	echo "-C prevents 'make clean' from being run before building"
@@ -679,7 +683,7 @@ for var in "$@" ; do
 	--show-work)		SHOW_WORK=show ; PM_THOROUGH=thorough ;;
 	--force-config)		export PM_FORCE_CONFIG=pm_force_config ;;
 	--*)			echo "Illegal option $var" ; echo ''
-				echo "===>>> Try ${0##*/} --help"; exit 1 ;;
+				echo "===>>> Try $progname --help"; exit 1 ;;
 	*)			newopts="$newopts $var" ;;
 	esac
 done
@@ -744,7 +748,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 		esac
 		PM_EXCL="${PM_EXCL}`globstrip ${OPTARG}` " ;;
 	y)	PM_YES=yopt; ARGS="-y $ARGS" ;;
-	*)	echo '' ; echo "===>>> Try ${0##*/} --help"; exit 1 ;;
+	*)	echo '' ; echo "===>>> Try $progname --help"; exit 1 ;;
 	esac
 done
 shift $(( $OPTIND - 1 ))
@@ -1789,7 +1793,7 @@ set_distfiles_and_subdir () {
 		echo "===>>> $full_port_subdir does not exist, therefore we"
 		echo '       will assume that all relevant distfiles are gone.'
 		echo ''
-		echo "       Try ${0##*/} [-y] --clean-distfiles for a full cleanup"
+		echo "       Try $progname [-y] --clean-distfiles for a full cleanup"
 		echo ''
 		return 3
 	fi
@@ -1854,7 +1858,7 @@ delete_all_distfiles () {
 	case "$rc" in
 	1)	echo ''
 		echo "===>>> No $pd/$origin exists to find the distfile list"
-		echo "       Try ${0##*/} [-y] --clean-distfiles for a full cleanup"
+		echo "       Try $progname [-y] --clean-distfiles for a full cleanup"
 		echo ''
 		if [ -n "$dist_list_files" ]; then
 			local answer f
@@ -1982,8 +1986,8 @@ if [ -n "$EXPUNGE" ]; then
 	echo "===>>> Running pkg delete -f $EXPUNGE"
 	pm_pkg_delete_s $EXPUNGE || fail "pkg delete failed"
 
-	echo '' ; echo "===>>> Running ${0##*/} -s $ARGS"
-	exec $0 -s $ARGS
+	echo '' ; echo "===>>> Running $progname -s $ARGS"
+	exec "$program" -s $ARGS
 	exit 0	# Should not be reached
 fi
 
@@ -2005,7 +2009,7 @@ if [ -n "$CLEAN_STALE" ]; then
 				dep=${dep%/+CON*} ; echo "	${dep##*/}"
 			done
 			echo ''
-			echo "===>>> Try ${0##*/} --check-depends"
+			echo "===>>> Try $progname --check-depends"
 			echo ''
 			continue
 		fi
@@ -2020,7 +2024,7 @@ if [ -n "$CLEAN_STALE" ]; then
 			echo "===>>> Running pkg delete -f $iport"
 			pm_pkg_delete_s $iport || fail "pkg delete failed"
 
-			exec $0 -s $ARGS ;;
+			exec "$program" -s $ARGS ;;
 		*)	no_del_list="${no_del_list}${iport}:" ;;
 		esac
 	done
@@ -2135,7 +2139,7 @@ term_printf () {
 	[ -n "$PM_NO_TERM_TITLE" ] && return
 	case "$TERM" in cons*) return ;; esac
 
-	printf "\033]0;${0##*/}: ${PM_PARENT_PORT}${1}\007"
+	printf "\033]0;$progname: ${PM_PARENT_PORT}${1}\007"
 }
 
 update_pm_nu () {
@@ -2223,7 +2227,7 @@ update_port () {
 		unset NO_DEP_UPDATES
 
 	if [ -z "$NO_ACTION" -o -n "$PM_FIRST_PASS" ]; then
-		($0 $ARGS $*) || update_failed=update_failed		
+		("$program" $ARGS $*) || update_failed=update_failed
 		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $1 failed"
 	else
@@ -2759,7 +2763,7 @@ multiport () {
 
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
-		($0 $ARGS $port) || update_failed=update_failed
+		("$program" $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
 
@@ -2803,7 +2807,7 @@ multiport () {
 
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
-		($0 $ARGS $port) || update_failed=update_failed
+		("$program" $ARGS $port) || update_failed=update_failed
 		. $IPC_SAVE && > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
 	done
@@ -2873,7 +2877,7 @@ if [ "$$" -eq "$PM_PARENT_PID" -a -z "$SHOW_WORK" ]; then
 			files=`find $pdb -type f -name PM_UPGRADE_DONE_FLAG`
 			if [ -n "$files" ]; then
 				echo "===>>> There are 'install complete' flags from a previous"
-				get_answer_g n y "       -[rf] run of ${0##*/}, delete them? y/n"
+				get_answer_g n y "       -[rf] run of $progname, delete them? y/n"
 				case "$?" in
 				1)	pm_sv Deleting \'install complete\' flags
 					pm_find_s $pdb -type f -name PM_UPGRADE_DONE_FLAG -delete ;;
@@ -3007,7 +3011,7 @@ fi	# [ -n "$UPDATE_ALL" ]
 
 no_valid_port () {
 	echo "===>>> No valid installed port, or port directory given"
-	echo "===>>> Try ${0##*/} --help" ; echo '' ; safe_exit 1
+	echo "===>>> Try $progname --help" ; echo '' ; safe_exit 1
 }
 
 # Figure out what we are going to be working on
@@ -3117,7 +3121,7 @@ if [ -z "$PM_INDEX_ONLY" ] && ! pm_isdir_pd "$portdir"; then
 	pm_isdir_pd "$moved_npd" || no_valid_port
 
 	[ "$$" -eq "$PM_PARENT_PID" ] && parent_exit
-	exec $0 $ARGS -o $moved_npd $upg_port
+	exec "$program" $ARGS -o $moved_npd $upg_port
 	# NOT REACHED
 fi
 
@@ -3672,7 +3676,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	find_dl_distfiles $portdir
 
-	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then
+	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then # <se> not always true for port moved to flavored version with no version update???
 		# Delete any existing versions of the old port
 		np_orphan=`pkg query "%a" $ro_upg_port`
 		pm_sv "Running pkg delete for $ro_upg_port"
@@ -3685,7 +3689,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 		*" $portdir "*)
 			preserve_port=`echo $portdir | sed 's#[-+/\.]#_#g'`
 			eval preserve_port_files="\$${preserve_port}_files"
-		preserve_dir=`/usr/bin/mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port} 2>/dev/null` ||
+			preserve_dir=`/usr/bin/mktemp -d ${TMPDIR}/d-${PM_PARENT_PID}-${preserve_port} 2>/dev/null` ||
 				fail "Could not create a temporary directory for $preserve_port in $TMPDIR"
 			for file in $preserve_port_files; do
 				cp -p $file ${preserve_dir}/ ||
