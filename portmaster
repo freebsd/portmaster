@@ -3033,9 +3033,8 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 			*)	echo '' ; no_valid_port ;;
 			esac
 		done ;;
-#	*)	pm_isdir "$pdb/$argv" && \
 	*)	pkg info -e $argv && \
-			upg_port=$argv ;;
+			upg_port=$(pkg query %n-%v $argv) ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
