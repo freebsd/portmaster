@@ -3033,8 +3033,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 			*)	echo '' ; no_valid_port ;;
 			esac
 		done ;;
-	*)	pkg info -e $argv && \
-			upg_port=$(pkg query %n-%v $argv) ;;
+	*)	upg_port=$(pkg query %n-%v $argv) ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
