@@ -794,10 +794,15 @@ of the
 .Nm
 command:
 .Pp
+Build and install a port not currently installed:
+.Dl "portmaster foo/fooport"
+.Dl "portmaster foo/fooport@flavor"
+.Pp
 Update one port:
 .Dl "portmaster fooport-1.23 or"
 .Dl "portmaster fooport or"
 .Dl "portmaster foo/fooport"
+.Dl "portmaster foo/fooport@flavor"
 .Pp
 Use a package if available:
 .Dl "portmaster --packages fooport-1.23"
