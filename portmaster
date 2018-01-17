@@ -308,8 +308,8 @@ safe_exit () {
 	exit ${1:-0}
 } # safe_exit()
 
-target_part	() { [ -z "{$1##*:*}" ] && echo "${1#*:}" || echo install; }
-flavor_part	() { local tmp="${1%%:*}"; [ -z "{$tmp##*@*}" ] && echo "${tmp#*@}"; }
+target_part	() { [ -z "${1##*:*}" ] && echo "${1#*:}" || echo install; }
+flavor_part	() { local tmp="${1%%:*}"; [ -z "${tmp##*@*}" ] && echo "${tmp#*@}"; }
 dir_part	() { local tmp="${1%%:*}"; echo "${tmp%%@*}"; }
 export_flavor	() { local flavor="$1"; if [ "$FLAVOR" != "$flavor" ]; then
 			pm_v "===>>> Setting FLAVOR to '$flavor' (was '$FLAVOR')";
@@ -2499,8 +2499,11 @@ dependency_check () {
 			check_for_updates $iport $origin || fail 'Update failed'
 		else
 			check_interactive $origin || continue
-			[ "$make_target" = "install" ] && make_target=""
-			update_port $origin${make_target:+:$make_target}
+			if [ "$make_target" != "install" ]; then
+				[ -z "$PM_FIRST_PASS" ] && post_clean_l="$post_clean_l $origin"
+				origin="$origin:$make_target"
+			fi
+			update_port "$origin"
 		fi
 	done
 	[ -n "$PM_FIRST_PASS" ] && unset doing_dep_check
@@ -3032,6 +3035,7 @@ no_valid_port () {
 }
 
 make_target=$(target_part "$1")
+post_clean_l=""
 
 # Figure out what we are going to be working on
 if [ -z "$REPLACE_ORIGIN" ]; then
@@ -3892,9 +3896,12 @@ if [ -n "$MAKE_PACKAGE" ]; then
 fi
 
 if [ -z "$use_package" -a -z "$DONT_POST_CLEAN" ]; then
-#	export_flavor $(flavor_part $portdir)
+	for dir in $post_clean_l; do
+		pm_v "===>>> Running 'make clean' for special build dependency $dir"
+		(FLAVOR=$(flavor_part $portdir) pm_make_s -C "$pd/$dir" clean NOCLEANDEPENDS=ncd2 >/dev/null)&
+	done
 	pm_v "===>>> Running 'make clean' in the background"
-	(pm_make_s clean NOCLEANDEPENDS=ncd2 >/dev/null)&
+	(FLAVOR=$(flavor_part $portdir) pm_make_s clean NOCLEANDEPENDS=ncd2 >/dev/null)&
 	pm_v
 fi
 if [ -n "$ro_opd" ]; then
