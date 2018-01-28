@@ -181,7 +181,7 @@ parent_exit () {
 
 		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
 		[ -n "$needws" ] && echo '' || pm_v
-		find $PM_WRKDIRPREFIX -depth -mindepth 1 -type d -empty -delete 2>/dev/null
+		find $PM_WRKDIRPREFIX -depth -mindepth 1 maxdepth 2 -type d -empty -delete 2>/dev/null
 	fi
 
 	case "$DISPLAY_LIST" in
@@ -2176,22 +2176,28 @@ update_pm_nu () {
 }
 
 update_build_l () {
-	local originflavor origin flavor iport
+	local originflavor origin flavor iport make_target
 
 	originflavor=$1 ; update_pm_nu $originflavor
 	origin=$(dir_part "$originflavor")
 	flavor=$(flavor_part "$originflavor")
 	iport="$2"
+	make_target=$3
 
 	[ -n "$PM_NO_CONFIRM" ] && return
 
 	if [ -z "$iport" ]; then
 		case "$build_l" in *\ $origin\\*) return ;; esac
-		build_l="${build_l}\tInstall $originflavor\n"
+		case $make_target in
+		install)
+			build_l="${build_l}\tInstall $originflavor\n" ;;
+		*)
+			build_l="${build_l}\tExecute make $make_target for $originflavor\n" ;;
+		esac
 		return
-	else
-		case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac
 	fi
+
+	case "$build_l" in *\ $iport\ *|*\ $iport\\*) return ;; esac
 
 	find_new_port "$originflavor" # sets global variable new_port
 
@@ -3240,7 +3246,7 @@ if [ -n "$PM_FIRST_PASS" -a -z "$FETCH_ONLY" ]; then
 		fi
 	fi
 
-	update_build_l $portdir $upg_port
+	update_build_l "$portdir" "$upg_port" "$make_target"
 elif [ -n "$FETCH_ONLY" -a -n "$PM_PACKAGES" ]; then
 	update_pm_nu $portdir
 fi
