@@ -3155,12 +3155,13 @@ if [ -z "$PM_INDEX_ONLY" ] && ! pm_isdir_pd "$portdir"; then
 fi
 
 iport_from_pkgname () {
-	local dir flavor pkgname
+	local dir flavor pkgname pattern
 
 	dir=$(dir_part $1)
 	flavor=$(flavor_part $1)
 	pkgname=$(FLAVOR=$flavor make -C "$pd/$dir" -V PKGNAME) || return 1
-	pkg info -x "^${pkgname%-*}"'-[^-]*' 2>/dev/null
+	pattern="^${pkgname%-*}"'-[^-]*$'
+	pkg info -x "$pattern" 2>/dev/null | egrep -- "$pattern"
 }
 
 if [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
