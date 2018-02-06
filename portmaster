@@ -3155,13 +3155,12 @@ if [ -z "$PM_INDEX_ONLY" ] && ! pm_isdir_pd "$portdir"; then
 fi
 
 iport_from_pkgname () {
-	local dir flavor pkgname pattern
+	local dir flavor pkgname
 
 	dir=$(dir_part $1)
 	flavor=$(flavor_part $1)
 	pkgname=$(FLAVOR=$flavor make -C "$pd/$dir" -V PKGNAME) || return 1
-	pattern="^${pkgname%-*}"'-[^-]*$'
-	pkg info -x "$pattern" 2>/dev/null | egrep -- "$pattern"
+	pkg info -xC "^${pkgname%-*}\$" 2>/dev/null
 }
 
 if [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
@@ -3657,7 +3656,7 @@ pkg_flavor () {
 	pm_make pretty-flavors-package-names | sed -ne 's!^\([A-Za-z0-9_]*\): *'$pkg'$!\1!p';
 }
 	export_flavor=$(pkg_flavor $new_port)
-	if [ -n "$HIDE_BUILD" ] && [ -n "$(pm_make -V LICENSE)" ]; then
+	if [ -n "$HIDE_BUILD" ] && [ -n "$(pm_make -V LICENSE)" ] && [ -z "$(pm_make -V DISABLE_LICENSES)" ]; then
 		pm_make extract ask-license || fail "make extract ask-license failed for $portdir"
 	fi
 	if [ "$make_target" = "extract" -o "$make_target" = "patch" ]; then
