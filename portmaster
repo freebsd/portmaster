@@ -311,18 +311,16 @@ safe_exit () {
 target_part	() { [ -z "${1##*:*}" ] && echo "${1#*:}" || echo install; }
 flavor_part	() { local tmp="${1%%:*}"; [ -z "${tmp##*@*}" ] && echo "${tmp#*@}"; }
 dir_part	() { local tmp="${1%%:*}"; echo "${tmp%%@*}"; }
-export_flavor	() { local flavor="$1"; if [ "$FLAVOR" != "$flavor" ]; then
-			pm_v "===>>> Setting FLAVOR to '$flavor' (was '$FLAVOR')";
-			export FLAVOR="$flavor"; fi; }
- 
+export_flavor	() { [ "$FLAVOR" != "$1" ] && export FLAVOR="$1"; }
+
 pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 			local dir=$pd/$(dir_part $1);
 			builtin cd $dir 2>/dev/null ||
 			fail "Cannot cd to port directory: $dir"; }
 pm_isdir	() { builtin test -d "$1"; }
-pm_isdir_pd	() { local dir=$pd/$(dir_part "$1");
-			builtin test -d "$dir"; }
+pm_isdir_pd	() { local dir=$(dir_part "$1");
+			builtin test -n "$dir" -a -d "$pd/$dir"; }
 pm_kill   () { kill $* >/dev/null 2>/dev/null; }
 pm_make   () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_URB_LIST;
 		 /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS $*; ); }
