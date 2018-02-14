@@ -44,6 +44,9 @@
 #
 # RECURSE_THOROUGH=topt
 #
+# Perform 'make test' after built package (-T)
+# NEED_TEST=Topt
+#
 # Be verbose (-v)
 # PM_VERBOSE=vopt
 #

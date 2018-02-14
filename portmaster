@@ -405,7 +405,7 @@ usage () {
 	version
 	echo ''
 	echo 'Usage:'
-	echo "Common flags: [--force-config -CGHKgntvw -[B|b] -[f|i] -[D|d]]"
+	echo "Common flags: [--force-config -CGHKTgntvw -[B|b] -[f|i] -[D|d]]"
 	echo "    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]"
 	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
 	echo "    [--local-packagedir=<path>] [--packages-local] [--delete-packages]"
@@ -463,6 +463,7 @@ usage () {
 	echo '-w save old shared libraries before deinstall'
 	echo '[-R] -f always rebuild ports (overrides -i)'
 	echo '-i interactive update mode -- ask whether to rebuild ports'
+	echo '-T testing of built package'
 	echo '-D no cleaning of distfiles'
 	echo '-d always clean distfiles'
 	echo "-m <arguments for the 'make' command line>"
@@ -700,7 +701,7 @@ set -- $newopts
 unset var newopts
 
 # Save switches for potential child processes
-while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDFGHKLPRTabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
@@ -713,6 +714,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	L)	LIST_PLUS=Lopt ;;
 	P)	packages_init first ;;
 	R)	RESTART=Ropt ; ARGS="-R $ARGS" ;;
+	T)	NEED_TEST=Topt ; ARGS="-T $ARGS" ;;
 	a)	UPDATE_ALL=aopt ;;
 	b)	BACKUP=bopt; ARGS="-b $ARGS" ;;
 	d)	ALWAYS_SCRUB_DISTFILES=dopt; ARGS="-d $ARGS" ;;
@@ -3640,6 +3642,10 @@ pkg_flavor () {
 		pm_make extract ask-license || fail "make extract ask-license failed for $portdir"
 	fi
 	eval pm_make build $port_log_args || fail "make build failed for $portdir"
+	
+	if [ -n "$NEED_TEST" ]; then
+		eval pm_make test $port_log_args || fail "make test failed for $portdir"
+	fi
 
 	pm_sv Running make stage
 	# Defining NO_DEPENDS ensures that we will control the installation
