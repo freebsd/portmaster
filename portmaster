@@ -178,10 +178,11 @@ parent_exit () {
 			fi
 			sleep 2
 		done
-
-		pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
-		[ -n "$needws" ] && echo '' || pm_v
-		find $PM_WRKDIRPREFIX -depth -mindepth 1 -type d -empty -delete 2>/dev/null
+		if [ -n "$ALWAYS_REMOVE_EMPTY_WRKDIR" ]; then
+			pm_v "===>>> Removing empty directories from WRKDIRPREFIX"
+			[ -n "$needws" ] && echo '' || pm_v
+			find $PM_WRKDIRPREFIX -depth -mindepth 1 -type d -empty -delete 2>/dev/null
+		fi
 	fi
 
 	case "$DISPLAY_LIST" in
@@ -451,6 +452,7 @@ usage () {
 	echo ''
 	echo "--force-config run 'make config' for all ports (overrides -G)"
 	echo "-C prevents 'make clean' from being run before building"
+	echo "-E always remove empty directory in WRKDIRPREFIX if set after each building"
 	echo "-G prevents 'make config'"
 	echo "-H hide details of the port build and install in a log file"
 	echo "-K prevents 'make clean' from being run after building"
@@ -700,11 +702,12 @@ set -- $newopts
 unset var newopts
 
 # Save switches for potential child processes
-while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDEFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
 	D)	DONT_SCRUB_DISTFILES=Dopt; ARGS="-D $ARGS" ;;
+	E)	ALWAYS_REMOVE_EMPTY_WRKDIR=Eopt; ARGS="-E $ARGS" ;;
 	F)	FETCH_ONLY=Fopt; ARGS="-F $ARGS" ;;
 	G)	[ -z "$PM_FORCE_CONFIG" ] && {
 			PM_NO_MAKE_CONFIG=Gopt; ARGS="-G $ARGS"; } ;;
