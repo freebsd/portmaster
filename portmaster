@@ -932,9 +932,7 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 fi	# [ "$$" -eq "$PM_PARENT_PID" ]
 
 #=============== cache some build parameters in the environment ===============
-
-export SCRIPTSDIR="$pd/Mk/Scripts"
-eval "$(PORTSDIR="$pd" MAKE=make /bin/sh "$SCRIPTSDIR/ports_env.sh")"
+SCRIPTSDIR="$pd/Mk/Scripts" PORTSDIR="$pd" MAKE=make . "$pd/Mk/Scripts/ports_env.sh" > /dev/null
 
 #=============== Begin functions relevant to --features and main ===============
 
