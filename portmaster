@@ -260,7 +260,7 @@ safe_exit () {
 		parent_exit $1
 	else
 		# Save state for the parent process to read back in
-		> $IPC_SAVE
+		: > $IPC_SAVE
 		if [ -z "$PM_FIRST_PASS" ]; then
 			echo "DISPLAY_LIST='$DISPLAY_LIST'" >> $IPC_SAVE
 			echo "INSTALLED_LIST='$INSTALLED_LIST'" >> $IPC_SAVE
@@ -931,6 +931,11 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	fi
 fi	# [ "$$" -eq "$PM_PARENT_PID" ]
 
+#=============== cache some build parameters in the environment ===============
+
+export SCRIPTSDIR="$pd/Mk/Scripts"
+eval "$(PORTSDIR="$pd" MAKE=make /bin/sh "$SCRIPTSDIR/ports_env.sh")"
+
 #=============== Begin functions relevant to --features and main ===============
 
 # find installed port for given origin (with optional @flavor) in the pkg DB
@@ -1062,7 +1067,7 @@ find_moved_port () {
 			fi ;;
 		${sf}\|*) moved_npd=${moved#*\|}	# New port directory
 			moved_npd=${moved_npd%%\|*}
-			[ -n $(flavor_part $moved_npd) ] && moved_npd=$(match_flavor $moved_npd $iport)
+			[ -n "$(flavor_part $moved_npd)" ] && moved_npd=$(match_flavor $moved_npd $iport)
 				
 			echo ''
 			echo "	===>>> The $sf port moved to $moved_npd"
@@ -1156,7 +1161,7 @@ read_distinfos_all () {
 		case "${origin#$pd/}" in
 		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS|base/*) continue ;; esac
 
-		pm_isdir "$origin" ] || continue
+		pm_isdir "$origin" || continue
 
 		if [ -s "${origin}/distinfo" ]; then
 			distinfo="${origin}/distinfo"
@@ -2790,7 +2795,7 @@ multiport () {
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
 		($program $ARGS $port) || update_failed=update_failed
-		. $IPC_SAVE && > $IPC_SAVE
+		. $IPC_SAVE && : > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
 
 		case "$PM_NEEDS_UPDATE" in
@@ -2839,7 +2844,7 @@ multiport () {
 		num=$(( $num + 1 ))
 		init_term_printf "$port ${num}/${numports}"
 		("$program" $ARGS $port) || update_failed=update_failed
-		. $IPC_SAVE && > $IPC_SAVE
+		. $IPC_SAVE && : > $IPC_SAVE
 		[ -n "$update_failed" ] && fail "Update for $port failed"
 	done
 
@@ -3085,7 +3090,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	[ "$make_target" != install ] && PM_MAKE_ARGS="-DDISABLE_CONFLICTS $PM_MAKE_ARGS"
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
-	export_flavor=$(flavor_part $portdir)
+	export_flavor $(flavor_part $portdir)
 	if [ -z "$PM_INDEX_ONLY" ]; then
 		pm_isdir_pd "$portdir" ] || missing=missing
 	else
@@ -3098,7 +3103,7 @@ else
 		echo '' ; no_valid_port
 	fi
 
-	upg_port=`iport_from_origin $portdir` || upg_port=$opd
+	upg_port=`iport_from_origin $portdir` || upg_port=$opd	# <se> $opd is never set???
 	arg2=${2#$pd/} ; arg2=${arg2#$pdb/} ; arg2=${arg2%/}
 
 	case "$arg2" in
@@ -3415,7 +3420,7 @@ fetch_package () {
 		export ppd
 	fi
 
-	pm_isdir "$ppd" ] || { pm_sv Creating $ppd; pm_mkdir_s $ppd; }
+	pm_isdir "$ppd" || { pm_sv Creating $ppd; pm_mkdir_s $ppd; }
 
 	if [ -z "$FETCH_ARGS" ]; then
 		FETCH_ARGS=`pm_make -f/usr/share/mk/bsd.port.mk -V FETCH_ARGS 2>/dev/null`
