@@ -561,6 +561,27 @@ find_glob_dirs () {
 	return 1
 }
 
+match_flavor () {
+	local origin=$(dir_part $1)
+	local flavor	# =$(flavor_part $1)
+	local iport="$2"
+	local dir="$pd/$origin"
+
+	if [ -d "$dir" ]; then
+	local IFS=' '
+	local pkgname=${iport%-*}
+	local flavors=$(pm_make -C "$dir" -V FLAVORS)
+	for flavor in $flavors; do
+		local p=$(pm_make -C "$dir" FLAVOR=$flavor -V PKGNAME)
+		if [ -n "$p" -a "${p%-*}" = "$pkgname" ]; then
+			echo "$origin@$flavor"
+			return
+		fi
+	done
+	fi
+	echo "$1"	# should not be reached!
+}
+
 origin_from_pdb () {
 	local flavor pkgname origin_flavor
 
@@ -1007,27 +1028,6 @@ get_answer_yn () {
 		[ -n "$PM_YES" ] && return 0
 		return 1
 	fi
-}
-
-match_flavor () {
-	local origin=$(dir_part $1)
-	local flavor	# =$(flavor_part $1)
-	local iport="$2"
-	local dir="$pd/$origin"
-
-	if [ -d "$dir" ]; then
-	local IFS=' '
-	local pkgname=${iport%-*}
-	local flavors=$(pm_make -C "$dir" -V FLAVORS)
-	for flavor in $flavors; do
-		local p=$(pm_make -C "$dir" FLAVOR=$flavor -V PKGNAME)
-		if [ -n "$p" -a "${p%-*}" = "$pkgname" ]; then
-			echo "$origin@$flavor"
-			return
-		fi
-	done
-	fi
-	echo "$1"	# should not be reached!
 }
 
 # Find the new origin for moved ports
