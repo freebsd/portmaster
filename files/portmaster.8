@@ -59,7 +59,7 @@ Common Flags:
 .Pp
 .Nm
 .Op Common Flags
-.Op Fl -update-if-newer
+.Op Fl U|--update-if-newer
 .Ar Multiple full names or paths from /usr/ports or /var/db/pkg,
 and/or multiple globs from /var/db/pkg
 .Nm
@@ -396,7 +396,7 @@ requirements.
 .It Fl -delete-build-only
 delete ports that are build-only dependencies after a successful run,
 only if installed this run
-.It Fl -update-if-newer
+.It Fl U|--update-if-newer
 (only for multiple ports listed on the command line)
 do not rebuild/reinstall if the installed version is up to date
 .It Fl P|--packages

@@ -415,7 +415,7 @@ usage () {
 	echo "$progname [Common flags] <full name of port directory in $pdb>"
 	echo "$progname [Common flags] <full path to $pd/foo/bar>"
 	echo "$progname [Common flags] <glob pattern of directories in $pdb>"
-	echo "$progname [Common flags] [--update-if-newer] Multiple full names/paths"
+	echo "$progname [Common flags] [-U|--update-if-newer] Multiple full names/paths"
 	echo "         from $pdb|$pd and/or multiple globs from $pdb"
 	echo ''
 	echo "$progname [Common flags] . [Use in $pd/foo/bar to build that port]"
