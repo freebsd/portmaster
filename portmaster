@@ -481,7 +481,7 @@ usage () {
 	echo '--delete-build-only delete ports that are build-only dependencies'
 	echo '   after a successful run, only if installed this run'
 	echo ''
-	echo '--update-if-newer (only for multiple ports listed on command line)'
+	echo '-U|--update-if-newer (only for multiple ports listed on command line)'
 	echo '   do not rebuild/reinstall if the installed version is up to date'
 	echo ''
 	echo '-P|--packages use packages, but build port if not available'
@@ -655,7 +655,7 @@ for var in "$@" ; do
 	--package-format=*)	PACKAGE_FORMAT=${var#--package-format=}
 				export PACKAGE_FORMAT ;;
 #	--flavor=*)		PM_FLAVOR=${var#--flavor=} ;;
-	--update-if-newer)	PM_UPDATE_IF_NEWER=pm_update_if_newer
+	-U|--update-if-newer)	PM_UPDATE_IF_NEWER=pm_update_if_newer
 				export PM_UPDATE_IF_NEWER ;;
 	--delete-build-only)	PM_DEL_BUILD_ONLY=pm_dbo
 				export PM_DEL_BUILD_ONLY ;;
