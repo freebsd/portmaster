@@ -3160,6 +3160,7 @@ if [ -z "$PM_INDEX_ONLY" ] && ! pm_isdir_pd "$portdir"; then
 	pm_isdir_pd "$moved_npd" || no_valid_port
 
 	[ "$$" -eq "$PM_PARENT_PID" ] && parent_exit
+	[ -z "$upg_port" ] && upg_port="$portdir"
 	exec "$program" $ARGS -o $moved_npd $upg_port
 	# NOT REACHED
 fi
@@ -3171,7 +3172,6 @@ iport_from_pkgname () {
 	flavor=$(flavor_part $1)
 	pkgname=$(FLAVOR=$flavor pm_make -C "$pd/$dir" -V PKGNAME) &&
 		$PKG_CMD query "%n-%v" "${pkgname%-*}"
-#	$PKG_CMD info -xC "^${pkgname%-*}\$" 2>/dev/null
 }
 
 if [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
