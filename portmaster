@@ -3663,7 +3663,7 @@ if [ -z "$use_package" ]; then
 
 # Return flavor for named pkg (must be executed in port directory!)
 pkg_flavor () {
-	local pkg="$1" flavor
+	local pkg="$1" flavor starttime
 	pm_make pretty-flavors-package-names | sed -ne 's!^\([A-Za-z0-9_]*\): *'$pkg'$!\1!p';
 }
 	export_flavor=$(pkg_flavor $new_port)
@@ -3674,8 +3674,10 @@ pkg_flavor () {
 		eval pm_make -DNO_DEPENDS $make_target $port_log_args || fail "make $make_target failed for $portdir"
 		safe_exit
 	fi
+	starttime=$(date "+%s")
 	eval pm_make build $port_log_args || fail "make build failed for $portdir"
 	[ "$make_target" = "build" ] && safe_exit
+	echo "===>>> Building the port required $(( `date "+%s"` - $starttime )) seconds"
 
 	pm_sv Running make stage
 	# Defining NO_DEPENDS ensures that we will control the installation
