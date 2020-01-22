@@ -969,6 +969,7 @@ iport_from_origin () {
 	origin=$(dir_part "$1")
 	flavor=$(flavor_part "$1")
 	if [ -z "$flavor" ]; then
+		unset FLAVOR
 		flavor=$(pm_make -C "${pd}/${origin}" -V FLAVOR)
 	fi
 	pkgname_l=$(echo $($PKG_CMD query '%n-%v' $origin)) || return 1
