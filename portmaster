@@ -360,7 +360,7 @@ pm_sv             () { [ -n "$PM_SU_VERBOSE" ] && echo -e "===>>> SU $*"; }
 if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	if [ -z "$pd" ]; then
 		if [ -z "$PORTSDIR" ]; then
-			pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null`
+			pd=`pm_make_b -f/usr/share/mk/bsd.port.mk -V PORTSDIR 2>/dev/null` || pd=""
 			[ -z "$pd" ] && pm_isdir /usr/ports && pd=/usr/ports
 		else
 			pd=$PORTSDIR
