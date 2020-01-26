@@ -434,6 +434,8 @@ usage () {
 	echo ''
 	echo "$progname --list-origins"
 	echo ''
+	echo "$progname --try-broken"
+	echo ''
 	echo "$progname [--force-config|-G] [-P|-PP] [-aftv] -F"
 	echo ''
 	echo "$progname [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
@@ -513,6 +515,8 @@ usage () {
 	echo ''
 	echo '-n answer no to all user prompts for the features below'
 	echo '-y answer yes to all user prompts for the features below'
+	echo ''
+	echo '--try-broken do not skip ports marked as broken'
 	echo ''
 	echo '[-n|y] [-b] [-D|d] -e expunge one port via pkg delete, and remove its distfiles'
 	echo '[-n|y] [-b] [-D|d] -s clean out stale ports that used to be depended on'
@@ -710,6 +714,7 @@ for var in "$@" ; do
 	--list-origins)		LIST_ORIGINS=list_origins ;;
 	--show-work)		SHOW_WORK=show ; PM_THOROUGH=thorough ;;
 	--force-config)		export PM_FORCE_CONFIG=pm_force_config ;;
+	--try-broken)		TRY_BROKEN=try_broken; PM_MAKE_ARGS="$PM_MAKE_ARGS -DTRYBROKEN" ;;
 	--*)			echo "Illegal option $var" ; echo ''
 				echo "===>>> Try $progname --help"; exit 1 ;;
 	*)			newopts="$newopts $var" ;;
@@ -748,7 +753,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	h)	usage 0 ;;
 	i)	INTERACTIVE_UPDATE=iopt; ARGS="-i $ARGS" ;;
 	l)	LIST=lopt ;;
-	m)	export PM_MAKE_ARGS=$OPTARG	# For 'make checksum'
+	m)	export PM_MAKE_ARGS="$PM_MAKE_ARGS $OPTARG"	# For 'make checksum'
 		ARGS="-m $PM_MAKE_ARGS $ARGS" ;;
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;; # -o should take a parameter and $OPTARG should be assigned here
@@ -1438,10 +1443,11 @@ fi
 
 check_state () {
 	# Global: state
-	local state_set
+	local state_set makevars
 
+	[ -z "$TRY_BROKEN" ] && makevars="FORBIDDEN BROKEN IGNORE" || makevars="FORBIDDEN"
 	if egrep -ql '^(FORBIDDEN|BROKEN|IGNORE)' Makefile; then
-		for state in FORBIDDEN BROKEN IGNORE; do
+		for state in $makevars; do
 			state_set=`pm_make -V $state`
 			if [ -n "$state_set" ]; then
 				echo "	===>>> This port is marked $state"

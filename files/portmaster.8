@@ -48,6 +48,7 @@ Common Flags:
 .Op Sy --index|--index-first|--index-only
 .Op Fl m Ar arguments for make
 .Op Fl x Ar glob pattern to exclude from building
+.Op Fl -try-broken
 .Nm
 .Op Common Flags
 .Ar full name of port directory in /var/db/pkg
@@ -460,6 +461,8 @@ check all ports, update as necessary
 .It Fl -show-work
 show what dependent ports are, and are not installed (implies
 .Fl t ) .
+.It Fl -try-broken
+do not skip ports marked as BROKEN or IGNORED and invoke the make command with -DTRYBROKEN.
 .It Fl o Ar <new port dir in /usr/ports> <installed port>
 replace the installed port with a port from a different origin
 .It [-R] Fl r Ar name/glob of port directory in /var/db/pkg
