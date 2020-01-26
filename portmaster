@@ -3644,7 +3644,7 @@ if [ -z "$use_package" ]; then
 
 	pm_cd_pd $portdir
 	export_flavor $(flavor_part $portdir)
-	[ -z "$DONT_PRE_CLEAN" ] && { pm_make clean NOCLEANDEPENDS=ncd ||
+	[ -z "$DONT_PRE_CLEAN" ] && { pm_make_s clean NOCLEANDEPENDS=ncd ||
 		fail 'make clean failed'; }
 
 	fl_read=`echo ${TMPDIR}/f-${PM_PARENT_PID}-fetchlog-${portdir#*/}.*`
