@@ -753,7 +753,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	h)	usage 0 ;;
 	i)	INTERACTIVE_UPDATE=iopt; ARGS="-i $ARGS" ;;
 	l)	LIST=lopt ;;
-	m)	export PM_MAKE_ARGS="$PM_MAKE_ARGS $OPTARG"	# For 'make checksum'
+	m)	export PM_MAKE_ARGS=$OPTARG	# For 'make checksum'
 		ARGS="-m $PM_MAKE_ARGS $ARGS" ;;
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;; # -o should take a parameter and $OPTARG should be assigned here
