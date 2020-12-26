@@ -343,6 +343,12 @@ pm_make_s         () { ( unset -v CUR_DEPS INSTALLED_LIST PM_DEPTH build_l PM_UR
 			 $PM_SU_CMD /usr/bin/nice /usr/bin/make $PM_MAKE_ARGS "$@"; ); }
 pm_mkdir_s        () { $PM_SU_CMD /bin/mkdir -p $1; }
 pm_pkg_delete_s   () {
+	for f in "$@"; do
+		if [ "$($PKG_CMD query %k $f)" = 1 ]; then
+			was_locked=1
+			$PKG_CMD unlock -qy $f
+		fi
+	done
 	$PM_SU_CMD /usr/local/sbin/pkg-static delete -yf "$@";
 	for d in $* ; do
 	    pm_rm_s -rf $pdb/$d
@@ -3833,6 +3839,10 @@ else
 	else
 		install_failed ${latest_pv}.txz
 	fi
+fi
+
+if [ "$was_locked" = 1 ]; then
+	$PKG_CMD lock -qy "$new_port"
 fi
 
 if [ -n "$preserve_dir" ]; then
