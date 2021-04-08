@@ -2472,11 +2472,8 @@ dependency_check () {
 			local conflicts glob confl_p dir flavor
 			dir=$(dir_part $d_port)
 			flavor=$(flavor_part $d_port)
-			conflicts=''
 			pm_cd "$pd/$dir" || fail "Cannot cd to $dir"
-			if grep -ql ^CONFLICTS Makefile ; then
-				conflicts=`FLAVOR=$flavor pm_make_b -V CONFLICTS -V CONFLICTS_BUILD -V CONFLICTS_INSTALL`	 
-			fi
+			conflicts=`FLAVOR=$flavor pm_make_b -V CONFLICTS -V CONFLICTS_BUILD -V CONFLICTS_INSTALL`	 
 			for glob in $conflicts; do
 				confl_p=`$PKG_CMD query -g "%n-%v" $glob 2>/dev/null`
 				if [ -n "$confl_p" ]; then
