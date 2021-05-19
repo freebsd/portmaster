@@ -313,7 +313,7 @@ dir_part	() { echo "${1%%@*}"; }
 export_flavor	() { local flavor="$1"; if [ "$FLAVOR" != "$flavor" ]; then
 			pm_v "===>>> Setting FLAVOR to '$flavor' (was '$FLAVOR')";
 			export FLAVOR="$flavor"; fi; }
- 
+
 pm_cd     () { builtin cd $1 2>/dev/null || return 1; }
 pm_cd_pd  () { [ -n "$PM_INDEX_ONLY" ] && return 2;
 			local dir=$pd/$(dir_part $1);
@@ -403,135 +403,137 @@ usage () {
 	[ -z "$port_dbdir" ] && port_dbdir=/var/db/ports
 
 	version
-	echo ''
-	echo 'Usage:'
-	echo "Common flags: [--force-config -CGHKgntvw -[B|b] -[f|i] -[D|d]]"
-	echo "    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]"
-	echo "    [--packages-if-newer] [--delete-build-only] [--always-fetch]"
-	echo "    [--local-packagedir=<path>] [--packages-local] [--delete-packages]"
-	echo "    [--backup-format=<fmt>] [--no-confirm] [--no-term-title] [--no-index-fetch]"
-	echo "    [--index|--index-first|--index-only] [-m <arguments for make>]"
-	echo "    [-x <glob pattern to exclude from building>]"
-	echo "$progname [Common flags] <full name of port directory in $pdb>"
-	echo "$progname [Common flags] <full path to $pd/foo/bar>"
-	echo "$progname [Common flags] <glob pattern of directories in $pdb>"
-	echo "$progname [Common flags] [--update-if-newer] Multiple full names/paths"
-	echo "         from $pdb|$pd and/or multiple globs from $pdb"
-	echo ''
-	echo "$progname [Common flags] . [Use in $pd/foo/bar to build that port]"
-	echo ''
-	echo "$progname [Common flags] -a"
-	echo ''
-	echo "$progname --show-work [-Gv] [-m <args>] <single port, as above>"
-	echo ''
-	echo "$progname [Common flags] -o <new port dir in $pd> <installed port>"
-	echo "$progname [Common flags] [-R] -r <name/glob of port directory in $pdb>"
-	echo '         (-r <port> can be specified multiple times)'
-	echo ''
-	echo "$progname -l"
-	echo "$progname [--index-only [-t]] -L"
-	echo ''
-	echo "$progname --list-origins"
-	echo ''
-	echo "$progname [--force-config|-G] [-P|-PP] [-aftv] -F"
-	echo ''
-	echo "$progname [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
-	echo "$progname [-n|y] [-b] [-D|d] -s"
-	echo ''
-	echo "$progname [-n|y] [-t] --clean-distfiles"
-	echo ''
-	echo "$progname [-n|y] [--index|--index-only] --clean-packages"
-	echo ''
-	echo "$progname [-n|y] [--index|--index-only] [-v] --check-depends"
-	echo ''
-	echo "$progname [-n|y] [-v] --check-port-dbdir"
-	echo ''
-	echo "$progname -h|--help"
-	echo "$progname --version"
-	echo ''
-	echo "--force-config run 'make config' for all ports (overrides -G)"
-	echo "-C prevents 'make clean' from being run before building"
-	echo "-G prevents 'make config'"
-	echo "-H hide details of the port build and install in a log file"
-	echo "-K prevents 'make clean' from being run after building"
-	echo '-B prevents creation of the backup package for the installed port'
-	echo '-b create and keep a backup package of an installed port'
-	echo '-g create a package of the new port'
-	echo '-n run through all steps, but do not make or install any ports'
-	echo '-t recurse dependencies thoroughly, using all-depends-list'
-	echo '-v verbose output'
-	echo '-w save old shared libraries before deinstall'
-	echo '[-R] -f always rebuild ports (overrides -i)'
-	echo '-i interactive update mode -- ask whether to rebuild ports'
-	echo '-D no cleaning of distfiles'
-	echo '-d always clean distfiles'
-	echo "-m <arguments for the 'make' command line>"
-	echo "-x <avoid building or updating ports that match this pattern>"
-	echo '   Can be specified more than once'
-	echo ''
-	echo '--no-confirm do not ask user to confirm list of ports to be'
-	echo '   installed and/or updated before proceeding'
-	echo '--no-term-title do not update the xterm title bar'
-	echo ''
-	echo '--no-index-fetch skip fetching the INDEX file'
-	echo '--index use INDEX-[7-9] exclusively to check if a port is up to date'
-	echo '--index-first use the INDEX for status, but double-check with the port'
-	echo '--index-only do not try to use /usr/ports'
-	echo ''
-	echo '--delete-build-only delete ports that are build-only dependencies'
-	echo '   after a successful run, only if installed this run'
-	echo ''
-	echo '--update-if-newer (only for multiple ports listed on command line)'
-	echo '   do not rebuild/reinstall if the installed version is up to date'
-	echo ''
-	echo '-P|--packages use packages, but build port if not available'
-	echo '-PP|--packages-only fail if no package is available'
-	echo '--packages-build use packages for all build dependencies'
-	echo '--packages-if-newer use package if newer than installed even'
-	echo '   if the package is not the latest according to the ports tree'
-	echo '--always-fetch fetch package even if it already exists locally'
-	echo '--local-packagedir=<path> where local packages can be found,'
-	echo '   will fall back to fetching if no local version exists'
-	echo '--packages-local use packages from --local-packagedir only'
-	echo '--delete-packages after installing from a package, delete it'
-	echo ''
-	echo '-a check all ports, update as necessary'
-	echo ''
-	echo '--show-work list what ports are and would be installed'
-	echo ''
-	echo '-o replace the installed port with a port from a different origin'
-	echo '[-R] -r rebuild port, and all ports that depend on it'
-	echo '-R used with -[rf] to skip ports updated on a previous run'
-	echo ''
-	echo '-l list all installed ports by category'
-	echo '-L list all installed ports by category, and search for updates'
-	echo ''
-	echo "--list-origins list directories from $pd for root and leaf ports"
-	echo ''
-	echo '[--force-config|-G] [-aftv] -F fetch distfiles only'
-	echo ''
-	echo '-n answer no to all user prompts for the features below'
-	echo '-y answer yes to all user prompts for the features below'
-	echo ''
-	echo '[-n|y] [-b] [-D|d] -e expunge one port via pkg delete, and remove its distfiles'
-	echo '[-n|y] [-b] [-D|d] -s clean out stale ports that used to be depended on'
-	echo ''
-	echo '[-t] [-n] --clean-distfiles offer to delete stale distfiles'
-	echo '[-t] -y --clean-distfiles delete stale distfiles without prompting'
-	echo '   with -t distfile is valid from any port, not just those installed'
-	echo ''
-	echo '[--index|--index-only] [-n] --clean-packages offer to delete stale packages'
-	echo '[--index|--index-only] -y --clean-packages delete without prompting'
-	echo '   --index-only is required if no ports tree is available'
-	echo ''
-	echo '[-n|y] [-v] --check-depends cross-check and update dependency info for all ports'
-	echo ''
-	echo "[-n|y] [-v] --check-port-dbdir check for stale entries in $port_dbdir"
-	echo ''
-	echo '-h|--help display this help message'
-	echo '--version display the version number'
-	echo ''
-	echo 'Please see the portmaster(8) man page for more information'
+	cat <<-EOF
+
+	Usage:
+	Common flags: [--force-config -CGHKgntvw -[B|b] -[f|i] -[D|d]]
+	    [[[--packages|-P]|[--packages-only|-PP]] | [--packages-build]]
+	    [--packages-if-newer] [--delete-build-only] [--always-fetch]
+	    [--local-packagedir=<path>] [--packages-local] [--delete-packages]
+	    [--backup-format=<fmt>] [--no-confirm] [--no-term-title] [--no-index-fetch]
+	    [--index|--index-first|--index-only] [-m <arguments for make>]
+	    [-x <glob pattern to exclude from building>]
+	$progname [Common flags] <full name of port directory in $pdb>
+	$progname [Common flags] <full path to $pd/foo/bar>
+	$progname [Common flags] <glob pattern of directories in $pdb>
+	$progname [Common flags] [--update-if-newer] Multiple full names/paths
+	         from $pdb|$pd and/or multiple globs from $pdb
+
+	$progname [Common flags] . [Use in $pd/foo/bar to build that port]
+
+	$progname [Common flags] -a
+
+	$progname --show-work [-Gv] [-m <args>] <single port, as above>
+
+	$progname [Common flags] -o <new port dir in $pd> <installed port>
+	$progname [Common flags] [-R] -r <name/glob of port directory in $pdb>
+	         (-r <port> can be specified multiple times)
+
+	$progname -l
+	$progname [--index-only [-t]] -L
+
+	$progname --list-origins
+
+	$progname [--force-config|-G] [-P|-PP] [-aftv] -F
+
+	$progname [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>
+	$progname [-n|y] [-b] [-D|d] -s
+
+	$progname [-n|y] [-t] --clean-distfiles
+
+	$progname [-n|y] [--index|--index-only] --clean-packages
+
+	$progname [-n|y] [--index|--index-only] [-v] --check-depends
+
+	$progname [-n|y] [-v] --check-port-dbdir
+
+	$progname -h|--help
+	$progname --version
+
+	--force-config run make config for all ports (overrides -G)
+	-C prevents make clean from being run before building
+	-G prevents make config
+	-H hide details of the port build and install in a log file
+	-K prevents make clean from being run after building
+	-B prevents creation of the backup package for the installed port
+	-b create and keep a backup package of an installed port
+	-g create a package of the new port
+	-n run through all steps, but do not make or install any ports
+	-t recurse dependencies thoroughly, using all-depends-list
+	-v verbose output
+	-w save old shared libraries before deinstall
+	[-R] -f always rebuild ports (overrides -i)
+	-i interactive update mode -- ask whether to rebuild ports
+	-D no cleaning of distfiles
+	-d always clean distfiles
+	-m <arguments for the make command line>
+	-x <avoid building or updating ports that match this pattern>
+	   Can be specified more than once
+
+	--no-confirm do not ask user to confirm list of ports to be
+	   installed and/or updated before proceeding
+	--no-term-title do not update the xterm title bar
+
+	--no-index-fetch skip fetching the INDEX file
+	--index use INDEX-[7-9] exclusively to check if a port is up to date
+	--index-first use the INDEX for status, but double-check with the port
+	--index-only do not try to use /usr/ports
+
+	--delete-build-only delete ports that are build-only dependencies
+	   after a successful run, only if installed this run
+
+	--update-if-newer (only for multiple ports listed on command line)
+	   do not rebuild/reinstall if the installed version is up to date
+
+	-P|--packages use packages, but build port if not available
+	-PP|--packages-only fail if no package is available
+	--packages-build use packages for all build dependencies
+	--packages-if-newer use package if newer than installed even
+	   if the package is not the latest according to the ports tree
+	--always-fetch fetch package even if it already exists locally
+	--local-packagedir=<path> where local packages can be found,
+	   will fall back to fetching if no local version exists
+	--packages-local use packages from --local-packagedir only
+	--delete-packages after installing from a package, delete it
+
+	-a check all ports, update as necessary
+
+	--show-work list what ports are and would be installed
+
+	-o replace the installed port with a port from a different origin
+	[-R] -r rebuild port, and all ports that depend on it
+	-R used with -[rf] to skip ports updated on a previous run
+
+	-l list all installed ports by category
+	-L list all installed ports by category, and search for updates
+
+	--list-origins list directories from $pd for root and leaf ports
+
+	[--force-config|-G] [-aftv] -F fetch distfiles only
+
+	-n answer no to all user prompts for the features below
+	-y answer yes to all user prompts for the features below
+
+	[-n|y] [-b] [-D|d] -e expunge one port via pkg delete, and remove its distfiles
+	[-n|y] [-b] [-D|d] -s clean out stale ports that used to be depended on
+
+	[-t] [-n] --clean-distfiles offer to delete stale distfiles
+	[-t] -y --clean-distfiles delete stale distfiles without prompting
+	   with -t distfile is valid from any port, not just those installed
+
+	[--index|--index-only] [-n] --clean-packages offer to delete stale packages
+	[--index|--index-only] -y --clean-packages delete without prompting
+	   --index-only is required if no ports tree is available
+
+	[-n|y] [-v] --check-depends cross-check and update dependency info for all ports
+
+	[-n|y] [-v] --check-port-dbdir check for stale entries in $port_dbdir
+
+	-h|--help display this help message
+	--version display the version number
+
+	Please see the portmaster(8) man page for more information
+	EOF
 	safe_exit ${1:-1}
 }
 
