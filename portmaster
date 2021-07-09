@@ -197,7 +197,7 @@ parent_exit () {
 
 		: ${PAGER:='less -e'}
 		if [ -n "$PM_NO_CONFIRM" ]; then
-			PAGER=cat ;;
+			PAGER=cat
 		fi
 		(
 		$PKG_CMD query "===>>> pkg-message for %n-%v\n%M" $DISPLAY_LIST
