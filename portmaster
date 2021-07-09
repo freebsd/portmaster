@@ -196,6 +196,9 @@ parent_exit () {
 		fi
 
 		: ${PAGER:='less -e'}
+		if [ -n "$PM_NO_CONFIRM" ]; then
+			PAGER=cat ;;
+		fi
 		(
 		$PKG_CMD query "===>>> pkg-message for %n-%v\n%M" $DISPLAY_LIST
 		echo "===>>> Done displaying pkg-message files" ; echo '' ) | $PAGER ;;
@@ -746,6 +749,7 @@ while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	G)	[ -z "$PM_FORCE_CONFIG" ] && {
 			PM_NO_MAKE_CONFIG=Gopt; ARGS="-G $ARGS"; } ;;
 	H)	HIDE_BUILD=Hopt; ARGS="-H $ARGS" ;;
+	I)	NON_INTERACTIVE=Iopt; ARGS="-I $ARGS" ;;
 	K)	DONT_POST_CLEAN=Kopt; ARGS="-K $ARGS" ;;
 	L)	LIST_PLUS=Lopt ;;
 	P)	packages_init first ;;
