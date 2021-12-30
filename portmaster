@@ -53,7 +53,7 @@ fi
 #=============== Begin functions we always want to have ===============
 
 version () {
-	echo '' ; echo "===>>> Version 3.19"
+	echo '' ; echo "===>>> Version %%PORTVERSION%%"
 }
 
 fail () {
@@ -740,7 +740,7 @@ set -- $newopts
 unset var newopts
 
 # Save switches for potential child processes
-while getopts 'BCDFGHKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDFGHIKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
