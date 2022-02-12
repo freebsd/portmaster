@@ -195,10 +195,6 @@ parent_exit () {
 			echo ''
 		fi
 
-		: ${PAGER:='less -e'}
-		if [ -n "$PM_NO_CONFIRM" ]; then
-			PAGER=cat
-		fi
 		(
 		$PKG_CMD query "===>>> pkg-message for %n-%v\n%M" $DISPLAY_LIST
 		echo "===>>> Done displaying pkg-message files" ; echo '' ) | $PAGER ;;
@@ -602,7 +598,7 @@ origin_from_pdb () {
 
 	pkgname="$1"
 	flavor=$($PKG_CMD annotate -Sq "$pkgname" flavor)
-	
+
 	if origin_flavor=$($PKG_CMD query '%o'"${flavor:+@$flavor}" "$pkgname" 2>/dev/null); then
 		match_flavor $origin_flavor $pkgname
 		return 0
@@ -855,6 +851,12 @@ if [ "$$" -eq "$PM_PARENT_PID" ]; then
 	[ -n "$PM_URB" -o -n "$UPDATE_ALL" ] && [ -n "$1" ] &&
 	    fail 'The -[ar] options are not compatible with other updates'
 
+	# Set PAGER if undefined, enforce PAGER=cat for --no-confirm case
+	: ${PAGER:='less -E'}
+	if [ -n "$PM_NO_CONFIRM" ]; then
+		PAGER=cat
+	fi
+
 	if [ -n "$PM_INDEX" ] &&
 	    [ -z "$LIST" -a -z "$LIST_ORIGINS" -a -z "$EXPUNGE" -a -z "$CLEAN_STALE" ]; then
 		if [ -z "$INDEXFILE" ]; then
@@ -1087,7 +1089,7 @@ find_moved_port () {
 		${sf}\|*) moved_npd=${moved#*\|}	# New port directory
 			moved_npd=${moved_npd%%\|*}
 			[ -n "$(flavor_part $moved_npd)" ] && moved_npd=$(match_flavor $moved_npd $iport)
-				
+
 			echo ''
 			echo "	===>>> The $sf port moved to $moved_npd"
 			echo "	===>>> Reason: ${moved##*|}"
@@ -2477,7 +2479,7 @@ dependency_check () {
 			dir=$(dir_part $d_port)
 			flavor=$(flavor_part $d_port)
 			pm_cd "$pd/$dir" || fail "Cannot cd to $dir"
-			conflicts=`FLAVOR=$flavor pm_make_b -V CONFLICTS -V CONFLICTS_BUILD -V CONFLICTS_INSTALL`	 
+			conflicts=`FLAVOR=$flavor pm_make_b -V CONFLICTS -V CONFLICTS_BUILD -V CONFLICTS_INSTALL`
 			for glob in $conflicts; do
 				confl_p=`$PKG_CMD query -g "%n-%v" $glob 2>/dev/null`
 				if [ -n "$confl_p" ]; then
