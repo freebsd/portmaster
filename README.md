@@ -21,4 +21,4 @@ Portmaster has the following features:
 
 WWW: http://portmaster.github.com
 
-IRC: #portmaster @ Freenode
+IRC: ircs://irc.libera.chat:6697/#portmaster
