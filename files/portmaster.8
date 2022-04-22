@@ -32,7 +32,7 @@
 .Nd manage your ports without external databases or languages
 .Sh SYNOPSIS
 Common Flags:
-.Op Fl -force-config CGHKgntvw [B|b] [f|i] [D|d]
+.Op Fl -force-config CGHKdgntvw [B|b] [f|i]
 .Op Sy [[--packages|-P]|[--packages-only|-PP]] | [--packages-build]
 .Op Fl -packages-if-newer
 .Op Fl -delete-build-only
@@ -98,12 +98,12 @@ and/or multiple globs from /var/db/pkg
 .Nm
 .Op Fl n|y
 .Op Fl b
-.Op Fl D|d
+.Op Fl D|d|--prompt-clean-distfiles
 .Fl e Ar name/glob of a single port directory in /var/db/pkg
 .Nm
 .Op Fl n|y
 .Op Fl b
-.Op Fl D|d
+.Op Fl D|d|--prompt-clean-distfiles
 .Fl s
 .Nm
 .Op Fl n|y
@@ -222,15 +222,20 @@ While recursing through the dependencies,
 if a port is marked IS_INTERACTIVE this will
 be flagged.
 In the absence of this notification,
-under normal circumstances the only user interaction
-required after the port starts building is to answer
-questions about the deletion of stale distfiles.
-This can be eliminated with the
+under normal circumstances no user interaction is
+required after the port starts building.
+If the
+.Fl -prompt-clean-distfiles
+is used, a question regading the deletion of stale distfiles
+will occur eaxch time a port has been built.
+The
 .Fl d
-or
+option can be used to delete stale distfiles after each
+successful upgrade of a port.
+The
 .Fl D
-options.
-.Pp
+option used to suppress the deletion of stale distfiles
+and has now been made the default.
 There are a number of
 .Fl -packages*
 options available to save the time that would normally
@@ -362,7 +367,7 @@ always rebuild ports (overrides
 .It Fl i
 interactive update mode -- ask whether to rebuild ports
 .It Fl D
-no cleaning of distfiles
+no cleaning of distfiles (this has been made the default behavior)
 .It Fl d
 always clean distfiles
 .It Fl m Ar arguments for make
@@ -508,16 +513,16 @@ fetch distfiles only
 answer no to all user prompts for the features below
 .It Fl y
 answer yes to all user prompts for the features below
-.It [-n|y] [-b] [-D|d] Fl e Ar name/glob of a single port directory in /var/db/pkg
+.It [-n|-y] [-b] [-d|-prompt-clean-distfiles] Fl e Ar name/glob of a single port directory in /var/db/pkg
 expunge a port using
-.Xr pkg-delete 8 ,
+.Xr pkg 8 Ar delete ,
 and optionally remove all distfiles.
 Calls
 .Fl s
 after it is done expunging in case removing
 the port causes a dependency to no longer be
 necessary.
-.It [-n|y] [-b] [-D|d] Fl s
+.It [-n|-y] [-b] [-D|-d|--prompt-clean-distfiles] Fl s
 clean out stale ports that used to be depended on
 .It [-t] [-n] Fl -clean-distfiles
 recurse through the installed ports to get a list
@@ -545,9 +550,9 @@ option is required if no ports tree is available.
 .Fl -clean-packages
 does the same as above, but deletes all out of date
 files without prompting.
-.It [-n|y] [-v] Fl -check-depends
+.It [-n|-y] [-v] Fl -check-depends
 cross-check and update dependency information for all ports
-.It [-n|y] [-v] Fl -check-port-dbdir
+.It [-n|-y] [-v] Fl -check-port-dbdir
 check for stale entries in
 .Pa /var/db/ports
 .It Fl h|--help
@@ -838,7 +843,7 @@ Update all ports that need updating:
 .Pp
 Update all ports that need updating, and delete stale
 distfiles after the update is done:
-.Dl "1. portmaster -aD"
+.Dl "1. portmaster -a"
 .Dl "2. portmaster --clean-distfiles"
 .Pp
 More complex tasks (please see the details for these options above):
@@ -871,8 +876,7 @@ to do a complete reinstallation of all ports:
 .Dl "   Remove both from ~/installed-port-list."
 .Dl "10. portmaster --no-confirm `cat ~/installed-port-list`"
 .Pp
-You probably want to use the -D option for the installation
-and then run --clean-distfiles [-y] again when you are done.
+You probably want to run --clean-distfiles [-y] again when you are done.
 You might also want to consider using the --force-config option
 when installing the new ports.
 .Pp
