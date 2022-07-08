@@ -3086,7 +3086,7 @@ no_valid_port () {
 	echo "===>>> Try $progname --help" ; echo '' ; safe_exit 1
 }
 
-make_target=$(target_part "$1")
+make_target=install # assume install
 post_clean_l=""
 
 # Figure out what we are going to be working on
@@ -3123,6 +3123,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 	fi
 	unset argv
 
+	make_target=$(target_part "$1")
 	[ "$make_target" != install ] && PM_MAKE_ARGS="-DDISABLE_CONFLICTS $PM_MAKE_ARGS"
 else
 	portdir="${1#$pd/}" ; portdir="${portdir%/}"
@@ -3845,7 +3846,7 @@ if [ -z "$use_package" ]; then
 	unset np_orphan
 	# Defining NO_DEPENDS ensures that we will control the installation
 	# of the depends, not bsd.port.mk.
-#	export_flavor $(flavor_part "$portdir")
+	export_flavor $(flavor_part "$portdir")
 	eval pm_make_s -DNO_DEPENDS install $port_log_args || install_failed $new_port
 else
 	[ -n "$local_package" ] && ppd=${LOCAL_PACKAGEDIR}/All
