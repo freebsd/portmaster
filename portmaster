@@ -2070,7 +2070,7 @@ fi
 if [ -n "$CLEAN_STALE" ]; then
 	[ -z "$no_del_list" ] && export no_del_list=':'
 
-	stale_ports=`$PKG_CMD query -ae '%a = 1' '%?r %n-%v' | awk '/^0 / { print \$2 }'`
+	stale_ports=`$PKG_CMD query -e '%a = 1 && %?r == 0' '%n-%v'`
 	for file in $stale_ports; do
 		iport="${file%/+REQUIRED_BY}" ; iport=${iport#$pdb/}
 
