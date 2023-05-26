@@ -1311,7 +1311,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 			get_answer_yn n "\t===>>> Delete stale file: $f"
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
-				/bin/unlink $df ;;
+				/bin/unlink "$f" ;;
 			*)	continue ;;
 			esac
 		fi
@@ -1777,7 +1777,7 @@ check_di_files () {
 	# Global: distfiles_checked
 
 	if [ -s "$DI_FILES" ]; then
-		if grep -ql ^${port_subdir}${1} $DI_FILES; then
+		if grep -Fql "^${port_subdir}${1}" $DI_FILES; then
 			distfiles_checked="${distfiles_checked}${1}:"
 			pm_v "===>>> Keeping distfile, valid for another port: $1"
 			return 0
@@ -1807,7 +1807,7 @@ find_and_delete_distfiles () {
 			distfiles_checked="${distfiles_checked}${file}:"
 			pm_v "===>>> Keeping current distfile: ${port_subdir}${file}"
 			continue ;;	# Do not delete current version
-		*)	check_di_files $file && continue
+		*)	check_di_files "$file" && continue
 
 			if [ -n "$ALWAYS_SCRUB_DISTFILES" -o -n "$delete_all" ]; then
 				echo "===>>> Deleting stale distfile: ${port_subdir}${file}"
@@ -1895,7 +1895,7 @@ delete_stale_distfiles () {
 				continue ;;	# Do not delete current version
 			esac
 
-			check_di_files $file && continue
+			check_di_files "$file" && continue
 
 			if [ -n "$ALWAYS_SCRUB_DISTFILES" -o -n "$delete_all" ]; then
 				echo "===>>> Deleting stale distfile: ${port_subdir}${file}"
@@ -1950,7 +1950,7 @@ delete_all_distfiles () {
 			[yY])	for f in $dist_list_files; do
 					if [ -f "$f" ]; then
 						echo "       Deleting ${port_subdir}${f}"
-						/bin/unlink $f
+						/bin/unlink "$f"
 					fi
 				done ;;
 			esac
