@@ -1182,9 +1182,7 @@ read_distinfos () {
 	done
 
 	# Tell safe_exit that we are done
-	pm_unlink ${DI_FILES}-e
-	sed -i -e 1s/############/%%%%%%%%%%%%/ $DI_FILES
-	pm_unlink ${DI_FILES}-e
+	sed -i "" 1s/############/%%%%%%%%%%%%/ $DI_FILES
 }
 
 read_distinfos_all () {
@@ -1220,10 +1218,20 @@ read_distinfos_all () {
 	done
 
 	# Tell safe_exit that we are done
-	pm_unlink ${DI_FILES}-e
-	sed -i -e 1s/############/%%%%%%%%%%%%/ $DI_FILES
-	pm_unlink ${DI_FILES}-e
+	sed -i "" 1s/############/%%%%%%%%%%%%/ $DI_FILES
 }
+
+di_file_complete=
+pm_wait_di_file_complete () {
+	if [ -z "$di_file_complete" ] && [ `head -1 $DI_FILES` = '############' ]; then
+		echo "===>>> Waiting for background read of distinfo files to finish"
+		while [ `head -1 $DI_FILES` = '############' ]; do
+			sleep 1
+		done
+	fi
+	di_file_complete=yes
+}
+
 
 ports_by_category () {
 	# Global: num_roots num_trunks num_branches num_leaves num_ports
@@ -1305,9 +1313,10 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 	fi
 
 	echo "===>>> Checking for stale distfiles" ; echo ''
-	for df in `find $DISTDIR -type f | sort`; do
-		f=${df#$DISTDIR}
-		if ! grep -ql ^$f $DI_FILES; then
+	pm_cd "$DISTDIR" || fail "Cannot cd to $DISTDIR"
+	for f in $(find . -type f | sed -e 's:^\./::;s: :\\?:g' | LANG=C sort); do
+		f=$(echo "$f" | sed -e 's:\\\?: :g')
+		if ! grep -Fxql "$f" $DI_FILES; then
 			get_answer_yn n "\t===>>> Delete stale file: $f"
 			case "$?" in
 			0)	echo "       Deleting $f" ; echo ''
@@ -1776,8 +1785,9 @@ find_dl_distfiles () {
 check_di_files () {
 	# Global: distfiles_checked
 
+	pm_wait_di_file_complete
 	if [ -s "$DI_FILES" ]; then
-		if grep -Fql "^${port_subdir}${1}" $DI_FILES; then
+		if grep -Fxql "${port_subdir}${1}" $DI_FILES; then
 			distfiles_checked="${distfiles_checked}${1}:"
 			pm_v "===>>> Keeping distfile, valid for another port: $1"
 			return 0
@@ -1791,6 +1801,7 @@ find_and_delete_distfiles () {
 	# Global: distfiles_checked
 	local file answer
 
+	pm_wait_di_file_complete
 	for file in ${1}*; do
 		# This generally means the pattern did not match
 		case "$file" in
@@ -1885,6 +1896,7 @@ delete_stale_distfiles () {
 	# If these two match, it means that the distfiles in the
 	# file are the current set, so do not delete them.
 	if [ ! " $dist_list_files" = "$distfiles" ]; then
+		pm_wait_di_file_complete
 		for file in $dist_list_files; do
 			[ -f "$file" ] || continue
 
