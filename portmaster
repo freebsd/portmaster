@@ -1338,15 +1338,16 @@ if [ -n "$CLEAN_PACKAGES" ]; then
 		pkg_dir=${package##*/} ; pkg_dir=${pkg_dir%\.*} ; echo ''
 
 		origin=`$PKG_CMD query -F $package "%o" 2>/dev/null` ||
-			origin=`tar -O -zxvf $package '+CONTENTS' 2>/dev/null | grep '@comment ORIGIN:'` ||
-			origin=`tar -O -zxvf $package '+MANIFEST' 2>/dev/null | grep '^origin:'` ||
+			origin=`tar -O -zxvf $package '+COMPACT_MANIFEST' 2>/dev/null |
+				    sed -ne 's/.*"origin":"\([^"]*\)".*/\1/p' && [ -n "$origin" ]` ||
 			fail "Empty origin in $package"
-		origin=${origin#@comment ORIGIN:}
-		origin=${origin#origin: }
+		flavor=`$PKG_CMD query -F $package %At=%Av 2>/dev/null | sed -ne 's/^flavor=//p'` ||
+			flavor=`tar -O -zxvf $package '+COMPACT_MANIFEST' 2>/dev/null |
+				    sed -ne 's/.*"flavor":"\([^"]*\)".*/\1/p'`
 
 		if [ -z "$PM_INDEX" ]; then
 			if pm_isdir_pd "$origin"; then
-				pm_cd $pd/$origin && port_ver=`pm_make -V PKGNAME`
+				pm_cd $pd/$origin && port_ver=`pm_make ${flavor:+FLAVOR=$flavor} -V PKGNAME`
 				[ -n "$port_ver" ] || fail "Is $pd/$origin/Makefile missing?"
 			else
 				echo "===>>> The origin for ${package##*/} ($origin) is missing"
