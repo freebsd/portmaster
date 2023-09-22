@@ -1223,7 +1223,8 @@ read_distinfos_all () {
 
 di_file_complete=
 pm_wait_di_file_complete () {
-	if [ -z "$di_file_complete" ] && [ `head -1 $DI_FILES` = '############' ]; then
+	if [ -z "$di_file_complete" ] && [ -n "$DI_FILES" ] \
+		   && [ `head -1 $DI_FILES` = '############' ]; then
 		echo "===>>> Waiting for background read of distinfo files to finish"
 		while [ `head -1 $DI_FILES` = '############' ]; do
 			sleep 1
