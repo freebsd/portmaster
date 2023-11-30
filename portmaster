@@ -1484,7 +1484,7 @@ fi
 check_state () {
 	# Global: state
 	local state_set makevars
-set -x
+
 	if egrep -ql '^(FORBIDDEN|BROKEN|IGNORE)' Makefile; then
 		[ -z "$TRY_BROKEN" ] && [ -z `pm_make -V TRYBROKEN` ] && \
 			makevars="FORBIDDEN BROKEN IGNORE" || \
