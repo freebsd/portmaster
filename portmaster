@@ -3316,7 +3316,7 @@ elif [ -n "$FETCH_ONLY" -a -n "$PM_PACKAGES" ]; then
 fi
 
 # Test for necessary privileges to actually install ports
-[ -n "$NO_ACTION" ] || [ "$($PM_SU_CMD id -u)" = 0 ] || fail "Insufficient privileges to install ports (run as root or set PM_SU_CMD)"
+[ -n "$NO_ACTION" -o -n "$FETCH_ONLY" ] || [ "$($PM_SU_CMD id -u)" = 0 ] || fail "Insufficient privileges to install ports (run as root or set PM_SU_CMD)"
 
 # Do these things first time through
 if [ -z "$PM_INDEX_ONLY" -a -z "$PM_BUILDING" -a -z "$SHOW_WORK" -a -z "$NO_ACTION" ]; then
