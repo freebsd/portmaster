@@ -446,7 +446,7 @@ usage () {
 	echo "$progname [-n|y] [-b] [-D|d] -e <name/glob of a single port in $pdb>"
 	echo "$progname [-n|y] [-b] [-D|d] -s"
 	echo ''
-	echo "$progname [-n|y] [-t] --clean-distfiles"
+	echo "$progname [-n|y] [-t] [-q] --clean-distfiles"
 	echo ''
 	echo "$progname [-n|y] [--index|--index-only] --clean-packages"
 	echo ''
@@ -509,6 +509,7 @@ usage () {
 	echo '--show-work list what ports are and would be installed'
 	echo ''
 	echo '-o replace the installed port with a port from a different origin'
+	echo '-q don'\''t list individual files when cleaning distfiles'
 	echo '[-R] -r rebuild port, and all ports that depend on it'
 	echo '-R used with -[rf] to skip ports updated on a previous run'
 	echo ''
@@ -527,8 +528,8 @@ usage () {
 	echo '[-n|y] [-b] [-D|d] -e expunge one port via pkg delete, and remove its distfiles'
 	echo '[-n|y] [-b] [-D|d] -s clean out stale ports that used to be depended on'
 	echo ''
-	echo '[-t] [-n] --clean-distfiles offer to delete stale distfiles'
-	echo '[-t] -y --clean-distfiles delete stale distfiles without prompting'
+	echo '[-t] [-n] [-q] --clean-distfiles offer to delete stale distfiles'
+	echo '[-t] [-q] -y --clean-distfiles delete stale distfiles without prompting'
 	echo '   with -t distfile is valid from any port, not just those installed'
 	echo ''
 	echo '[--index|--index-only] [-n] --clean-packages offer to delete stale packages'
@@ -738,7 +739,7 @@ set -- $newopts
 unset var newopts
 
 # Save switches for potential child processes
-while getopts 'BCDFGHIKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
+while getopts 'BCDFGHIKLPRabde:fghilm:nop:qr:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	case "${COMMAND_LINE_ARGUMENT}" in
 	B)	NO_BACKUP=Bopt; ARGS="-B $ARGS" ;;
 	C)	DONT_PRE_CLEAN=Copt; ARGS="-C $ARGS" ;;
@@ -766,6 +767,7 @@ while getopts 'BCDFGHIKLPRabde:fghilm:nop:r:stvwx:y' COMMAND_LINE_ARGUMENT ; do
 	n)	NO_ACTION=nopt; ARGS="-n $ARGS" ;;
 	o)	REPLACE_ORIGIN=oopt ;; # -o should take a parameter and $OPTARG should be assigned here
 	p)	fail 'The -p option has been deprecated' ;;
+	q)	PM_QUIET=qopt; ARGS="-q $ARGS" ;;
 	r)	PM_URB=ropt
 		if [ -d "$pdb/$OPTARG" ] && $PKG_CMD info -e $OPTARG; then
 			glob_dirs=$OPTARG
@@ -1320,7 +1322,7 @@ if [ -n "$CLEAN_DISTFILES" ]; then
 		if ! grep -Fxql "$f" $DI_FILES; then
 			get_answer_yn n "\t===>>> Delete stale file: $f"
 			case "$?" in
-			0)	echo "       Deleting $f" ; echo ''
+			0)	if [ -z "$PM_QUIET" ]; then echo "       Deleting $f" ; echo ''; fi
 				/bin/unlink "$f" ;;
 			*)	continue ;;
 			esac
