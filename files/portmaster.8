@@ -108,6 +108,7 @@ and/or multiple globs from /var/db/pkg
 .Nm
 .Op Fl n|y
 .Op Fl t
+.Op Fl q
 .Fl -clean-distfiles
 .Nm
 .Op Fl n|y
@@ -470,6 +471,8 @@ show what dependent ports are, and are not installed (implies
 do not skip ports marked as BROKEN or IGNORED and invoke the make command with -DTRYBROKEN.
 .It Fl o Ar <new port dir in /usr/ports> <installed port>
 replace the installed port with a port from a different origin
+.It Fl q
+don't list individual files when cleaning distfiles
 .It [-R] Fl r Ar name/glob of port directory in /var/db/pkg
 rebuild the specified port, and all ports that depend on it.
 The list of dependent ports is built according to origin (i.e.,
@@ -524,7 +527,7 @@ the port causes a dependency to no longer be
 necessary.
 .It [-n|-y] [-b] [-D|-d|--prompt-clean-distfiles] Fl s
 clean out stale ports that used to be depended on
-.It [-t] [-n] Fl -clean-distfiles
+.It [-t] [-n] [-q] Fl -clean-distfiles
 recurse through the installed ports to get a list
 of distinfo files,
 then recurse through all files in
@@ -536,7 +539,7 @@ With the
 .Fl t
 option a distfile is considered valid if it is in
 use by any port, not just those installed.
-.It [-t]
+.It [-t] [-q]
 .Fl y
 .Fl -clean-distfiles
 does the same as above, but deletes all files without prompting.
