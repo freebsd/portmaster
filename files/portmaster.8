@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 5, 2016
+.Dd June 17, 2025
 .Dt PORTMASTER 8
 .Os
 .Sh NAME
@@ -472,7 +472,7 @@ do not skip ports marked as BROKEN or IGNORED and invoke the make command with -
 .It Fl o Ar <new port dir in /usr/ports> <installed port>
 replace the installed port with a port from a different origin
 .It Fl q
-don't list individual files when cleaning distfiles
+do not list individual files when cleaning distfiles
 .It [-R] Fl r Ar name/glob of port directory in /var/db/pkg
 rebuild the specified port, and all ports that depend on it.
 The list of dependent ports is built according to origin (i.e.,
@@ -516,7 +516,7 @@ fetch distfiles only
 answer no to all user prompts for the features below
 .It Fl y
 answer yes to all user prompts for the features below
-.It [-n|-y] [-b] [-d|-prompt-clean-distfiles] Fl e Ar name/glob of a single port directory in /var/db/pkg
+.It [-n|-y] [-b] [-d|--prompt-clean-distfiles] Fl e Ar name/glob of a single port directory in /var/db/pkg
 expunge a port using
 .Xr pkg 8 Ar delete ,
 and optionally remove all distfiles.
