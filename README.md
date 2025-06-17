@@ -19,6 +19,6 @@ Portmaster has the following features:
   * Packages can be used for installation either exclusively, if available,
     or only for build dependencies
 
-WWW: http://portmaster.github.com
+WWW: https://portmaster.github.io/
 
 IRC: ircs://irc.libera.chat:6697/#portmaster
