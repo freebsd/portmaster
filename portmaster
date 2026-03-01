@@ -3912,13 +3912,6 @@ if [ -z "$temp" ] && pm_isdir "$LOCALBASE_COMPAT"; then
 	unset temp file files
 fi
 
-[ -z "$temp" ] && temp=`find $LOCALBASE_COMPAT -type d -empty 2>/dev/null`
-if pm_isdir "$temp"; then
-	pm_sv Deleting the empty $LOCALBASE_COMPAT
-	pm_rmdir_s $temp
-fi
-unset temp
-
 # This will serve for *delete*distfiles() as well
 [ -z "$use_package" ] && make_distfiles
 if [ -n "$distfiles" ]; then
