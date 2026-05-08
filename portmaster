@@ -1547,7 +1547,7 @@ check_for_updates () {
 	[ "$1" = 'list' -o "$1" = 'multi' ] && { nf=nonfatal; shift; }
 
 	iport=$1
-	originflavor=${2:-`origin_from_pdb $iport`} || return 0
+	originflavor=${2:-`origin_from_pdb $iport`}
 	flavor=$(flavor_part "$originflavor")
 	export_flavor $flavor
 	origin=$(dir_part "$originflavor")
@@ -1571,7 +1571,7 @@ check_for_updates () {
 		fi
 	fi
 
-	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ] && pm_isdir "$pd/$origin"; then
+	if [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" -a -n "$origin" ] && pm_isdir "$pd/$origin"; then
 		if ! pm_cd $pd/$origin; then # <se> cannot happen - see pm_isdir test above
 			if pm_islocked "$iport"; then
 				echo "	===>>> Warning: Unable to cd to $pd/$origin"
@@ -1584,7 +1584,10 @@ check_for_updates () {
 			fi
 		fi
 		port_ver=`FLAVOR=$flavor pm_make -V PKGNAME`
-		[ -z "$port_ver" ] && fail "Is $pd/$origin/Makefile missing?"
+		if [ -z "$port_ver" ]; then
+			echo "  ===>>> port directory missing for $iport"
+			return 0
+		fi
 	elif [ -z "$do_update" -a -z "$skip" -a -z "$PM_INDEX_ONLY" ]; then
 		find_moved_port $origin $iport $nf
 
