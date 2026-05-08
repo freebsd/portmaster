@@ -581,16 +581,21 @@ match_flavor () {
 	local dir="$pd/$origin"
 
 	if [ -d "$dir" ]; then
-	local IFS=' '
-	local pkgname=${iport%-*}
-	local flavors=$(pm_make -C "$dir" -V FLAVORS)
-	for flavor in $flavors; do
-		local p=$(pm_make -C "$dir" FLAVOR=$flavor -V PKGNAME)
-		if [ -n "$p" -a "${p%-*}" = "$pkgname" ]; then
-			echo "$origin@$flavor"
+		local IFS=' '
+		local pkgname=${iport%-*}
+		local flavors=$(pm_make -C "$dir" -V FLAVORS)
+		if [ -z "$flavors" ]; then
+			echo "$origin"
 			return
+		else
+			for flavor in $flavors; do
+				local p=$(pm_make -C "$dir" FLAVOR=$flavor -V PKGNAME)
+				if [ -n "$p" -a "${p%-*}" = "$pkgname" ]; then
+					echo "$origin@$flavor"
+					return
+				fi
+			done
 		fi
-	done
 	fi
 	echo "$1"	# should not be reached!
 }
