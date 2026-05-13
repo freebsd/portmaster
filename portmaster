@@ -1139,7 +1139,7 @@ find_moved_port () {
 }
 
 all_pkgs_by_origin () {
-	namesorigins=`$PKG_CMD query -e "%n !~ FreeBSD-*" -a "%n-%v %o"`
+	namesorigins=`$PKG_CMD query -e "%o !~ base/*" -a "%n-%v %o"`
 	echo "$namesorigins"
 	return
 }
@@ -1246,17 +1246,17 @@ ports_by_category () {
 	local pkg
 
 	pm_v "===>>> Sorting ports by category"
-	roots=`   $PKG_CMD query -e "%#d = 0 && %#r = 0 && %n !~ FreeBSD-*" "%n-%v"`
-	trunks=`  $PKG_CMD query -e "%#d = 0 && %#r > 0 && %n !~ FreeBSD-*" "%n-%v"`
-	branches=`$PKG_CMD query -e "%#d > 0 && %#r > 0 && %n !~ FreeBSD-*" "%n-%v"`
-	leaves=`  $PKG_CMD query -e "%#d > 0 && %#r = 0 && %n !~ FreeBSD-*" "%n-%v"`
+	roots=`   $PKG_CMD query -e "%#d = 0 && %#r = 0 && %o !~ base/*" "%n-%v"`
+	trunks=`  $PKG_CMD query -e "%#d = 0 && %#r > 0 && %o !~ base/*" "%n-%v"`
+	branches=`$PKG_CMD query -e "%#d > 0 && %#r > 0 && %o !~ base/*" "%n-%v"`
+	leaves=`  $PKG_CMD query -e "%#d > 0 && %#r = 0 && %o !~ base/*" "%n-%v"`
 
 	num_roots=$(echo    $(echo $roots    | wc -w))
 	num_trunks=$(echo   $(echo $trunks   | wc -w))
 	num_branches=$(echo $(echo $branches | wc -w))
 	num_leaves=$(echo   $(echo $leaves   | wc -w))
 
-	num_ports=$(echo $($PKG_CMD query -e '%n !~ FreeBSD-*' -a "%n-%v" | wc -w))
+	num_ports=$(echo $($PKG_CMD query -e '%o !~ base/*' -a "%n-%v" | wc -w))
 }
 
 delete_empty_dist_subdirs () {
@@ -2068,7 +2068,7 @@ if [ -n "$EXPUNGE" ]; then
 	fi
 
 	origin=`origin_from_pdb $EXPUNGE`
-	deplist=`$PKG_CMD query -e "%n !~ FreeBSD-*" "%rn-%rv" $origin`
+	deplist=`$PKG_CMD query -e "%o !~ base/*" "%rn-%rv" $origin`
 	if [ -n "$deplist" ]; then
 		echo "===>>> Warning: Ports with dependencies on ${EXPUNGE}:"
 		echo "$deplist" | sed 's/^/	/'
@@ -2096,7 +2096,7 @@ fi
 if [ -n "$CLEAN_STALE" ]; then
 	[ -z "$no_del_list" ] && export no_del_list=':'
 
-	stale_ports=`$PKG_CMD query -e '%a = 1 && %?r == 0 && %n !~ FreeBSD-*' '%n-%v'`
+	stale_ports=`$PKG_CMD query -e '%a = 1 && %?r == 0 && %o !~ base/*' '%n-%v'`
 	for file in $stale_ports; do
 		iport="${file%/+REQUIRED_BY}" ; iport=${iport#$pdb/}
 
@@ -2712,7 +2712,7 @@ urb_update () {
 			case " $PM_URB_ORIGINS" in *" $req_by_o "*) continue ;; esac
 			PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 		done <<-EOF
-		$($PKG_CMD query  -e "%n !~ FreeBSD-*" "%rn-%rv %ro" ${origin})
+		$($PKG_CMD query  -e "%o !~ base/*" "%rn-%rv %ro" ${origin})
 		EOF
 	done
 
@@ -3135,7 +3135,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 			*)	echo '' ; no_valid_port ;;
 			esac
 		done ;;
-	*)	upg_port=$($PKG_CMD query -e "%n !~ FreeBSD-*" %n-%v "$argv") ;;
+	*)	upg_port=$($PKG_CMD query -e "%o !~ base/*" %n-%v "$argv") ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
@@ -3187,7 +3187,7 @@ else
 	unset arg2
 
 	if [ -z "$ro_upg_port" ]; then
-		$PKG_CMD query -e "%n !~ FreeBSD-*" -a "%do" | grep -q "^$ro_opd$"
+		$PKG_CMD query -e "%o !~ base/*" -a "%do" | grep -q "^$ro_opd$"
 		if [ "$?" -eq 1 ]; then
 			echo ''
 			echo "===>>> The second argument to -o can be a package name,"
@@ -3234,7 +3234,7 @@ iport_from_pkgname () {
 	dir=$(dir_part $1)
 	flavor=$(flavor_part $1)
 	pkgname=$(FLAVOR=$flavor pm_make -C "$pd/$dir" -V PKGNAME) &&
-		$PKG_CMD query -e "%n !~ FreeBSD-*" "%n-%v" "${pkgname%-*}"
+		$PKG_CMD query -e "%o !~ base/*" "%n-%v" "${pkgname%-*}"
 }
 
 if [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
@@ -3790,7 +3790,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then # <se> not always true for port moved to flavored version with no version update???
 		# Delete any existing versions of the old port
-		np_orphan=`$PKG_CMD query -e "%n !~ FreeBSD-*" "%a" $ro_upg_port`
+		np_orphan=`$PKG_CMD query -e "%o !~ base/*" "%a" $ro_upg_port`
 		pm_sv "Running pkg delete for $ro_upg_port"
 		pm_pkg_delete_s $ro_upg_port
 	fi
