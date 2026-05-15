@@ -1,6 +1,8 @@
 #!/bin/sh
 
+# SPDX-License-Identifier: BSD-2-Clause
 # Copyright (c) 2005-2012 Douglas Barton, All rights reserved
+# Copyright (c) 2017-2026 Stefan Eßer <se@FreeBSD.org>
 # Please see detailed copyright below
 
 trap trap_exit INT
@@ -11,7 +13,8 @@ progcmd="$0"				# actual invocation of this program for search in ps output
 progname="${0##*/}"			# program name in messages
 program="$(realpath $0 || echo $0)"	# full path to program for recursive calls
 
-PKG_CMD="/usr/local/sbin/pkg-static"
+PKG_CMD="/usr/local/sbin/pkg-static"	# stand-alone pkg command not depending on shared libraries
+BASE_GLOB="base/*"			# pattern used to ignore pkgbase packages not built from a port
 
 # Initialize crucial values for the parent, and export them for the children
 if [ -z "$PM_PARENT_PID" ]; then
@@ -1139,7 +1142,7 @@ find_moved_port () {
 }
 
 all_pkgs_by_origin () {
-	namesorigins=`$PKG_CMD query -e "%o !~ base/*" -a "%n-%v %o"`
+	namesorigins=`$PKG_CMD query -e "%o !~ $BASE_GLOB" -a "%n-%v %o"`
 	echo "$namesorigins"
 	return
 }
@@ -1202,7 +1205,7 @@ read_distinfos_all () {
 
 	for origin in ${pd}/*/*; do
 		case "${origin#$pd/}" in
-		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS|base/*) continue ;; esac
+		Mk/*|T*|distfiles/*|packages/*|*/[Mm]akefile*|CVS/*|*/CVS|$BASE_GLOB) continue ;; esac
 
 		pm_isdir "$origin" || continue
 
@@ -1246,17 +1249,17 @@ ports_by_category () {
 	local pkg
 
 	pm_v "===>>> Sorting ports by category"
-	roots=`   $PKG_CMD query -e "%#d = 0 && %#r = 0 && %o !~ base/*" "%n-%v"`
-	trunks=`  $PKG_CMD query -e "%#d = 0 && %#r > 0 && %o !~ base/*" "%n-%v"`
-	branches=`$PKG_CMD query -e "%#d > 0 && %#r > 0 && %o !~ base/*" "%n-%v"`
-	leaves=`  $PKG_CMD query -e "%#d > 0 && %#r = 0 && %o !~ base/*" "%n-%v"`
+	roots=`   $PKG_CMD query -e "%#d = 0 && %#r = 0 && %o !~ $BASE_GLOB" "%n-%v"`
+	trunks=`  $PKG_CMD query -e "%#d = 0 && %#r > 0 && %o !~ $BASE_GLOB" "%n-%v"`
+	branches=`$PKG_CMD query -e "%#d > 0 && %#r > 0 && %o !~ $BASE_GLOB" "%n-%v"`
+	leaves=`  $PKG_CMD query -e "%#d > 0 && %#r = 0 && %o !~ $BASE_GLOB" "%n-%v"`
 
 	num_roots=$(echo    $(echo $roots    | wc -w))
 	num_trunks=$(echo   $(echo $trunks   | wc -w))
 	num_branches=$(echo $(echo $branches | wc -w))
 	num_leaves=$(echo   $(echo $leaves   | wc -w))
 
-	num_ports=$(echo $($PKG_CMD query -e '%o !~ base/*' -a "%n-%v" | wc -w))
+	num_ports=$(echo $($PKG_CMD query -e '%o !~ $BASE_GLOB' -a "%n-%v" | wc -w))
 }
 
 delete_empty_dist_subdirs () {
@@ -2068,7 +2071,7 @@ if [ -n "$EXPUNGE" ]; then
 	fi
 
 	origin=`origin_from_pdb $EXPUNGE`
-	deplist=`$PKG_CMD query -e "%o !~ base/*" "%rn-%rv" $origin`
+	deplist=`$PKG_CMD query -e "%o !~ $BASE_GLOB" "%rn-%rv" $origin`
 	if [ -n "$deplist" ]; then
 		echo "===>>> Warning: Ports with dependencies on ${EXPUNGE}:"
 		echo "$deplist" | sed 's/^/	/'
@@ -2096,7 +2099,7 @@ fi
 if [ -n "$CLEAN_STALE" ]; then
 	[ -z "$no_del_list" ] && export no_del_list=':'
 
-	stale_ports=`$PKG_CMD query -e '%a = 1 && %?r == 0 && %o !~ base/*' '%n-%v'`
+	stale_ports=`$PKG_CMD query -e '%a = 1 && %?r == 0 && %o !~ $BASE_GLOB' '%n-%v'`
 	for file in $stale_ports; do
 		iport="${file%/+REQUIRED_BY}" ; iport=${iport#$pdb/}
 
@@ -2712,7 +2715,7 @@ urb_update () {
 			case " $PM_URB_ORIGINS" in *" $req_by_o "*) continue ;; esac
 			PM_URB_LIST="${PM_URB_LIST} ${req_by}"
 		done <<-EOF
-		$($PKG_CMD query  -e "%o !~ base/*" "%rn-%rv %ro" ${origin})
+		$($PKG_CMD query  -e "%o !~ $BASE_GLOB" "%rn-%rv %ro" ${origin})
 		EOF
 	done
 
@@ -3135,7 +3138,7 @@ if [ -z "$REPLACE_ORIGIN" ]; then
 			*)	echo '' ; no_valid_port ;;
 			esac
 		done ;;
-	*)	upg_port=$($PKG_CMD query -e "%o !~ base/*" %n-%v "$argv") ;;
+	*)	upg_port=$($PKG_CMD query -e "%o !~ $BASE_GLOB" %n-%v "$argv") ;;
 	esac
 
 	if [ -z "$portdir" -a -z "$upg_port" ]; then
@@ -3187,7 +3190,7 @@ else
 	unset arg2
 
 	if [ -z "$ro_upg_port" ]; then
-		$PKG_CMD query -e "%o !~ base/*" -a "%do" | grep -q "^$ro_opd$"
+		$PKG_CMD query -e "%o !~ $BASE_GLOB" -a "%do" | grep -q "^$ro_opd$"
 		if [ "$?" -eq 1 ]; then
 			echo ''
 			echo "===>>> The second argument to -o can be a package name,"
@@ -3234,7 +3237,7 @@ iport_from_pkgname () {
 	dir=$(dir_part $1)
 	flavor=$(flavor_part $1)
 	pkgname=$(FLAVOR=$flavor pm_make -C "$pd/$dir" -V PKGNAME) &&
-		$PKG_CMD query -e "%o !~ base/*" "%n-%v" "${pkgname%-*}"
+		$PKG_CMD query -e "%o !~ $BASE_GLOB" "%n-%v" "${pkgname%-*}"
 }
 
 if [ -z "$upg_port" -a -z "$REPLACE_ORIGIN" ]; then
@@ -3790,7 +3793,7 @@ if [ -n "$upg_port" -o -n "$ro_upg_port" ] && [ -z "$FETCH_ONLY" ]; then
 
 	if [ -n "$REPLACE_ORIGIN" -a -n "$ro_upg_port" ]; then # <se> not always true for port moved to flavored version with no version update???
 		# Delete any existing versions of the old port
-		np_orphan=`$PKG_CMD query -e "%o !~ base/*" "%a" $ro_upg_port`
+		np_orphan=`$PKG_CMD query -e "%o !~ $BASE_GLOB" "%a" $ro_upg_port`
 		pm_sv "Running pkg delete for $ro_upg_port"
 		pm_pkg_delete_s $ro_upg_port
 	fi
